@@ -65,6 +65,18 @@ export default async function BookPage({ params }: { params: Params }) {
               ))}
             </p>
           )}
+          {book.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              {book.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </header>
 
         {body && (
