@@ -135,8 +135,10 @@ export async function getBingo(year: number): Promise<BingoCard | null> {
     ? (data.squares as Array<Record<string, unknown>>).map(
         (s): BingoSquare => ({
           id: typeof s.id === "string" ? s.id : "",
-          label: typeof s.label === "string" ? s.label : "",
+          title: typeof s.title === "string" ? s.title : null,
+          authors: parseStringList(s.authors),
           book: typeof s.book === "string" && s.book.length > 0 ? s.book : null,
+          done: s.done === true,
           free: s.free === true,
         }),
       )

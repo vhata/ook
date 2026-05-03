@@ -145,13 +145,13 @@ function Stars({ rating }: { rating: number }) {
 }
 
 function BingoGrid({ card }: { card: BingoCard }) {
-  const claimed = card.squares.filter((s) => s.book !== null && !s.free).length;
+  const done = card.squares.filter((s) => s.done && !s.free).length;
   const total = card.squares.filter((s) => !s.free).length;
 
   return (
     <div className="space-y-3">
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        {claimed} / {total} squares claimed
+        {done} / {total} squares done
       </p>
       <div
         className="grid gap-1.5"
@@ -168,26 +168,42 @@ function BingoGrid({ card }: { card: BingoCard }) {
 }
 
 function BingoCell({ square }: { square: BingoSquare }) {
-  const claimed = square.book !== null;
-  const free = square.free === true;
-  const placeholder = square.label.startsWith("PLACEHOLDER");
+  const free = square.free;
+  const done = square.done;
+  const titleAttr = free
+    ? "Free space"
+    : `${square.title ?? "(untitled)"}${square.authors.length ? ` — ${square.authors.join(", ")}` : ""}`;
 
   const base =
-    "aspect-square rounded-md border p-2 text-[10px] leading-tight flex flex-col justify-between overflow-hidden";
+    "aspect-square rounded-md border p-2 text-[11px] leading-tight flex flex-col justify-between overflow-hidden relative";
   const style = free
-    ? "border-zinc-300 bg-zinc-100 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-    : claimed
-      ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-      : placeholder
-        ? "border-dashed border-zinc-300 bg-white text-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-600"
-        : "border-zinc-200 bg-white text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300";
+    ? "border-zinc-300 bg-zinc-100 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 items-center justify-center"
+    : done
+      ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+      : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400";
+
+  if (free) {
+    return (
+      <div className={`${base} ${style}`} title={titleAttr}>
+        <span className="font-medium">Free</span>
+      </div>
+    );
+  }
 
   return (
-    <div className={`${base} ${style}`} title={square.label}>
-      <span className="line-clamp-3">{free ? "Free" : square.label}</span>
-      {claimed && (
-        <span className="truncate font-medium text-emerald-800 dark:text-emerald-300">
-          {square.book}
+    <div className={`${base} ${style}`} title={titleAttr}>
+      {done && (
+        <span
+          className="absolute right-1 top-1 text-amber-500"
+          aria-label="done"
+        >
+          ★
+        </span>
+      )}
+      <span className="line-clamp-3 font-medium pr-3">{square.title}</span>
+      {square.authors.length > 0 && (
+        <span className="truncate text-zinc-500 dark:text-zinc-500">
+          {square.authors[0]}
         </span>
       )}
     </div>

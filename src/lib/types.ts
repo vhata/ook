@@ -26,8 +26,10 @@ export type Book = {
 
 export type BingoSquare = {
   id: string;
-  label: string;
+  title: string | null;
+  authors: string[];
   book: string | null;
+  done: boolean;
   free: boolean;
 };
 
