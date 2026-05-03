@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getBookBySlug, isPublicVisible } from "@/lib/books";
@@ -8,6 +9,19 @@ import type { Book } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 type Params = Promise<{ slug: string }>;
+
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { slug } = await params;
+  const page = await getBookBySlug(decodeURIComponent(slug));
+  if (!page || !isPublicVisible(page.book)) {
+    return { title: "Not found" };
+  }
+  const author = page.book.authors[0] ?? null;
+  return {
+    title: author ? `${page.book.title} — ${author}` : page.book.title,
+    description: page.book.series ?? undefined,
+  };
+}
 
 export default async function BookPage({ params }: { params: Params }) {
   const { slug } = await params;
@@ -36,6 +50,21 @@ export default async function BookPage({ params }: { params: Params }) {
           )}
           {book.series && <p className="text-sm text-zinc-500 dark:text-zinc-500">{book.series}</p>}
           <BookMeta book={book} />
+          {book.bingoSquares.length > 0 && (
+            <p className="pt-1 text-sm text-zinc-500 dark:text-zinc-500">
+              On the{" "}
+              <Link href="/#bingo" className="underline underline-offset-2">
+                2026 bingo card
+              </Link>
+              {" — "}
+              {book.bingoSquares.map((id, i) => (
+                <span key={id} className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
+                  {i > 0 && ", "}
+                  {id}
+                </span>
+              ))}
+            </p>
+          )}
         </header>
 
         {body && (

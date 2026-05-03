@@ -44,7 +44,7 @@ export default async function Home() {
           )}
         </Section>
 
-        <Section title={bingo ? bingo.title : "Bingo"} empty="No bingo card found.">
+        <Section title={bingo ? bingo.title : "Bingo"} empty="No bingo card found." id="bingo">
           {bingo && <BingoGrid card={bingo} />}
         </Section>
 
@@ -69,10 +69,12 @@ function TbrBody({ tbr }: { tbr: Tbr }) {
 function Section({
   title,
   empty,
+  id,
   children,
 }: {
   title: string;
   empty: string;
+  id?: string;
   children: React.ReactNode;
 }) {
   const hasContent =
@@ -82,7 +84,7 @@ function Section({
     !(Array.isArray(children) && children.length === 0);
 
   return (
-    <section className="space-y-4">
+    <section id={id} className="space-y-4 scroll-mt-8">
       <h2 className="text-sm font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
         {title}
       </h2>
