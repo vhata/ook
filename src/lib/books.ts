@@ -134,7 +134,14 @@ async function readBookDir(slug: string): Promise<Book | null> {
 }
 
 export async function getAllBooks(): Promise<Book[]> {
-  const entries = await fs.readdir(booksDir(), { withFileTypes: true });
+  let entries;
+  try {
+    entries = await fs.readdir(booksDir(), { withFileTypes: true });
+  } catch {
+    // Vault dir missing (e.g. fresh production deploy without the key wired
+    // up yet). Return empty so the site renders an empty-state instead of 500.
+    return [];
+  }
   const slugs = entries
     .filter((e) => e.isDirectory() && e.name !== META_DIR && !e.name.startsWith("."))
     .map((e) => e.name);
