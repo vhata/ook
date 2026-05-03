@@ -1,26 +1,38 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Source_Serif_4, Inter_Tight, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const serif = Source_Serif_4({
+  variable: "--font-serif",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const sans = Inter_Tight({
+  variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const mono = IBM_Plex_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "ook — a reading log",
+    default: "ook — a reading journal",
     template: "%s · ook",
   },
-  description: "What I'm reading, what I've read, and the bingo card I'm chasing.",
+  description: "What I'm reading, what I've finished, and the bingo card I'm chasing.",
   openGraph: {
-    title: "ook — a reading log",
-    description: "What I'm reading, what I've read, and the bingo card I'm chasing.",
+    title: "ook — a reading journal",
+    description: "What I'm reading, what I've finished, and the bingo card I'm chasing.",
     type: "website",
   },
 };
@@ -31,18 +43,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+    <html
+      lang="en"
+      className={`${serif.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
+    >
+      <body className="bg-bg text-ink font-sans flex min-h-full flex-col">
         <div className="flex-1">{children}</div>
-        <footer className="border-t border-zinc-200 bg-zinc-50 py-6 text-center text-xs text-zinc-500 dark:border-zinc-900 dark:bg-zinc-950 dark:text-zinc-500">
+        <footer className="border-rule text-ink-soft border-t py-6 text-center text-xs">
           <p>
             <a
               href="https://github.com/vhata/ook"
-              className="underline underline-offset-2 hover:text-zinc-700 dark:hover:text-zinc-300"
+              className="hover:text-ink underline underline-offset-2"
             >
               ook
             </a>
-            {" · "}rendered from a markdown vault
+            {" · "}built from a markdown vault
           </p>
         </footer>
       </body>

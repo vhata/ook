@@ -1,26 +1,92 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Theme — paper-and-ink light, charcoal dark, rust accent.
+   Tokens come straight from Claude Design's D3 palette. */
+
+:root,
+html[data-theme="light"] {
+  --bg: #faf7f1;
+  --bg-raised: #fffdf7;
+  --surface: #ffffff;
+  --surface-mute: #f1ecdf;
+  --ink: #1c1b18;
+  --ink-soft: #6b665d;
+  --ink-dim: #9a9489;
+  --rule: #e3dccb;
+  --rule-soft: #efe9d8;
+  --accent: #a3402a; /* rust */
+  --accent-soft: #a3402a1a;
+  --star: #a3792a;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html[data-theme="dark"] {
+  --bg: #0d1014;
+  --bg-raised: #11151a;
+  --surface: #161b21;
+  --surface-mute: #1c2128;
+  --ink: #eae5db;
+  --ink-soft: #9a958c;
+  --ink-dim: #6f6a62;
+  --rule: #262c34;
+  --rule-soft: #1f242b;
+  --accent: #d97757; /* rust dark */
+  --accent-soft: #d9775733;
+  --star: #d8b066;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  html:not([data-theme]) {
+    --bg: #0d1014;
+    --bg-raised: #11151a;
+    --surface: #161b21;
+    --surface-mute: #1c2128;
+    --ink: #eae5db;
+    --ink-soft: #9a958c;
+    --ink-dim: #6f6a62;
+    --rule: #262c34;
+    --rule-soft: #1f242b;
+    --accent: #d97757;
+    --accent-soft: #d9775733;
+    --star: #d8b066;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-raised: var(--bg-raised);
+  --color-surface: var(--surface);
+  --color-surface-mute: var(--surface-mute);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-dim: var(--ink-dim);
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-star: var(--star);
+  --font-serif: var(--font-serif);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+@keyframes ook-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+/* Selection in the rust accent */
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
 }
