@@ -149,14 +149,14 @@ function StatsStrip({
   const done = bingo ? bingo.squares.filter((s) => s.done && !s.free).length : 0;
   const total = bingo ? bingo.squares.filter((s) => !s.free).length : 0;
   return (
-    <section className="bg-surface border-rule mb-12 grid grid-cols-2 rounded border md:grid-cols-4">
-      <Stat label="Currently reading" value={String(reading)} />
-      <Stat label="Recently finished" value={String(finished)} />
-      <Stat label="Bingo squares" value={bingo ? `${done} / ${total}` : "—"} />
+    <section className="bg-surface border-rule mb-10 grid grid-cols-2 rounded border md:mb-12 md:grid-cols-4">
+      <Stat label="Reading" longLabel="Currently reading" value={String(reading)} />
+      <Stat label="Finished" longLabel="Recently finished" value={String(finished)} />
+      <Stat label="Bingo" value={bingo ? `${done} / ${total}` : "—"} />
       <Stat
         label="Status"
         value={editor ? "editor" : "public"}
-        hint={editor ? "private books visible" : "private hidden"}
+        hint={editor ? "private visible" : "private hidden"}
         accent
       />
     </section>
@@ -165,24 +165,29 @@ function StatsStrip({
 
 function Stat({
   label,
+  longLabel,
   value,
   hint,
   accent,
 }: {
   label: string;
+  longLabel?: string;
   value: string;
   hint?: string;
   accent?: boolean;
 }) {
   return (
-    <div className="border-rule border-r p-5 last:border-r-0">
-      <div className="text-ink-soft mb-2 text-[11px] tracking-[0.14em] uppercase">{label}</div>
+    <div className="border-rule border-r p-4 last:border-r-0 md:p-5 [&:nth-child(2)]:border-r-0 md:[&:nth-child(2)]:border-r [&:nth-child(2)]:border-b-0 [&:nth-child(1)]:border-b [&:nth-child(2)]:border-b">
+      <div className="text-ink-soft mb-1.5 text-[10px] tracking-[0.14em] uppercase md:text-[11px]">
+        <span className="md:hidden">{label}</span>
+        <span className="hidden md:inline">{longLabel ?? label}</span>
+      </div>
       <div
-        className={`font-serif mb-1 text-[28px] leading-none font-medium tracking-[-0.015em] ${accent ? "text-accent" : "text-ink"}`}
+        className={`font-serif mb-0.5 text-[22px] leading-none font-medium tracking-[-0.015em] md:mb-1 md:text-[28px] ${accent ? "text-accent" : "text-ink"}`}
       >
         {value}
       </div>
-      {hint && <div className="text-ink-soft text-xs">{hint}</div>}
+      {hint && <div className="text-ink-soft text-[11px] md:text-xs">{hint}</div>}
     </div>
   );
 }
@@ -223,17 +228,19 @@ function CurrentCard({ book, editor }: { book: Book; editor: boolean }) {
   return (
     <Link
       href={hrefFor(book.slug, editor)}
-      className="bg-surface border-rule hover:border-accent block rounded-md border p-7 transition-colors"
+      className="bg-surface border-rule hover:border-accent block rounded-md border p-5 transition-colors sm:p-7"
     >
-      <div className="flex flex-col gap-7 sm:flex-row">
-        <Cover
-          src={book.cover}
-          title={book.title}
-          width={120}
-          height={180}
-          hatched={!book.public && editor}
-        />
-        <div className="flex-1">
+      <div className="flex flex-col gap-5 sm:flex-row sm:gap-7">
+        <div className="self-start">
+          <Cover
+            src={book.cover}
+            title={book.title}
+            width={96}
+            height={144}
+            hatched={!book.public && editor}
+          />
+        </div>
+        <div className="min-w-0 flex-1">
           <div className="text-accent mb-3 flex items-center gap-2 text-[11px] tracking-[0.14em] uppercase">
             <span
               className="bg-accent inline-block h-2 w-2 rounded-full"
@@ -246,13 +253,15 @@ function CurrentCard({ book, editor }: { book: Book; editor: boolean }) {
               </span>
             )}
           </div>
-          <h3 className="font-serif m-0 text-[36px] leading-[1.05] font-medium tracking-[-0.022em]">
+          <h3 className="font-serif m-0 text-[24px] leading-[1.1] font-medium tracking-[-0.022em] break-words sm:text-[36px] sm:leading-[1.05]">
             {book.title}
           </h3>
-          <div className="text-ink-soft mt-1 text-[16px]">{book.authors.join(", ")}</div>
+          <div className="text-ink-soft mt-1 text-[14px] sm:text-[16px]">
+            {book.authors.join(", ")}
+          </div>
           {book.progress && (
-            <div className="border-rule text-ink mt-5 border-t pt-4 text-[14px] leading-[1.5]">
-              <div className="text-ink-soft mb-1.5 text-[10px] tracking-[0.16em] uppercase">
+            <div className="border-rule text-ink mt-4 border-t pt-3.5 text-[13px] leading-[1.5] sm:text-[14px]">
+              <div className="text-ink-soft mb-1 text-[10px] tracking-[0.16em] uppercase">
                 Last note
                 {book.lastEdited && ` · ${book.lastEdited}`}
               </div>
@@ -277,28 +286,36 @@ function FinishedCard({ book, editor }: { book: Book; editor: boolean }) {
       href={hrefFor(book.slug, editor)}
       className="bg-surface border-rule hover:border-ink relative block rounded-md border p-4 transition-all hover:-translate-y-0.5"
     >
-      <div className="relative mb-3 w-full" style={{ aspectRatio: "0.78 / 1" }}>
-        <Cover
-          src={book.cover}
-          title={book.title}
-          width="100%"
-          height="100%"
-          hatched={!book.public && editor}
-        />
-      </div>
-      <div className="text-star mb-2 flex items-center gap-1.5 text-[10px] tracking-[0.16em] uppercase">
-        <span>★</span>
-        <span>Finished{book.finished ? ` ${book.finished}` : ""}</span>
-      </div>
-      <h3 className="font-serif m-0 text-[20px] leading-tight font-medium tracking-[-0.015em]">
-        {book.title}
-      </h3>
-      <div className="text-ink-soft mt-1 text-[13px]">{book.authors.join(", ")}</div>
-      {book.series && (
-        <div className="border-rule text-ink-soft mt-3 border-t pt-3 text-[11px] leading-[1.5] italic">
-          {book.series}
+      {/* Mobile: cover left, info right. Desktop: cover top, info below. */}
+      <div className="flex gap-4 sm:block">
+        <div
+          className="relative w-20 shrink-0 sm:mb-3 sm:w-full"
+          style={{ aspectRatio: "0.78 / 1" }}
+        >
+          <Cover
+            src={book.cover}
+            title={book.title}
+            width="100%"
+            height="100%"
+            hatched={!book.public && editor}
+          />
         </div>
-      )}
+        <div className="min-w-0 flex-1">
+          <div className="text-star mb-2 flex items-center gap-1.5 text-[10px] tracking-[0.16em] uppercase">
+            <span>★</span>
+            <span>Finished{book.finished ? ` ${book.finished}` : ""}</span>
+          </div>
+          <h3 className="font-serif m-0 text-[18px] leading-tight font-medium tracking-[-0.015em] sm:text-[20px]">
+            {book.title}
+          </h3>
+          <div className="text-ink-soft mt-1 text-[13px]">{book.authors.join(", ")}</div>
+          {book.series && (
+            <div className="border-rule text-ink-soft mt-3 border-t pt-3 text-[11px] leading-[1.5] italic">
+              {book.series}
+            </div>
+          )}
+        </div>
+      </div>
     </Link>
   );
 }
@@ -313,12 +330,31 @@ function Legend({ dotClass, label }: { dotClass: string; label: string }) {
 }
 
 function BingoGrid({ card }: { card: BingoCard }) {
+  // Desktop: 5×5 grid. Mobile: scroll-snap horizontal strip with 5 rows of cells
+  // (the 5×5 shape stays sacred — viewport scrolls instead of reflowing).
   return (
-    <div className="grid grid-cols-5 gap-1.5 overflow-x-auto sm:gap-3">
-      {card.squares.map((sq) => (
-        <BingoCellEl key={sq.id} square={sq} />
-      ))}
-    </div>
+    <>
+      <div className="hidden grid-cols-5 gap-3 sm:grid">
+        {card.squares.map((sq) => (
+          <BingoCellEl key={sq.id} square={sq} />
+        ))}
+      </div>
+      <div className="-mx-6 sm:hidden">
+        <div
+          className="grid grid-flow-col grid-rows-5 gap-2 overflow-x-auto px-6 pb-3"
+          style={{ gridAutoColumns: "112px", scrollSnapType: "x mandatory" }}
+        >
+          {card.squares.map((sq) => (
+            <div key={sq.id} className="snap-start">
+              <BingoCellEl square={sq} />
+            </div>
+          ))}
+        </div>
+        <div className="text-ink-dim mt-2 px-6 text-center text-[10px] tracking-[0.14em] uppercase">
+          swipe → · 5 × 5 · {card.squares.filter((s) => s.done && !s.free).length} done
+        </div>
+      </div>
+    </>
   );
 }
 

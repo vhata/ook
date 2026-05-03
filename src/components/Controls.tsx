@@ -63,33 +63,36 @@ export default function Controls() {
   const themeLabel = theme === "dark" ? "☾ dark" : theme === "light" ? "☀ light" : "auto";
 
   return (
-    <div className="border-rule bg-bg-raised fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full border py-1 pr-1 pl-3 text-[11px] shadow-[0_4px_16px_rgba(0,0,0,0.18)]">
-      <span className="text-ink-soft tracking-[0.14em] uppercase">ook</span>
+    <div className="border-rule bg-bg-raised fixed top-3 right-3 z-50 flex items-center gap-1.5 rounded-full border py-1 pr-1 pl-2.5 text-[11px] shadow-[0_4px_16px_rgba(0,0,0,0.18)] sm:top-4 sm:right-4 sm:gap-2 sm:pl-3">
+      <span className="text-ink-soft hidden tracking-[0.14em] uppercase sm:inline">ook</span>
       <Link
         href="/log"
-        className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-3 py-1 whitespace-nowrap"
+        className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
       >
         log
       </Link>
       <button
         type="button"
         onClick={flipTheme}
-        className="border-rule text-ink hover:border-accent rounded-full border px-3 py-1 whitespace-nowrap"
+        className="border-rule text-ink hover:border-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
         title="Toggle dark/light"
+        aria-label="Toggle dark/light"
       >
-        {themeLabel}
+        <span className="hidden sm:inline">{themeLabel}</span>
+        <span className="sm:hidden">{theme === "light" ? "☀" : "☾"}</span>
       </button>
       <button
         type="button"
         onClick={flipEditor}
-        className={`rounded-full border px-3 py-1 whitespace-nowrap tracking-[0.16em] uppercase ${
+        className={`rounded-full border px-2.5 py-1 whitespace-nowrap tracking-[0.16em] uppercase sm:px-3 ${
           editor
             ? "border-accent bg-accent-soft text-accent"
             : "border-rule text-ink-soft hover:border-accent hover:text-accent"
         }`}
         title={editor ? "Hide private (public view)" : "Show private (editor mode)"}
       >
-        {editor ? "◉ editor" : "◇ public"}
+        <span className="hidden sm:inline">{editor ? "◉ editor" : "◇ public"}</span>
+        <span className="sm:hidden">{editor ? "◉" : "◇"}</span>
       </button>
     </div>
   );
