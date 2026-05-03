@@ -8,6 +8,5 @@ Flat backlog. Each entry tagged with `#area`. Done items deleted, not struck thr
 
 - Production data plumbing: how does Vercel get the (private) vault content at build time? Decide between submodule, deploy-key clone, and webhook rebuild. `#deploy #vault`
 - Cover image rendering on the bingo grid and per-book pages. Decide on source (Open Library? local cache?) before wiring. `#feature #render`
-- TBR list rendering (read from `_meta/tbr.md`, render lightly on the home page or a dedicated route). `#feature #render`
-- Re-read aspirations rendering (same source, separate section). `#feature #render`
+- TBR file currently includes long instructional prose meant for the agent ("When one moves into 'currently reading', promote it…"). Decide whether the public site should hide that prose (a `public_body` field, an HTML comment marker, or just edit the vault to be public-friendly). `#polish #render`
 - Flesh out `ook-review` Layer 2 categories as project-specific rules emerge in `ARCHITECTURE.md`. `#review #setup`

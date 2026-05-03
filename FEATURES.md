@@ -12,4 +12,6 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ Per-book pages at `/books/[slug]` rendering body markdown plus optional review and quotes. Linked from home-page book cards and bingo cells with a known book.
 - ✓ Per-book pages respect the `public` flag in production (404 if not public). Local dev shows everything; `OOK_SHOW_PRIVATE=1` reveals private books on deployed builds.
 - ✓ Home-page Currently Reading and Recently Finished lists also respect the `public` flag in production.
+- ✓ TBR / Re-Read Aspirations section on the home page renders `_meta/tbr.md` body.
+- ✓ Bare YAML dates in book frontmatter (`finished: 2026-02-20`) parsed into `YYYY-MM-DD` strings, fixing recently-finished sort order.
 - ⋯ Production data plumbing (vault → Vercel build).

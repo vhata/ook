@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
-import type { Book, BookStatus, BingoCard, BingoSquare } from "./types";
+import type { Book, BookStatus, BingoCard, BingoSquare, Tbr } from "./types";
 
 const META_DIR = "_meta";
 
@@ -32,7 +32,11 @@ function parseStringList(value: unknown): string[] {
 }
 
 function parseNullableString(value: unknown): string | null {
-  return typeof value === "string" && value.length > 0 ? value : null;
+  if (typeof value === "string" && value.length > 0) return value;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  return null;
 }
 
 function parseNullableBoolean(value: unknown): boolean | null {
@@ -187,4 +191,18 @@ export function isPublicVisible(book: Book): boolean {
   if (process.env.NODE_ENV !== "production") return true;
   if (process.env.OOK_SHOW_PRIVATE === "1") return true;
   return false;
+}
+
+export async function getTbr(): Promise<Tbr | null> {
+  const file = path.join(booksDir(), META_DIR, "tbr.md");
+  if (!(await fileExists(file))) return null;
+
+  const raw = await fs.readFile(file, "utf8");
+  const { data, content } = matter(raw);
+
+  return {
+    title: typeof data.title === "string" ? data.title : "To Be Read",
+    updated: parseNullableString(data.updated),
+    body: content.trim(),
+  };
 }

@@ -35,3 +35,9 @@ export type BingoCard = {
   freeSquare: "center" | null;
   squares: BingoSquare[];
 };
+
+export type Tbr = {
+  title: string;
+  updated: string | null;
+  body: string;
+};

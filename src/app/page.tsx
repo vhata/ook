@@ -1,14 +1,17 @@
 import Link from "next/link";
-import { getBingo, getCurrentlyReading, getRecentlyFinished } from "@/lib/books";
-import type { Book, BingoCard, BingoSquare } from "@/lib/types";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { getBingo, getCurrentlyReading, getRecentlyFinished, getTbr } from "@/lib/books";
+import type { Book, BingoCard, BingoSquare, Tbr } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [reading, finished, bingo] = await Promise.all([
+  const [reading, finished, bingo, tbr] = await Promise.all([
     getCurrentlyReading(),
     getRecentlyFinished(5),
     getBingo(2026),
+    getTbr(),
   ]);
 
   return (
@@ -44,7 +47,21 @@ export default async function Home() {
         <Section title={bingo ? bingo.title : "Bingo"} empty="No bingo card found.">
           {bingo && <BingoGrid card={bingo} />}
         </Section>
+
+        {tbr && (
+          <Section title={tbr.title} empty="">
+            <TbrBody tbr={tbr} />
+          </Section>
+        )}
       </main>
+    </div>
+  );
+}
+
+function TbrBody({ tbr }: { tbr: Tbr }) {
+  return (
+    <div className="space-y-3 text-zinc-700 dark:text-zinc-300 [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-medium [&_h2]:text-zinc-900 dark:[&_h2]:text-zinc-100 [&_p]:leading-7 [&_ul]:list-disc [&_ul]:pl-6 [&_li]:my-1 [&_em]:text-zinc-500 dark:[&_em]:text-zinc-500">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{tbr.body}</ReactMarkdown>
     </div>
   );
 }

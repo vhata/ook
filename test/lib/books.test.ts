@@ -6,6 +6,7 @@ import {
   getBookBySlug,
   getCurrentlyReading,
   getRecentlyFinished,
+  getTbr,
   isPublicVisible,
 } from "../../src/lib/books";
 
@@ -116,6 +117,26 @@ describe("getBingo", () => {
   it("returns null for non-existent year", async () => {
     const card = await getBingo(2099);
     expect(card).toBeNull();
+  });
+});
+
+describe("getTbr", () => {
+  it("loads frontmatter and the markdown body", async () => {
+    const tbr = await getTbr();
+    expect(tbr).not.toBeNull();
+    expect(tbr?.title).toBe("To Be Read");
+    expect(tbr?.updated).toBe("2026-04-01");
+    expect(tbr?.body).toContain("## Wanted");
+    expect(tbr?.body).toContain("Old Favourite");
+  });
+});
+
+describe("YAML date frontmatter", () => {
+  it("parses bare YAML dates into YYYY-MM-DD strings", async () => {
+    const books = await getAllBooks();
+    const test = books.find((b) => b.slug === "TestBook");
+    expect(test?.started).toBe("2026-01-15");
+    expect(test?.finished).toBe("2026-02-20");
   });
 });
 
