@@ -14,4 +14,11 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ Home-page Currently Reading and Recently Finished lists also respect the `public` flag in production.
 - ✓ TBR / Re-Read Aspirations section on the home page renders `_meta/tbr.md` body.
 - ✓ Bare YAML dates in book frontmatter (`finished: 2026-02-20`) parsed into `YYYY-MM-DD` strings, fixing recently-finished sort order.
+- ✓ Per-book pages show which bingo squares the book claims, with a link back to the bingo grid.
+- ✓ Per-book pages render the book's tags as small badges.
+- ✓ Per-book document title is `<Title> — <Author> · ook`; layout title template "%s · ook".
+- ✓ Custom 404 page consistent with site styling (root + `/books/[slug]` segment variants).
+- ✓ Global footer with link back to the GitHub repo.
+- ✓ Open Graph metadata for the site title, description, and type.
+- ✓ Stats line under the home-page H1 (`N reading · M recently finished · X / Y bingo`).
 - ⋯ Production data plumbing (vault → Vercel build).
