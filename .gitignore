@@ -43,3 +43,19 @@ next-env.d.ts
 
 # local data (optional symlink to the books vault for dev — BOOKS_DIR can also be absolute)
 /books
+
+# editor / OS
+*.swp
+.idea/
+.vscode/
+
+# claude worktrees
+.claude/worktrees/
+
+# typescript build/test artefacts (beyond Next.js defaults already listed above)
+dist/
+.vite/
+.turbo/
+test-results/
+playwright-report/
+*.log
