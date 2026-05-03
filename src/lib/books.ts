@@ -21,12 +21,9 @@ const META_DIR = "_meta";
 
 function booksDir(): string {
   const dir = process.env.BOOKS_DIR;
-  if (!dir) {
-    throw new Error(
-      "BOOKS_DIR environment variable is not set. Point it at your books vault directory.",
-    );
-  }
-  return dir;
+  if (dir) return dir;
+  // Production (Vercel) default: the prebuild script clones vhata/books here.
+  return path.join(process.cwd(), ".vault");
 }
 
 const VALID_STATUSES: BookStatus[] = ["tbr", "reading", "finished", "abandoned", "paused"];
