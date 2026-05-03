@@ -17,11 +17,12 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
       <main className="mx-auto max-w-3xl px-6 py-16 sm:py-24 space-y-16">
-        <header className="space-y-2">
+        <header className="space-y-3">
           <h1 className="text-4xl font-semibold tracking-tight">ook</h1>
           <p className="text-zinc-600 dark:text-zinc-400">
             What I&rsquo;m reading, what I&rsquo;ve read, and the bingo card I&rsquo;m chasing.
           </p>
+          <Stats reading={reading.length} finished={finished.length} bingo={bingo} />
         </header>
 
         <Section title="Currently Reading" empty="Nothing on the go right now.">
@@ -63,6 +64,32 @@ function TbrBody({ tbr }: { tbr: Tbr }) {
     <div className="space-y-3 text-zinc-700 dark:text-zinc-300 [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-medium [&_h2]:text-zinc-900 dark:[&_h2]:text-zinc-100 [&_p]:leading-7 [&_ul]:list-disc [&_ul]:pl-6 [&_li]:my-1 [&_em]:text-zinc-500 dark:[&_em]:text-zinc-500">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{tbr.body}</ReactMarkdown>
     </div>
+  );
+}
+
+function Stats({
+  reading,
+  finished,
+  bingo,
+}: {
+  reading: number;
+  finished: number;
+  bingo: BingoCard | null;
+}) {
+  const bits: string[] = [];
+  if (reading > 0) bits.push(`${reading} reading`);
+  if (finished > 0) bits.push(`${finished} recently finished`);
+  if (bingo) {
+    const done = bingo.squares.filter((s) => s.done && !s.free).length;
+    const total = bingo.squares.filter((s) => !s.free).length;
+    bits.push(`${done} / ${total} bingo`);
+  }
+  if (bits.length === 0) return null;
+
+  return (
+    <p className="text-xs uppercase tracking-wider text-zinc-400 dark:text-zinc-600">
+      {bits.join(" · ")}
+    </p>
   );
 }
 
