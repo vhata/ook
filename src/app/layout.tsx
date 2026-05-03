@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Source_Serif_4, Inter_Tight, IBM_Plex_Mono } from "next/font/google";
+import { Suspense } from "react";
+import Controls from "@/components/Controls";
 import "./globals.css";
 
 const serif = Source_Serif_4({
@@ -48,6 +50,9 @@ export default function RootLayout({
       className={`${serif.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="bg-bg text-ink font-sans flex min-h-full flex-col">
+        <Suspense fallback={null}>
+          <Controls />
+        </Suspense>
         <div className="flex-1">{children}</div>
         <footer className="border-rule text-ink-soft border-t py-6 text-center text-xs">
           <p>
