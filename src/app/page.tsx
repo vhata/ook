@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getBingo, getCurrentlyReading, getRecentlyFinished } from "@/lib/books";
 import type { Book, BingoCard, BingoSquare } from "@/lib/types";
 
@@ -75,34 +76,39 @@ function Section({
 
 function BookCard({ book, showProgress }: { book: Book; showProgress?: boolean }) {
   return (
-    <li className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-baseline justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="truncate font-medium">{book.title}</h3>
-          {book.authors.length > 0 && (
-            <p className="truncate text-sm text-zinc-600 dark:text-zinc-400">
-              {book.authors.join(", ")}
-            </p>
-          )}
+    <li>
+      <Link
+        href={`/books/${encodeURIComponent(book.slug)}`}
+        className="block rounded-lg border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-300 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700 dark:hover:bg-zinc-800"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate font-medium">{book.title}</h3>
+            {book.authors.length > 0 && (
+              <p className="truncate text-sm text-zinc-600 dark:text-zinc-400">
+                {book.authors.join(", ")}
+              </p>
+            )}
+          </div>
+          <Visibility isPublic={book.public} />
         </div>
-        <Visibility isPublic={book.public} />
-      </div>
 
-      {book.series && (
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">{book.series}</p>
-      )}
+        {book.series && (
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">{book.series}</p>
+        )}
 
-      {showProgress && book.progress && (
-        <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">{book.progress}</p>
-      )}
+        {showProgress && book.progress && (
+          <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">{book.progress}</p>
+        )}
 
-      {book.status === "finished" && (
-        <div className="mt-2 flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
-          {book.finished && <span>{book.finished}</span>}
-          {book.rating !== null && <Stars rating={book.rating} />}
-          {book.wouldReread === true && <span>· would re-read</span>}
-        </div>
-      )}
+        {book.status === "finished" && (
+          <div className="mt-2 flex items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
+            {book.finished && <span>{book.finished}</span>}
+            {book.rating !== null && <Stars rating={book.rating} />}
+            {book.wouldReread === true && <span>· would re-read</span>}
+          </div>
+        )}
+      </Link>
     </li>
   );
 }
@@ -177,8 +183,8 @@ function BingoCell({ square }: { square: BingoSquare }) {
     );
   }
 
-  return (
-    <div className={`${base} ${style}`} title={titleAttr}>
+  const inner = (
+    <>
       {done && (
         <span className="absolute right-1 top-1 text-amber-500" aria-label="done">
           ★
@@ -188,6 +194,24 @@ function BingoCell({ square }: { square: BingoSquare }) {
       {square.authors.length > 0 && (
         <span className="truncate text-zinc-500 dark:text-zinc-500">{square.authors[0]}</span>
       )}
+    </>
+  );
+
+  if (square.book) {
+    return (
+      <Link
+        href={`/books/${encodeURIComponent(square.book)}`}
+        className={`${base} ${style} transition-colors hover:border-amber-400 dark:hover:border-amber-700`}
+        title={titleAttr}
+      >
+        {inner}
+      </Link>
+    );
+  }
+
+  return (
+    <div className={`${base} ${style}`} title={titleAttr}>
+      {inner}
     </div>
   );
 }

@@ -146,3 +146,45 @@ export async function getBingo(year: number): Promise<BingoCard | null> {
     squares,
   };
 }
+
+export type BookPage = {
+  book: Book;
+  body: string;
+  review: string | null;
+  quotes: string | null;
+};
+
+export async function getBookBySlug(slug: string): Promise<BookPage | null> {
+  const dir = path.join(booksDir(), slug);
+  const stat = await fs.stat(dir).catch(() => null);
+  if (!stat?.isDirectory()) return null;
+
+  const refFile = path.join(dir, `${slug}.md`);
+  if (!(await fileExists(refFile))) return null;
+
+  const book = await readBookDir(slug);
+  if (!book) return null;
+
+  const raw = await fs.readFile(refFile, "utf8");
+  const { content } = matter(raw);
+
+  const [review, quotes] = await Promise.all([
+    readOptionalFile(path.join(dir, "review.md")),
+    readOptionalFile(path.join(dir, "quotes.md")),
+  ]);
+
+  return { book, body: content.trim(), review, quotes };
+}
+
+async function readOptionalFile(p: string): Promise<string | null> {
+  if (!(await fileExists(p))) return null;
+  const raw = await fs.readFile(p, "utf8");
+  return raw.trim();
+}
+
+export function isPublicVisible(book: Book): boolean {
+  if (book.public) return true;
+  if (process.env.NODE_ENV !== "production") return true;
+  if (process.env.OOK_SHOW_PRIVATE === "1") return true;
+  return false;
+}

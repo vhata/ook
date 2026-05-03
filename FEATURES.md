@@ -8,7 +8,8 @@ Legend: ✓ shipped · ⋯ in progress
 
 - ✓ Home page renders Currently Reading, Recently Finished, and the 2026 Bingo grid from the local vault path.
 - ✓ Bingo grid shows title + first author per square, with a gold star on done squares and a `N / 24 squares done` counter.
-- ✓ Public/private badge per book card (informational; render does not yet gate on it).
-- ⋯ Per-book pages.
-- ⋯ Public flag actually gates rendering.
+- ✓ Public/private badge per book card (informational on the home page; render gates per-book pages).
+- ✓ Per-book pages at `/books/[slug]` rendering body markdown plus optional review and quotes. Linked from home-page book cards and bingo cells with a known book.
+- ✓ Per-book pages respect the `public` flag in production (404 if not public). Local dev shows everything; `OOK_SHOW_PRIVATE=1` reveals private books on deployed builds.
+- ⋯ Public flag also gates the home-page list of currently-reading and recently-finished books.
 - ⋯ Production data plumbing (vault → Vercel build).
