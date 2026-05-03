@@ -11,6 +11,11 @@ would_reread: true
 public: true
 bingo_squares: [a1]
 tags: [scifi, test]
+cover: covers/test-book.svg
+pullquote:
+  text: A short, memorable line.
+  source: Ch. 5
+see_also: [PrivateBook]
 ---
 
 ## Notes
