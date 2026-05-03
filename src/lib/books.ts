@@ -103,13 +103,13 @@ export async function getAllBooks(): Promise<Book[]> {
 
 export async function getCurrentlyReading(): Promise<Book[]> {
   const all = await getAllBooks();
-  return all.filter((b) => b.status === "reading");
+  return all.filter((b) => b.status === "reading" && isPublicVisible(b));
 }
 
 export async function getRecentlyFinished(limit = 5): Promise<Book[]> {
   const all = await getAllBooks();
   return all
-    .filter((b) => b.status === "finished")
+    .filter((b) => b.status === "finished" && isPublicVisible(b))
     .sort((a, b) => {
       const aDate = a.finished ?? "0000-00-00";
       const bDate = b.finished ?? "0000-00-00";

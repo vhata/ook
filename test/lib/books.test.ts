@@ -45,14 +45,28 @@ describe("getAllBooks", () => {
 });
 
 describe("getCurrentlyReading", () => {
-  it("returns only books with status reading", async () => {
+  it("returns reading books outside production (private included)", async () => {
     const reading = await getCurrentlyReading();
     expect(reading.map((b) => b.slug)).toEqual(["PrivateBook"]);
+  });
+
+  it("hides private reading books in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("OOK_SHOW_PRIVATE", "");
+    const reading = await getCurrentlyReading();
+    expect(reading).toEqual([]);
   });
 });
 
 describe("getRecentlyFinished", () => {
   it("returns finished books sorted by finished date desc", async () => {
+    const finished = await getRecentlyFinished(5);
+    expect(finished.map((b) => b.slug)).toEqual(["TestBook"]);
+  });
+
+  it("hides private finished books in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("OOK_SHOW_PRIVATE", "");
     const finished = await getRecentlyFinished(5);
     expect(finished.map((b) => b.slug)).toEqual(["TestBook"]);
   });

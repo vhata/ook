@@ -6,7 +6,6 @@ Flat backlog. Each entry tagged with `#area`. Done items deleted, not struck thr
 
 ## Backlog
 
-- Make the public flag also gate the home-page list of currently-reading and recently-finished books. Per-book pages already gate. `#feature #privacy`
 - Production data plumbing: how does Vercel get the (private) vault content at build time? Decide between submodule, deploy-key clone, and webhook rebuild. `#deploy #vault`
 - Cover image rendering on the bingo grid and per-book pages. Decide on source (Open Library? local cache?) before wiring. `#feature #render`
 - TBR list rendering (read from `_meta/tbr.md`, render lightly on the home page or a dedicated route). `#feature #render`

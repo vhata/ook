@@ -11,5 +11,5 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ Public/private badge per book card (informational on the home page; render gates per-book pages).
 - ✓ Per-book pages at `/books/[slug]` rendering body markdown plus optional review and quotes. Linked from home-page book cards and bingo cells with a known book.
 - ✓ Per-book pages respect the `public` flag in production (404 if not public). Local dev shows everything; `OOK_SHOW_PRIVATE=1` reveals private books on deployed builds.
-- ⋯ Public flag also gates the home-page list of currently-reading and recently-finished books.
+- ✓ Home-page Currently Reading and Recently Finished lists also respect the `public` flag in production.
 - ⋯ Production data plumbing (vault → Vercel build).
