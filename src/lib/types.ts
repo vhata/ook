@@ -1,9 +1,4 @@
-export type BookStatus =
-  | "tbr"
-  | "reading"
-  | "finished"
-  | "abandoned"
-  | "paused";
+export type BookStatus = "tbr" | "reading" | "finished" | "abandoned" | "paused";
 
 export type Book = {
   slug: string;

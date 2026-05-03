@@ -15,7 +15,7 @@ Run `make` (no target) for the list.
 
 ## Living documents
 
-Four documents are updated *in the same commit as the change they describe*. A commit that alters user-observable behaviour, or that completes a tracked TODO, without touching the relevant document is a bug to be amended.
+Four documents are updated _in the same commit as the change they describe_. A commit that alters user-observable behaviour, or that completes a tracked TODO, without touching the relevant document is a bug to be amended.
 
 - **`README.md`** — what the project is, how to run it, current status, links to `SPEC.md` and `ARCHITECTURE.md` for the technically curious. Plain language. Updated when user-observable behaviour changes.
 - **`FEATURES.md`** — feature ledger, grouped by release (or milestone). Each entry one line, marked ✓ shipped or ⋯ in progress. Plain language. Updated when a feature changes status.

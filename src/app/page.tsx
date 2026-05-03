@@ -1,8 +1,4 @@
-import {
-  getBingo,
-  getCurrentlyReading,
-  getRecentlyFinished,
-} from "@/lib/books";
+import { getBingo, getCurrentlyReading, getRecentlyFinished } from "@/lib/books";
 import type { Book, BingoCard, BingoSquare } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +16,7 @@ export default async function Home() {
         <header className="space-y-2">
           <h1 className="text-4xl font-semibold tracking-tight">ook</h1>
           <p className="text-zinc-600 dark:text-zinc-400">
-            What I&rsquo;m reading, what I&rsquo;ve read, and the bingo card
-            I&rsquo;m chasing.
+            What I&rsquo;m reading, what I&rsquo;ve read, and the bingo card I&rsquo;m chasing.
           </p>
         </header>
 
@@ -73,11 +68,7 @@ function Section({
       <h2 className="text-sm font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
         {title}
       </h2>
-      {hasContent ? (
-        children
-      ) : (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">{empty}</p>
-      )}
+      {hasContent ? children : <p className="text-sm text-zinc-500 dark:text-zinc-400">{empty}</p>}
     </section>
   );
 }
@@ -98,15 +89,11 @@ function BookCard({ book, showProgress }: { book: Book; showProgress?: boolean }
       </div>
 
       {book.series && (
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-          {book.series}
-        </p>
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">{book.series}</p>
       )}
 
       {showProgress && book.progress && (
-        <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
-          {book.progress}
-        </p>
+        <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">{book.progress}</p>
       )}
 
       {book.status === "finished" && (
@@ -193,18 +180,13 @@ function BingoCell({ square }: { square: BingoSquare }) {
   return (
     <div className={`${base} ${style}`} title={titleAttr}>
       {done && (
-        <span
-          className="absolute right-1 top-1 text-amber-500"
-          aria-label="done"
-        >
+        <span className="absolute right-1 top-1 text-amber-500" aria-label="done">
           ★
         </span>
       )}
       <span className="line-clamp-3 font-medium pr-3">{square.title}</span>
       {square.authors.length > 0 && (
-        <span className="truncate text-zinc-500 dark:text-zinc-500">
-          {square.authors[0]}
-        </span>
+        <span className="truncate text-zinc-500 dark:text-zinc-500">{square.authors[0]}</span>
       )}
     </div>
   );

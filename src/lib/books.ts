@@ -15,13 +15,7 @@ function booksDir(): string {
   return dir;
 }
 
-const VALID_STATUSES: BookStatus[] = [
-  "tbr",
-  "reading",
-  "finished",
-  "abandoned",
-  "paused",
-];
+const VALID_STATUSES: BookStatus[] = ["tbr", "reading", "finished", "abandoned", "paused"];
 
 function parseStatus(value: unknown): BookStatus {
   if (typeof value === "string" && (VALID_STATUSES as string[]).includes(value)) {
