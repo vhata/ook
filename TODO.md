@@ -12,3 +12,4 @@ Flat backlog. Each entry tagged with `#area`. Done items deleted, not struck thr
 - Cover image rendering on the bingo grid and per-book pages. Decide on source (Open Library? local cache?) before wiring. `#feature #render`
 - TBR list rendering (read from `_meta/tbr.md`, render lightly on the home page or a dedicated route). `#feature #render`
 - Re-read aspirations rendering (same source, separate section). `#feature #render`
+- Flesh out `ook-review` Layer 2 categories as project-specific rules emerge in `ARCHITECTURE.md`. `#review #setup`
