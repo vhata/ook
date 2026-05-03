@@ -21,4 +21,13 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ Global footer with link back to the GitHub repo.
 - ✓ Open Graph metadata for the site title, description, and type.
 - ✓ Stats line under the home-page H1 (`N reading · M recently finished · X / Y bingo`).
+- ✓ Visual overhaul to Claude Design's D3 prototype: paper-and-ink + charcoal palette, Source Serif 4 + Inter Tight + IBM Plex Mono, rust accent, bordered stats strip, large hero "Reading now" card, finished grid with covers, bingo with id chips and per-square cover slots, TBR with sub-pile filter pills, sticky-TOC book pages with pullquote and cross-links.
+- ✓ Editor mode toggle (`?editor=1` URL flag, persisted in URL only). Replaces per-item privacy badges; hatch overlay on private covers in editor mode.
+- ✓ Theme toggle (light / dark / auto) persisted in localStorage via `useSyncExternalStore`.
+- ✓ Frontmatter extensions: `cover`, `pullquote`, `see_also`, derived `lastEdited` from git log.
+- ✓ TBR pile parser (`## Wanted`, `## Re-Read Aspirations`, etc.) into typed entries; falls back to raw markdown body when piles are empty.
+- ✓ `/log` route: reading log grouped by month, derived from each book's `started`/`finished` dates.
+- ✓ Spoiler markdown directive (`:::spoiler ... :::` via remark-directive) renders click-to-reveal blur on per-book pages.
+- ✓ Mobile responsive: bingo becomes a horizontal scroll-strip (5×5 stays sacred); finished cards stack horizontally; stats compress to 2-col with short labels; controls bar icon-only.
+- ⋯ Cover images. Frontmatter `cover` field is wired; placeholder striped art renders when no URL is set. Need a source (Open Library by ISBN13, etc.) — see TODO.
 - ⋯ Production data plumbing (vault → Vercel build).

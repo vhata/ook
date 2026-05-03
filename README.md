@@ -4,7 +4,7 @@ What I'm reading, what I've read, and the bingo card I'm chasing.
 
 ## Status
 
-Renders Currently Reading, Recently Finished, and the 2026 Bingo grid from a local vault path. Per-book pages and production data plumbing not yet wired.
+Home page (Currently Reading + Recently Finished + 2026 Book Bingo + TBR), per-book pages with sticky TOC + pullquote + spoiler-blur + cross-links, `/log` route grouped by month, and a global editor-mode toggle. Reads from a local vault path; production data plumbing (vault → Vercel) not yet wired.
 
 ## How to run
 
