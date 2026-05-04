@@ -9,7 +9,6 @@ Flat backlog. Each entry tagged with `#area`. Done items deleted, not struck thr
 ### Site / render
 
 - TBR file currently includes long instructional prose meant for the agent ("When one moves into 'currently reading', promote it…"). The pile parser correctly extracts `## Wanted` / `## Re-Read Aspirations`, but those piles are empty (no entries yet), so the home page falls back to rendering the raw markdown body. Either fill the piles with real entries or strip the instructional prose from `tbr.md`. `#polish #render`
-- Multi-year bingo support. Currently `2026` is hardcoded on the home page (`getBingo(2026)`), in the per-book "On the 2026 bingo card" copy, and in `/log` page logic. Decide on a convention (latest by filename mtime? frontmatter `current: true`?) and refactor. `#feature #render`
 - Per-book page React-component tests (would catch render regressions; needs `@testing-library/react` + `happy-dom`). `#testing`
 - Flesh out `ook-review` Layer 2 categories as project-specific rules emerge in `ARCHITECTURE.md`. `#review #setup`
 - Manual log entries from `_meta/log.md`. Currently the `/log` route derives entries from `started`/`finished` dates only. Add a parser for an optional `_meta/log.md` so non-book events (added to TBR, committed to bingo, milestone notes) appear chronologically. `#feature #log`

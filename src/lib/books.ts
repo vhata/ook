@@ -166,6 +166,53 @@ export async function getRecentlyFinished(limit = 5): Promise<Book[]> {
     .slice(0, limit);
 }
 
+// List the years for which a bingo file exists, descending. Source of truth
+// for "what cards are there" — pages call this (or `getCurrentBingoYear`)
+// rather than hardcoding a year.
+export async function getBingoYears(): Promise<number[]> {
+  const dir = path.join(booksDir(), META_DIR);
+  let entries;
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const years: number[] = [];
+  for (const e of entries) {
+    if (!e.isFile()) continue;
+    const m = /^bingo-(\d{4})\.md$/.exec(e.name);
+    if (m) years.push(Number(m[1]));
+  }
+  years.sort((a, b) => b - a);
+  return years;
+}
+
+// Highest bingo-year on disk, or null when no card exists. The "current"
+// card for the home page and bingo CTAs.
+export async function getCurrentBingoYear(): Promise<number | null> {
+  const years = await getBingoYears();
+  return years[0] ?? null;
+}
+
+// Load every bingo card on disk. Used for per-book attribution: a book may
+// claim squares on a card from a prior year, and the per-book page wants to
+// surface "2025 Bingo · X" rather than mis-labelling with the current year.
+export async function getAllBingoCards(): Promise<BingoCard[]> {
+  const years = await getBingoYears();
+  const cards = await Promise.all(years.map((y) => getBingo(y)));
+  return cards.filter((c): c is BingoCard => c !== null);
+}
+
+// Find the bingo year that references a given book slug. Returns the most
+// recent matching year, or null if the book is on no card.
+export async function findBingoYearForBook(slug: string): Promise<number | null> {
+  const cards = await getAllBingoCards();
+  for (const c of cards) {
+    if (c.squares.some((s) => s.book === slug)) return c.year;
+  }
+  return null;
+}
+
 export async function getBingo(year: number): Promise<BingoCard | null> {
   const file = path.join(booksDir(), META_DIR, `bingo-${year}.md`);
   if (!(await fileExists(file))) return null;

@@ -39,6 +39,5 @@ Live in production at https://b-ook.vercel.app. Vault (`vhata/books`) is a priva
 
 ## Open questions
 
-- **Multi-year bingo.** `2026` is hardcoded on the home page (`getBingo(2026)`), per-book bingo indicator, and `/log` page. Convention for picking the current year (latest by filename? frontmatter `current: true`?) deferred.
 - **`summary.md` content.** The convention says it's a "full-spoiler plot summary," but tier 1 puts it one click away. For books where the summary really is full-spoiler (Ra), one option is moving that content into the reference notes (tier 2) and reserving `summary.md` for tier-1 synopses. Decide as the user populates more.
 - **Manual log entries.** `/log` derives from `started`/`finished` dates only. A future `_meta/log.md` could carry non-book events ("added to TBR", "committed to bingo"). Schema not yet designed.

@@ -8,13 +8,11 @@ import { Cover } from "@/components/Cover";
 import DeepNotes from "@/components/DeepNotes";
 import RevealSection from "@/components/RevealSection";
 import Spoiler from "@/components/Spoiler";
-import { getAllBooks, getBookBySlug } from "@/lib/books";
+import { findBingoYearForBook, getAllBooks, getBookBySlug } from "@/lib/books";
 import { remarkSpoilerDirective, slugify } from "@/lib/markdown";
 import type { Book } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-const YEAR = 2026;
 
 type Params = Promise<{ slug: string }>;
 
@@ -38,7 +36,10 @@ export default async function BookPage({ params }: { params: Params }) {
 
   const { book, review, quotes } = page;
 
-  const allBooks = await getAllBooks();
+  const [allBooks, bingoYear] = await Promise.all([
+    getAllBooks(),
+    book.bingoSquares.length > 0 ? findBingoYearForBook(book.slug) : Promise.resolve(null),
+  ]);
   const seeAlso = book.seeAlso
     .map((s) => allBooks.find((b) => b.slug === s))
     .filter((b): b is Book => b !== undefined);
@@ -52,7 +53,7 @@ export default async function BookPage({ params }: { params: Params }) {
         ← back
       </Link>
 
-      <BookHeader book={book} />
+      <BookHeader book={book} bingoYear={bingoYear} />
 
       <div className="grid grid-cols-1 gap-9 md:grid-cols-[180px_1fr]">
         <Toc seeAlso={seeAlso} />
@@ -99,16 +100,17 @@ export default async function BookPage({ params }: { params: Params }) {
   );
 }
 
-function BookHeader({ book }: { book: Book }) {
+function BookHeader({ book, bingoYear }: { book: Book; bingoYear: number | null }) {
   return (
     <header className="border-rule mb-12 grid grid-cols-1 gap-8 border-b pb-8 sm:grid-cols-[180px_1fr]">
       <Cover src={book.cover} title={book.title} width={180} height={270} />
       <div className="min-w-0">
         <div className="text-ink-soft mb-4 flex flex-wrap items-center gap-2 text-[10px] tracking-[0.16em] uppercase">
-          {book.bingoSquares.length > 0 && (
+          {book.bingoSquares.length > 0 && bingoYear !== null && (
             <>
               <span>
-                {YEAR} Bingo · <span className="text-accent">{book.bingoSquares.join(", ")}</span>
+                {bingoYear} Bingo ·{" "}
+                <span className="text-accent">{book.bingoSquares.join(", ")}</span>
               </span>
               <span>·</span>
             </>

@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import path from "node:path";
 import {
+  findBingoYearForBook,
+  getAllBingoCards,
   getAllBooks,
   getBingo,
+  getBingoYears,
   getBookBySlug,
+  getCurrentBingoYear,
   getCurrentlyReading,
   getReadingLog,
   getRecentlyFinished,
@@ -105,6 +109,28 @@ describe("getBingo", () => {
   it("returns null for non-existent year", async () => {
     const card = await getBingo(2099);
     expect(card).toBeNull();
+  });
+});
+
+describe("multi-year bingo helpers", () => {
+  it("getBingoYears returns all years on disk, descending", async () => {
+    const years = await getBingoYears();
+    expect(years).toEqual([2026, 2025]);
+  });
+
+  it("getCurrentBingoYear is the most recent year on disk", async () => {
+    expect(await getCurrentBingoYear()).toBe(2026);
+  });
+
+  it("getAllBingoCards loads every card", async () => {
+    const cards = await getAllBingoCards();
+    expect(cards.map((c) => c.year).sort()).toEqual([2025, 2026]);
+  });
+
+  it("findBingoYearForBook attributes a book to its card year", async () => {
+    expect(await findBingoYearForBook("TestBook")).toBe(2026);
+    expect(await findBingoYearForBook("PrivateBook")).toBe(2025);
+    expect(await findBingoYearForBook("DoesNotExist")).toBeNull();
   });
 });
 

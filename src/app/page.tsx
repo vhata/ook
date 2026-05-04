@@ -2,12 +2,16 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Cover } from "@/components/Cover";
-import { getBingo, getCurrentlyReading, getRecentlyFinished, getTbr } from "@/lib/books";
+import {
+  getBingo,
+  getCurrentBingoYear,
+  getCurrentlyReading,
+  getRecentlyFinished,
+  getTbr,
+} from "@/lib/books";
 import type { BingoCard, BingoSquare, Book, Tbr } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-const YEAR = 2026;
 
 type SearchParams = Promise<{ pile?: string }>;
 
@@ -15,16 +19,19 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const sp = await searchParams;
   const selectedPile = typeof sp.pile === "string" ? sp.pile : "All";
 
+  const journalYear = new Date().getFullYear();
+  const bingoYear = await getCurrentBingoYear();
+
   const [reading, finished, bingo, tbr] = await Promise.all([
     getCurrentlyReading(),
     getRecentlyFinished(6),
-    getBingo(YEAR),
+    bingoYear !== null ? getBingo(bingoYear) : Promise.resolve(null),
     getTbr(),
   ]);
 
   return (
     <main className="mx-auto box-border w-full max-w-[1140px] px-6 py-12 sm:px-14 sm:pt-14 sm:pb-20">
-      <Header />
+      <Header year={journalYear} />
 
       <StatsStrip reading={reading.length} finished={finished.length} bingo={bingo} />
 
@@ -32,7 +39,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
         {reading.length === 0 ? (
           <EmptyNote>Nothing on the desk right now.</EmptyNote>
         ) : (
-          reading.map((b) => <CurrentCard key={b.slug} book={b} />)
+          reading.map((b) => <CurrentCard key={b.slug} book={b} bingoYear={bingo?.year ?? null} />)
         )}
       </Section>
 
@@ -98,12 +105,12 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   );
 }
 
-function Header() {
+function Header({ year }: { year: number }) {
   return (
     <header className="border-rule mb-10 grid grid-cols-1 items-end gap-8 border-b pb-7 sm:grid-cols-[1.4fr_1fr]">
       <div>
         <div className="text-ink-soft mb-3 text-[11px] tracking-[0.18em] uppercase">
-          A reading journal · {YEAR}
+          A reading journal · {year}
         </div>
         <h1 className="font-serif m-0 text-[72px] leading-[0.92] font-normal tracking-[-0.035em] sm:text-[96px]">
           ook<span className="text-accent">.</span>
@@ -203,7 +210,7 @@ function EmptyNote({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CurrentCard({ book }: { book: Book }) {
+function CurrentCard({ book, bingoYear }: { book: Book; bingoYear: number | null }) {
   return (
     <Link
       href={`/books/${encodeURIComponent(book.slug)}`}
@@ -236,9 +243,9 @@ function CurrentCard({ book }: { book: Book }) {
               {book.progress}
             </div>
           )}
-          {book.bingoSquares.length > 0 && (
+          {book.bingoSquares.length > 0 && bingoYear !== null && (
             <div className="text-ink-soft mt-3 text-xs">
-              On the {YEAR} bingo card —{" "}
+              On the {bingoYear} bingo card —{" "}
               <span className="text-accent font-mono">{book.bingoSquares.join(", ")}</span>
             </div>
           )}
