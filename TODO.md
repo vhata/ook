@@ -119,8 +119,6 @@ Surface your own past back to you. All vault-only.
 
 Let the site reach beyond the page-view.
 
-- **`/feed.xml` Atom feed of finished books**: subscribable. Trivial route. `#feature #feed #atom`
-- **JSON Feed at `/feed.json`**: modern cousin to RSS. `#feature #feed #json`
 - **WebSub push notification on book status flips**: niche but real, pingable subscribers. `#feature #feed #websub`
 - **Email digest, monthly self-mail**: cron + Resend, summary of "what you read, what you said." `#feature #email #digest`
 - **Per-book QR code endpoint**: at `/books/[slug]/qr.png`, usable as printable bookmark slip. `#feature #qr #per-book`

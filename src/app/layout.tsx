@@ -37,6 +37,12 @@ export const metadata: Metadata = {
     description: "What I'm reading, what I've finished, and the bingo card I'm chasing.",
     type: "website",
   },
+  alternates: {
+    types: {
+      "application/atom+xml": [{ url: "/feed.xml", title: "ook — finished books (Atom)" }],
+      "application/feed+json": [{ url: "/feed.json", title: "ook — finished books (JSON Feed)" }],
+    },
+  },
 };
 
 export default function RootLayout({
