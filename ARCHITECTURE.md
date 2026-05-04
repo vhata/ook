@@ -23,7 +23,7 @@ Live in production at https://b-ook.vercel.app. Vault (`vhata/books`) is a priva
 - **`src/lib/types.ts`** — domain types: `Book`, `BookStatus`, `BingoCard`, `BingoSquare`, `Tbr`, `LogEntry`, `Pullquote`. The TypeScript projection of the vault's frontmatter schema.
 - **`src/lib/books.ts`** — vault reader. Walks `BOOKS_DIR`, parses per-book reference files, reads `_meta/bingo-<year>.md`, `_meta/tbr.md`, and the optional `_meta/log.md` for manual log entries. Returns plain typed values; no React, no rendering. The boundary between "data on disk" and "the rest of the app".
 - **`src/lib/markdown.ts`** — markdown helpers: heading extraction for the per-book TOC, slug generation, the `:::spoiler` remark directive plugin.
-- **`src/app/`** — Next.js App Router pages (home, `/books/[slug]`, `/log`, `/api/books/[slug]/notes`). Server components only; data is read at request/build time via the vault reader.
+- **`src/app/`** — Next.js App Router pages (home, `/books/[slug]`, `/log`, `/stats`, `/stats/[year]`, `/api/books/[slug]/notes`). Server components only; data is read at request/build time via the vault reader.
 - **`src/app/api/books/[slug]/notes/route.ts`** — tier 2 endpoint. Returns the deep reference-notes markdown as JSON. Lives outside SSR so the body never appears in initial HTML.
 - **`src/components/`** — client components for tiered reveals (`RevealSection`, `DeepNotes`), inline spoiler blur (`Spoiler`), the cover image (`Cover`), and the top-right theme/log controls (`Controls`).
 - **`scripts/fetch-vault.mjs`** — prebuild step that clones `vhata/books` into `./.vault/` on the build server using `BOOKS_DEPLOY_KEY`. Local dev no-ops.

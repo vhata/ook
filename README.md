@@ -4,7 +4,7 @@ What I'm reading, what I've read, and the bingo card I'm chasing.
 
 ## Status
 
-Live at https://b-ook.vercel.app — vault data lives in private `vhata/books`, cloned at build time via deploy key + webhook redeploys on push. Home page (Currently Reading + Recently Finished + 2026 Book Bingo + TBR), per-book pages with tiered spoiler reveal (catalog always · synopsis/review/quotes one click · deep notes fetched after explicit opt-in), `/log` route grouped by month, light/dark theme toggle.
+Live at https://b-ook.vercel.app — vault data lives in private `vhata/books`, cloned at build time via deploy key + webhook redeploys on push. Home page (Currently Reading + Recently Finished + the year's Book Bingo + TBR), per-book pages with tiered spoiler reveal (catalog always · synopsis/review/quotes one click · deep notes fetched after explicit opt-in) and an outbound link row (Goodreads · Hardcover · Storygraph · Bookwyrm) for any IDs in frontmatter, `/log` route grouped by month with optional manual entries from `_meta/log.md`, `/stats/[year]` annual reading stats, light/dark theme toggle.
 
 ## How to run
 
