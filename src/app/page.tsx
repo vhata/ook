@@ -6,10 +6,11 @@ import {
   getBingo,
   getCurrentBingoYear,
   getCurrentlyReading,
+  getOnThisDay,
   getRecentlyFinished,
   getTbr,
 } from "@/lib/books";
-import type { BingoCard, BingoSquare, Book, Tbr } from "@/lib/types";
+import type { BingoCard, BingoSquare, Book, LogEntry, Tbr } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +23,12 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const journalYear = new Date().getFullYear();
   const bingoYear = await getCurrentBingoYear();
 
-  const [reading, finished, bingo, tbr] = await Promise.all([
+  const [reading, finished, bingo, tbr, onThisDay] = await Promise.all([
     getCurrentlyReading(),
     getRecentlyFinished(6),
     bingoYear !== null ? getBingo(bingoYear) : Promise.resolve(null),
     getTbr(),
+    getOnThisDay(),
   ]);
 
   return (
@@ -34,6 +36,8 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       <Header year={journalYear} />
 
       <StatsStrip reading={reading.length} finished={finished.length} bingo={bingo} />
+
+      {onThisDay.length > 0 && <OnThisDay entries={onThisDay} />}
 
       <Section title="Currently reading">
         {reading.length === 0 ? (
@@ -175,6 +179,54 @@ function Stat({
       </div>
       {hint && <div className="text-ink-soft text-[11px] md:text-xs">{hint}</div>}
     </div>
+  );
+}
+
+function OnThisDay({ entries }: { entries: LogEntry[] }) {
+  const today = new Date();
+  const monthName = today.toLocaleString("en", { month: "long", timeZone: "UTC" });
+  const day = today.getUTCDate();
+  return (
+    <section className="border-rule mb-12 rounded border border-dashed p-5 md:p-6">
+      <div className="text-ink-soft mb-3 flex items-baseline justify-between text-[10px] tracking-[0.18em] uppercase">
+        <span>On this day</span>
+        <span className="text-ink-dim">
+          past {monthName} {day}s · {entries.length}
+        </span>
+      </div>
+      <ul className="m-0 list-none space-y-2 p-0">
+        {entries.map((e, i) => (
+          <li key={i} className="flex items-baseline gap-3 text-[14px]">
+            <span className="text-ink-dim font-mono text-[11px] tracking-[0.04em]">
+              {e.date.slice(0, 4)}
+            </span>
+            <span
+              className={
+                e.kind === "finished"
+                  ? "text-star text-[10px] tracking-[0.16em] uppercase"
+                  : e.kind === "started" || e.kind === "reread"
+                    ? "text-accent text-[10px] tracking-[0.16em] uppercase"
+                    : "text-ink-soft text-[10px] tracking-[0.16em] uppercase"
+              }
+            >
+              {e.kind}
+            </span>
+            {e.title && e.slug ? (
+              <Link
+                href={`/books/${encodeURIComponent(e.slug)}`}
+                className="font-serif text-ink decoration-accent-soft hover:decoration-accent text-[15px] underline underline-offset-[3px]"
+              >
+                {e.title}
+              </Link>
+            ) : e.title ? (
+              <span className="font-serif text-ink text-[15px]">{e.title}</span>
+            ) : (
+              <span className="font-serif text-ink text-[15px]">{e.detail}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

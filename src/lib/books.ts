@@ -567,6 +567,22 @@ export async function getStatsYears(): Promise<number[]> {
   return [...years].filter((y) => Number.isFinite(y)).sort((a, b) => b - a);
 }
 
+// Reading-log entries from past years that share today's month-and-day.
+// "On this day" — finds anniversaries of starts, finishes, or manual log
+// notes from previous calendar years. Today is excluded (no point telling
+// you what you did this morning); current year past-dates are excluded
+// too — those are still "this year," not "on this day in a past year".
+export async function getOnThisDay(today: Date = new Date()): Promise<LogEntry[]> {
+  const mm = String(today.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(today.getUTCDate()).padStart(2, "0");
+  const currentYear = today.getUTCFullYear();
+  const log = await getReadingLog();
+  return log.filter((e) => {
+    const [yStr, m, d] = e.date.split("-");
+    return Number(yStr) < currentYear && m === mm && d === dd;
+  });
+}
+
 // One entry per calendar day in the year, with a count of reading events
 // (started + finished + manual log) on that day. Powers the heatmap on
 // `/stats/[year]`.

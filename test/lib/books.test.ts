@@ -12,6 +12,7 @@ import {
   getCurrentBingoYear,
   getCurrentlyReading,
   getManualLogEntries,
+  getOnThisDay,
   getReadingLog,
   getRecentlyFinished,
   getStatsYears,
@@ -383,6 +384,28 @@ describe("getYearStats", () => {
     expect(stats.averageRating).toBeNull();
     expect(stats.topTags).toEqual([]);
     expect(stats.topAuthors).toEqual([]);
+  });
+});
+
+describe("getOnThisDay", () => {
+  it("returns past-year entries that match today's MM-DD", async () => {
+    // Pretend it's 2027-02-20: TestBook finished 2026-02-20 should match.
+    const today = new Date("2027-02-20T12:00:00Z");
+    const entries = await getOnThisDay(today);
+    const slugs = entries.map((e) => `${e.date}/${e.kind}`);
+    expect(slugs).toContain("2026-02-20/finished");
+  });
+
+  it("excludes current-year matches (those are not 'past')", async () => {
+    const today = new Date("2026-02-20T12:00:00Z");
+    const entries = await getOnThisDay(today);
+    expect(entries).toHaveLength(0);
+  });
+
+  it("returns nothing when no past-year matches exist", async () => {
+    const today = new Date("2027-07-04T12:00:00Z");
+    const entries = await getOnThisDay(today);
+    expect(entries).toEqual([]);
   });
 });
 
