@@ -7,6 +7,7 @@ import {
   getCurrentBingoYear,
   getCurrentlyReading,
   getOnThisDay,
+  getRandomPullquote,
   getRecentlyFinished,
   getTbr,
 } from "@/lib/books";
@@ -23,12 +24,13 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const journalYear = new Date().getFullYear();
   const bingoYear = await getCurrentBingoYear();
 
-  const [reading, finished, bingo, tbr, onThisDay] = await Promise.all([
+  const [reading, finished, bingo, tbr, onThisDay, rotatingQuote] = await Promise.all([
     getCurrentlyReading(),
     getRecentlyFinished(6),
     bingoYear !== null ? getBingo(bingoYear) : Promise.resolve(null),
     getTbr(),
     getOnThisDay(),
+    getRandomPullquote(),
   ]);
 
   return (
@@ -36,6 +38,8 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       <Header year={journalYear} />
 
       <StatsStrip reading={reading.length} finished={finished.length} bingo={bingo} />
+
+      {rotatingQuote && <RotatingQuote quote={rotatingQuote} />}
 
       {onThisDay.length > 0 && <OnThisDay entries={onThisDay} />}
 
@@ -185,6 +189,31 @@ function Stat({
       </div>
       {hint && <div className="text-ink-soft text-[11px] md:text-xs">{hint}</div>}
     </div>
+  );
+}
+
+function RotatingQuote({
+  quote,
+}: {
+  quote: { book: Book; pullquote: NonNullable<Book["pullquote"]> };
+}) {
+  const { book, pullquote } = quote;
+  return (
+    <figure className="border-accent bg-accent-soft mb-12 rounded-r-md border-l-2 px-6 py-5">
+      <blockquote className="font-serif text-ink m-0 text-[20px] leading-[1.45] tracking-[-0.005em] italic sm:text-[22px]">
+        &ldquo;{pullquote.text}&rdquo;
+      </blockquote>
+      <figcaption className="text-ink-soft mt-3 flex flex-wrap items-baseline gap-2 text-[11px] tracking-[0.14em] uppercase">
+        <Link
+          href={`/books/${encodeURIComponent(book.slug)}`}
+          className="text-ink hover:text-accent decoration-rule hover:decoration-accent underline underline-offset-[3px]"
+        >
+          {book.title}
+        </Link>
+        {book.authors.length > 0 && <span>· {book.authors.join(", ")}</span>}
+        {pullquote.source && <span>· {pullquote.source}</span>}
+      </figcaption>
+    </figure>
   );
 }
 

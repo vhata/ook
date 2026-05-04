@@ -673,6 +673,24 @@ function scorePair(a: Book, b: Book): { score: number; reasons: ConnectionReason
   return { score, reasons };
 }
 
+// Random pullquote from any finished book that has one. The home page
+// renders this as a quiet "from the shelf" line — feels different on
+// each page-load (the route is force-dynamic), without any UI controls.
+// Returns the picked book alongside so the home page can link to it.
+export async function getRandomPullquote(): Promise<{
+  book: Book;
+  pullquote: NonNullable<Book["pullquote"]>;
+} | null> {
+  const books = await getAllBooks();
+  const candidates = books.filter(
+    (b): b is Book & { pullquote: NonNullable<Book["pullquote"]> } =>
+      b.pullquote !== null && b.status === "finished",
+  );
+  if (candidates.length === 0) return null;
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  return { book: pick, pullquote: pick.pullquote };
+}
+
 // Top-N books most similar to the given slug, by the same scoring used
 // for /discover. Excludes the book itself; null score (no signal) drops
 // out. Returns lite summaries — the per-book sidebar only renders

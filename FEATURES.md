@@ -46,3 +46,4 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ Reading-drought banner on `/log` — when the most-recent event is more than 21 days old, the page heads with a soft "X days since the last event — quiet stretch" callout.
 - ✓ Polish: breathing accent dot on the home-page masthead (4-second opacity loop, gentler than the reading-now pulse), and a redesigned 404 page across both root and per-book routes — site palette, dropped-book line-art SVG, restored typography.
 - ✓ "Threads" sidebar on per-book pages — top 3 algorithmically-similar books from `getSimilarBooks`, alongside the existing user-curated "See also" links. Each thread row shows the strongest reason (see-also · series · author · tag) and links into the full `/discover` index.
+- ✓ Rotating pullquote on the home page — random `pullquote` from any finished book that has one, surfaced as a small italic block between the stats strip and the rest of the page. Re-rolled per page-load.
