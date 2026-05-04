@@ -68,3 +68,142 @@ Source notes:
 - **Highlight overlap visualiser**: When a personal highlight overlaps (fuzzy match) with a Goodreads/Amazon popular highlight, mark it with "also highlighted by N readers." Bumps overlap matches up the pullquote suggester scoring. **Sketch:** normalise + token-set ratio > 0.85; render badge on per-book page. **Homework:** none — derived. `#feature #highlights #overlap`
 - **Public-page anti-spoiler guard for community quotes**: Filter community quotes that look like ending-spoilers before rendering on public per-book pages. Personal highlights unaffected (user has finished those). **Source:** Goodreads' optional `<spoiler>` markers + heuristic on phrases like "in the end", "finally,", "died" + agent pass on remainders. **Homework:** none — automatic. `#feature #highlights #spoilers`
 - **Punted: Storygraph / BookWyrm community quotes**: No public per-book quotes endpoints today (Storygraph is stat/recommendation-focused, BookWyrm uses ActivityPub federation per-instance). Revisit in 12 months. `#not-now #highlights`
+
+### Visual & experience (brainstormed 2026-05-03)
+
+Cosmetic and atmospheric ideas. Mostly low-stakes; pick whichever delights.
+
+- **Year-end cover mosaic**: every cover of every finished book tiled into one wall, sharable as a single image. Builds on existing `/stats/[year]`. `#feature #visual #stats`
+- **Bookspine shelf view**: SVG strip of vertical spines, scaled to actual page counts when known, sortable by colour. Aesthetic-shelf delight. Needs `pages` schema. `#feature #visual #shelf`
+- **Procedural cover for the coverless**: hand-drawn-looking abstract jacket generated from title letterforms when no real cover exists. Beats the current "no cover" placeholder. `#feature #visual #covers`
+- **Foxing & yellowing by age**: subtle CSS filter on book cards that ages by how long ago you finished. Cosmetic, optional theme. `#polish #visual`
+- **Bookmark-ribbon progress strip**: silk-ribbon-style indicator on currently-reading cards showing chapter or % progress. Needs structured progress data. `#feature #visual #currently-reading`
+- **Marginalia mode for quotes**: render quotes in the margin with hand-drawn pencil-bracket SVG instead of indented blockquotes. `#feature #visual #per-book`
+- **Page-turn micro-interaction**: animate the switch between review/quotes/synopsis tabs as a page-curl. `#polish #visual #per-book`
+- **Embossed/letterpress alternative theme**: a third theme beyond light/dark, vintage printer's aesthetic. `#feature #visual #theme`
+- **Seasonal accent palette drift**: rust → forest → slate → ochre quarterly; paper-and-ink stays constant. `#polish #visual #theme`
+- **Rating-as-wear-marks**: instead of stars, render condition (pristine for 5, dog-eared for 3, water-damaged for 1). May offend the rated. `#feature #visual #ratings`
+- **Animated "ook." breathing**: 4-second opacity loop on the rust dot in the masthead. Quiet sign-of-life. `#polish #visual #masthead`
+- **Custom 404 illustration**: dropped book, page-down, in line art on the existing 404 page. `#polish #visual #404`
+
+### Stats & introspection (brainstormed 2026-05-03)
+
+Vault-only stats; no external API needed. All extend the existing `/stats/[year]` route.
+
+- **Reading heatmap on `/stats/[year]`**: GitHub-contribution-style calendar grid coloured by event density (started, finished, progress). `#feature #stats #visual`
+- **Rating-over-time line chart**: across all finished books, plot rating; reveals taste drift, harshening, kindening. `#feature #stats`
+- **Tag overlap Sankey across years**: flows between top tags year-on-year. Reveals genre migrations. `#feature #stats #visual`
+- **First book of every year list**: a small annual ritual surfaced at `/stats`. `#feature #stats #ritual`
+- **Last book before personal milestone**: overlay log on a manually-maintained `_meta/milestones.md` (birthdays, moves, losses). Sentimental. `#feature #stats #personal`
+- **Reading drought detector**: gaps over three weeks flagged on `/log` with a wry "you went silent here" note. `#feature #stats #log`
+- **Word frequency across reviews**: what _you_ keep saying. Self-portrait. `#feature #stats #introspection`
+- **"Books I rated 5 but never re-read"**: introspection axis; needs `reread_count` schema. `#feature #stats #introspection`
+- **"You always read X before Y" pattern detection**: consecutive-finishes patterns surfaced on `/stats`. `#feature #stats`
+- **Pages-per-month chart**: contingent on `pages` frontmatter. `#feature #stats #pages`
+- **Weekday vs weekend reading split**: derived from log events. `#feature #stats`
+- **Most-annotated book signal**: quote count + review length, surfaced as a "this one stuck" badge per finished card. `#feature #stats #per-book`
+- **Series progress bars at `/series`**: "Realm of the Elderlings · 3 of 16," for every series in vault. Total count needs Open Library / Hardcover lookup. `#feature #series`
+- **Author depth chart**: per author, books-read / books-written. Denominator from Hardcover or Open Library. `#feature #stats #authors #hardcover`
+- **Reading-velocity projection**: given current `started` date and historical pace, project a finish window for currently-reading. Surface on home or per-book. `#feature #stats #currently-reading`
+
+### Discovery & wandering (brainstormed 2026-05-03)
+
+Surface your own past back to you. All vault-only.
+
+- **`/random` route**: pick a random finished book, redirect. Wikipedia-stunt joy. Twenty-line route. `#feature #route #discovery`
+- **`/discover` from vault data alone**: `see_also` chain traversal + tag-overlap recommendations, no Hardcover required. Cousin of the existing Hardcover-driven `/discover` entry. `#feature #route #discovery`
+- **Serendipity engine on home page**: surfaces a finished book you haven't touched in over a year, in a quiet sidebar. `#feature #discovery #home`
+- **"On this day" strip**: what you started/finished on this calendar day in past years, on home or `/log`. Pure derivation. `#feature #discovery #log`
+- **"Books I read while the world did X" overlay**: major news events from Wikipedia overlaid on `/log`. Provenance-marked, never asserted as causation. `#feature #discovery #log #wikipedia`
+
+### Sharing & outbound (brainstormed 2026-05-03)
+
+Let the site reach beyond the page-view.
+
+- **`/feed.xml` Atom feed of finished books**: subscribable. Trivial route. `#feature #feed #atom`
+- **JSON Feed at `/feed.json`**: modern cousin to RSS. `#feature #feed #json`
+- **WebSub push notification on book status flips**: niche but real, pingable subscribers. `#feature #feed #websub`
+- **Email digest, monthly self-mail**: cron + Resend, summary of "what you read, what you said." `#feature #email #digest`
+- **Per-book QR code endpoint**: at `/books/[slug]/qr.png`, usable as printable bookmark slip. `#feature #qr #per-book`
+- **Postcard generator at `/books/[slug]/postcard.png`**: printable "I just finished X" card with a quote. `#feature #postcard #per-book`
+- **Reply-by-email comments**: `mailto:` link on per-book pages with subject pre-filled, lands in vault inbox. `#feature #per-book #comments`
+- **ActivityPub federation of finishes to Bookwyrm/Mastodon**: heavy lift; if you join a Bookwyrm instance, ook becomes the front-end of your entry. `#feature #activitypub #bookwyrm`
+- **Embeddable "now reading" widget**: a `<script>`-includable tile for personal homepages. `#feature #embed #widget`
+
+### Capture / input (brainstormed 2026-05-03)
+
+How books arrive in the vault. Most are split between vault repo + an ook-side receiving endpoint.
+
+- **iOS Shortcut "share to ook TBR"**: share any book URL, drops a stub into the vault inbox. `#feature #capture #ios #vault`
+- **Browser extension on Amazon/Goodreads/Hardcover/Storygraph**: "add to ook TBR" button that scrapes title/author/cover. `#feature #capture #browser-ext`
+- **Email-to-vault inbox**: forward a Goodreads "Want to read" notification to a special address, importer parses and stubs. `#feature #capture #email`
+- **Voice capture endpoint**: "Hey ook, I just finished Piranesi" via Apple Shortcuts → drops a finish-stub into vault inbox. `#feature #capture #voice`
+- **Receipt OCR import**: snap a Powell's receipt, books added to TBR with provenance. `#feature #capture #ocr`
+- **Cover photo capture**: phone snap of a paperback, OCR the title, stub it. `#feature #capture #ocr`
+- **Library hold notification → TBR stub**: when a hold becomes available at your library, auto-stub. Library-specific integration. `#feature #capture #library`
+- **Apple Books / Kindle library mirror diff**: periodic diff that flags "in your devices but not in your vault." Distinct from the highlights work — this is the library, not the annotations. `#feature #capture #devices`
+
+### Cross-domain integrations (brainstormed 2026-05-03)
+
+Where reading touches the rest of life. Mostly out-of-character for a render-only site, listed for completeness.
+
+- **Slack / Discord status auto-update**: "Reading X" while currently-reading exists. `#feature #cross-domain #status`
+- **Smart-light "reading mode"**: warm light auto-on at sunset when `/now` is non-empty. Home Assistant / Hue integration. `#feature #cross-domain #lights`
+- **Pomodoro reading timer**: integrated, tracks minutes-per-session per book. `#feature #cross-domain #timer`
+- **Calendar block proposal**: starting a book of N pages? Propose a daily reading block based on pace. iCal export. `#feature #cross-domain #calendar`
+- **Spotify "soundtracks for finished books"**: manually curated or genre-matched playlists per book, surfaced on per-book page. `#feature #cross-domain #spotify`
+- **Cocktail / meal pairing per book**: the "Drinks of the Books" spinoff. Cute, deeply optional. `#feature #cross-domain #pairing`
+
+### AI-flavoured experiments (brainstormed 2026-05-03)
+
+Use sparingly. Each is a vector that can swallow the project's soul.
+
+- **Embedding-based recommender from your own corpus**: vector search across reviews + quotes; "more like this" without Hardcover. `#feature #ai #recommender`
+- **Chat with your library**: agent reads all reviews, answers introspective questions ("what do I think about female protagonists in sci-fi?"). `#feature #ai #chat`
+- **Draft-review generator**: when finishing, pre-fill a review skeleton based on your past style. `#feature #ai #review`
+- **"Imagined sequel" paragraph**: one paragraph speculating on a follow-up to a finished book. Pure novelty. `#feature #ai #per-book`
+- **Annual letter from your reading**: Claude composes a "Dear reader, here's what 2026 looked like" piece from `/log` and reviews. `#feature #ai #annual`
+- **Vector "find me the book where..."**: paste a vague memory ("the one with the labyrinth and the bird"), it finds the matching book. `#feature #ai #search`
+
+### Schema extensions (vault-side, brainstormed 2026-05-03)
+
+Vault-write work, but ook will render whatever lands. Listed here so the renderer knows what's coming.
+
+- **`read_at` location field**: coffee shop / plane / bed / beach. Surfaces a "where I read it" view. `#schema #vault`
+- **`companion_media`**: albums, films, podcasts paired with the book in your memory. Free-form list. `#schema #vault #cross-domain`
+- **`partner` field**: solo / kid / book club / read-aloud / spouse. `#schema #vault`
+- **`trigger` field**: what brought you to the book — recommendation, gift, impulse, obligation. `#schema #vault #provenance`
+- **`mood_on_finish`**: single-word emotional state when you closed the cover. `#schema #vault #introspection`
+- **`edition` field**: paperback / hardcover / UK / audio. Affects which cover _should_ render. `#schema #vault #covers`
+- **`reread_count` integer**: increments instead of overwrites when you re-read. Unlocks several stats axes. `#schema #vault #rereads`
+- **`abandoned_at_pct` field**: where you stopped on abandons. `#schema #vault #abandoned`
+- **`voice_memo` link**: URL to a 30-second audio reflection per book. `#schema #vault #audio`
+- **`if_read_earlier` field**: speculative-wistfulness reflection. `#schema #vault #introspection`
+- **`pages` frontmatter**: integer page count. Unblocks pages-read, longest-book, reading velocity, the bookspine shelf, and several stats axes. `#schema #vault #pages`
+
+### Wild & probably-doomed (brainstormed 2026-05-03)
+
+The unfiltered drawer. Strike most. Keep one.
+
+- **Time-machine view**: `?at=2026-01-15` shows the site as it would have rendered on that date, vault-history-aware. Pulls past commits of the books repo. `#wild #time-machine`
+- **`ook quiz` CLI**: flashcards on quotes from finished books. Lives in the vault repo's `bin/`. `#wild #cli #quotes`
+- **Library-card aesthetic mode**: every book gets a stamped checkout-history card view. Theme. `#wild #visual #theme`
+- **Reverse bingo archaeology**: every past book retroactively tagged with which prior bingo squares it could have filled. A guilt trip. `#wild #bingo`
+- **"Read in 2026, remember in 2032" check-in email**: at finish time, schedule a six-year-out self-mail asking if you'd re-read. `#wild #email #future`
+- **Book-as-shader**: procedural fragment shader generates a unique abstract per book from tags + rating + length. Cosmetic, mesmerising. `#wild #visual #shader`
+- **3D reading room**: every finished book a physical volume in a virtual space. Probably terrible, possibly transcendent. `#wild #3d #spatial`
+- **Meta-bingo card**: 5×5 of past bingo cards. Each cell a year's card. Click → that year. `#wild #bingo #meta`
+- **`/print/[year]` print mode**: formats year as a real-paper bibliography, mailable. `#wild #print #year`
+- **Static-export branch**: generate a fully-static archive that needs no Vercel. Posterity hedge. `#wild #posterity #static`
+- **ePub export of your reviews**: your own book, of you, by you, about you reading. `#wild #epub #archive`
+- **Postal-stamp art per book**: tiny illustrated stamp for each finished volume. `#wild #visual`
+- **Bookcrossing log**: track physical lending — "this copy is currently with Sarah." `#wild #lending`
+
+### Tooling & vault hygiene (brainstormed 2026-05-03)
+
+- **`make vault-lint` subcommand**: validate every book's frontmatter against the schema, flag missing fields, surface drift before it shows up as a render bug. Co-locates schema check with schema reader. `#tooling #vault #lint`
+- **Schema explorer page on the site**: auto-documented frontmatter schema with live examples from the vault. `#feature #docs #schema`
+- **Frontmatter migration tool**: bulk-update fields safely across all books. CLI in vault repo, but ook can render a "schema version" badge. `#tooling #vault #migration`
+- **Orphan detector**: books in vault that nothing references; broken `see_also` links. Surface inside `make vault-lint`. `#tooling #vault #lint`
+- **Tag-taxonomy / co-occurrence view**: surfaces the implicit ontology you're building in tags. `#feature #stats #tags`
+- **Diffable vault view**: what changed week-over-week, surfaced at `/changelog` or similar. `#feature #vault #diff`
