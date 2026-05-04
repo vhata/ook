@@ -27,6 +27,6 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ Spoiler markdown directive (`:::spoiler ... :::` via remark-directive) renders click-to-reveal blur on per-book pages.
 - ✓ Mobile responsive: bingo becomes a horizontal scroll-strip (5×5 stays sacred); finished cards stack horizontally; stats compress to 2-col with short labels; controls bar icon-only.
 - ✓ Open Library cover URLs in frontmatter for all bingo squares + per-book directories. Bingo cell tooltip shows "title — author" on hover.
-- ✓ Vercel deploy live at https://ook-kappa.vercel.app. Vault split into private `vhata/books` repo with deploy key + webhook on push for auto-rebuild.
-- ✓ `bin/book` Node CLI in the vault for deterministic frontmatter mutations + `book list` (with vault / bingo / Goodreads sources, filters by status, public, tag, etc.) + `book covers` (HTML grid of Open Library editions in the browser) + `book cover` (set chosen URL) + `book import-goodreads` (parse CSV, write to `_meta/goodreads.md`).
+- ✓ Vercel deploy live at https://b-ook.vercel.app. Vault split into private `vhata/books` repo with deploy key + webhook on push for auto-rebuild.
+- ✓ `bin/book` Node CLI in the vault for deterministic frontmatter mutations + `book list` (with vault / bingo / Goodreads sources, filters by status, tag, bingo, rated) + `book covers` (HTML grid of Open Library editions in the browser) + `book cover` (set chosen URL) + `book import-goodreads` (parse CSV, write to `_meta/goodreads.md`).
 - ✓ Auto-promote bingo and Goodreads-only entries to vault directories on first mutation. Verification prompt for GR-claimed status / rating / date.

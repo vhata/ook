@@ -4,7 +4,7 @@ What I'm reading, what I've read, and the bingo card I'm chasing.
 
 ## Status
 
-Home page (Currently Reading + Recently Finished + 2026 Book Bingo + TBR), per-book pages with sticky TOC + pullquote + spoiler-blur + cross-links, `/log` route grouped by month, and a global editor-mode toggle. Reads from a local vault path; production data plumbing (vault → Vercel) not yet wired.
+Live at https://b-ook.vercel.app — vault data lives in private `vhata/books`, cloned at build time via deploy key + webhook redeploys on push. Home page (Currently Reading + Recently Finished + 2026 Book Bingo + TBR), per-book pages with tiered spoiler reveal (catalog always · synopsis/review/quotes one click · deep notes fetched after explicit opt-in), `/log` route grouped by month, light/dark theme toggle.
 
 ## How to run
 
