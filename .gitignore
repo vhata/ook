@@ -43,6 +43,7 @@ next-env.d.ts
 
 # local data (optional symlink to the books vault for dev — BOOKS_DIR can also be absolute)
 /books
+/vault
 
 # vault checkout populated by scripts/fetch-vault.mjs in production builds
 /.vault
