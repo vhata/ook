@@ -2,30 +2,22 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Cover } from "@/components/Cover";
-import {
-  getBingo,
-  getCurrentlyReading,
-  getRecentlyFinished,
-  getTbr,
-  type ViewOpts,
-} from "@/lib/books";
+import { getBingo, getCurrentlyReading, getRecentlyFinished, getTbr } from "@/lib/books";
 import type { BingoCard, BingoSquare, Book, Tbr } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 const YEAR = 2026;
 
-type SearchParams = Promise<{ editor?: string; pile?: string }>;
+type SearchParams = Promise<{ pile?: string }>;
 
 export default async function Home({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
-  const editor = sp.editor === "1";
-  const opts: ViewOpts = { editor };
   const selectedPile = typeof sp.pile === "string" ? sp.pile : "All";
 
   const [reading, finished, bingo, tbr] = await Promise.all([
-    getCurrentlyReading(opts),
-    getRecentlyFinished(6, opts),
+    getCurrentlyReading(),
+    getRecentlyFinished(6),
     getBingo(YEAR),
     getTbr(),
   ]);
@@ -34,18 +26,13 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     <main className="mx-auto box-border w-full max-w-[1140px] px-6 py-12 sm:px-14 sm:pt-14 sm:pb-20">
       <Header />
 
-      <StatsStrip
-        reading={reading.length}
-        finished={finished.length}
-        bingo={bingo}
-        editor={editor}
-      />
+      <StatsStrip reading={reading.length} finished={finished.length} bingo={bingo} />
 
       <Section title="Currently reading">
         {reading.length === 0 ? (
           <EmptyNote>Nothing on the desk right now.</EmptyNote>
         ) : (
-          reading.map((b) => <CurrentCard key={b.slug} book={b} editor={editor} />)
+          reading.map((b) => <CurrentCard key={b.slug} book={b} />)
         )}
       </Section>
 
@@ -64,7 +51,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
             {finished.map((b) => (
-              <FinishedCard key={b.slug} book={b} editor={editor} />
+              <FinishedCard key={b.slug} book={b} />
             ))}
           </div>
         )}
@@ -139,26 +126,18 @@ function StatsStrip({
   reading,
   finished,
   bingo,
-  editor,
 }: {
   reading: number;
   finished: number;
   bingo: BingoCard | null;
-  editor: boolean;
 }) {
   const done = bingo ? bingo.squares.filter((s) => s.done && !s.free).length : 0;
   const total = bingo ? bingo.squares.filter((s) => !s.free).length : 0;
   return (
-    <section className="bg-surface border-rule mb-10 grid grid-cols-2 rounded border md:mb-12 md:grid-cols-4">
+    <section className="bg-surface border-rule mb-10 grid grid-cols-3 rounded border md:mb-12">
       <Stat label="Reading" longLabel="Currently reading" value={String(reading)} />
       <Stat label="Finished" longLabel="Recently finished" value={String(finished)} />
       <Stat label="Bingo" value={bingo ? `${done} / ${total}` : "—"} />
-      <Stat
-        label="Status"
-        value={editor ? "editor" : "public"}
-        hint={editor ? "private visible" : "private hidden"}
-        accent
-      />
     </section>
   );
 }
@@ -224,21 +203,15 @@ function EmptyNote({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CurrentCard({ book, editor }: { book: Book; editor: boolean }) {
+function CurrentCard({ book }: { book: Book }) {
   return (
     <Link
-      href={hrefFor(book.slug, editor)}
+      href={`/books/${encodeURIComponent(book.slug)}`}
       className="bg-surface border-rule hover:border-accent block rounded-md border p-5 transition-colors sm:p-7"
     >
       <div className="flex flex-col gap-5 sm:flex-row sm:gap-7">
         <div className="self-start">
-          <Cover
-            src={book.cover}
-            title={book.title}
-            width={96}
-            height={144}
-            hatched={!book.public && editor}
-          />
+          <Cover src={book.cover} title={book.title} width={96} height={144} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-accent mb-3 flex items-center gap-2 text-[11px] tracking-[0.14em] uppercase">
@@ -247,11 +220,6 @@ function CurrentCard({ book, editor }: { book: Book; editor: boolean }) {
               style={{ animation: "ook-pulse 2s infinite" }}
             />
             Reading now
-            {!book.public && editor && (
-              <span className="text-ink-soft ml-auto text-[10px] tracking-[0.16em] uppercase">
-                ◉ private
-              </span>
-            )}
           </div>
           <h3 className="font-serif m-0 text-[24px] leading-[1.1] font-medium tracking-[-0.022em] break-words sm:text-[36px] sm:leading-[1.05]">
             {book.title}
@@ -280,10 +248,10 @@ function CurrentCard({ book, editor }: { book: Book; editor: boolean }) {
   );
 }
 
-function FinishedCard({ book, editor }: { book: Book; editor: boolean }) {
+function FinishedCard({ book }: { book: Book }) {
   return (
     <Link
-      href={hrefFor(book.slug, editor)}
+      href={`/books/${encodeURIComponent(book.slug)}`}
       className="bg-surface border-rule hover:border-ink relative block rounded-md border p-4 transition-all hover:-translate-y-0.5"
     >
       {/* Mobile: cover left, info right. Desktop: cover top, info below. */}
@@ -292,13 +260,7 @@ function FinishedCard({ book, editor }: { book: Book; editor: boolean }) {
           className="relative w-20 shrink-0 sm:mb-3 sm:w-full"
           style={{ aspectRatio: "0.78 / 1" }}
         >
-          <Cover
-            src={book.cover}
-            title={book.title}
-            width="100%"
-            height="100%"
-            hatched={!book.public && editor}
-          />
+          <Cover src={book.cover} title={book.title} width="100%" height="100%" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-star mb-2 flex items-center gap-1.5 text-[10px] tracking-[0.16em] uppercase">
@@ -522,9 +484,4 @@ function TbrEntryCard({
       </div>
     </div>
   );
-}
-
-function hrefFor(slug: string, editor: boolean): string {
-  const path = `/books/${encodeURIComponent(slug)}`;
-  return editor ? `${path}?editor=1` : path;
 }

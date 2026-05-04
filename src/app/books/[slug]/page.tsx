@@ -5,9 +5,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkDirective from "remark-directive";
 import { Cover } from "@/components/Cover";
+import DeepNotes from "@/components/DeepNotes";
+import RevealSection from "@/components/RevealSection";
 import Spoiler from "@/components/Spoiler";
-import { getAllBooks, getBookBySlug, isPublicVisible } from "@/lib/books";
-import { extractHeadings, remarkSpoilerDirective, slugify, type Heading } from "@/lib/markdown";
+import { getAllBooks, getBookBySlug } from "@/lib/books";
+import { remarkSpoilerDirective, slugify } from "@/lib/markdown";
 import type { Book } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -15,12 +17,11 @@ export const dynamic = "force-dynamic";
 const YEAR = 2026;
 
 type Params = Promise<{ slug: string }>;
-type SearchParams = Promise<{ editor?: string }>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { slug } = await params;
   const page = await getBookBySlug(decodeURIComponent(slug));
-  if (!page || !isPublicVisible(page.book)) return { title: "Not found" };
+  if (!page) return { title: "Not found" };
   const author = page.book.authors[0] ?? null;
   return {
     title: author ? `${page.book.title} — ${author}` : page.book.title,
@@ -28,79 +29,80 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   };
 }
 
-export default async function BookPage({
-  params,
-  searchParams,
-}: {
-  params: Params;
-  searchParams: SearchParams;
-}) {
+export default async function BookPage({ params }: { params: Params }) {
   const { slug } = await params;
-  const sp = await searchParams;
-  const editor = sp.editor === "1";
   const decodedSlug = decodeURIComponent(slug);
   const page = await getBookBySlug(decodedSlug);
 
   if (!page) notFound();
-  if (!isPublicVisible(page.book, { editor })) notFound();
 
-  const { book, body, review, quotes } = page;
-  const headings = extractHeadings(body);
+  const { book, review, quotes } = page;
 
-  // Resolve see_also slugs to titles so the sidebar can label them.
   const allBooks = await getAllBooks();
   const seeAlso = book.seeAlso
     .map((s) => allBooks.find((b) => b.slug === s))
-    .filter((b): b is Book => b !== undefined && isPublicVisible(b, { editor }));
+    .filter((b): b is Book => b !== undefined);
 
   return (
     <main className="mx-auto box-border w-full max-w-[1140px] px-6 py-12 sm:px-14 sm:pt-10 sm:pb-20">
       <Link
-        href={editor ? "/?editor=1" : "/"}
+        href="/"
         className="border-rule text-ink-soft hover:text-ink mb-8 inline-block rounded-full border px-3 py-1.5 text-xs whitespace-nowrap"
       >
         ← back
       </Link>
 
-      <BookHeader book={book} editor={editor} />
+      <BookHeader book={book} />
 
       <div className="grid grid-cols-1 gap-9 md:grid-cols-[180px_1fr]">
-        <Toc headings={headings} seeAlso={seeAlso} editor={editor} />
+        <Toc seeAlso={seeAlso} />
 
         <div className="min-w-0">
           {book.pullquote && (
             <Pullquote text={book.pullquote.text} source={book.pullquote.source} />
           )}
 
-          {body && <Markdown source={body} />}
-
           {review && (
-            <NamedSection title="Review">
+            <RevealSection
+              storageKey={`review-revealed:${book.slug}`}
+              buttonLabel="Show review"
+              expandedTitle="Review"
+            >
               <Markdown source={review} />
-            </NamedSection>
+            </RevealSection>
           )}
 
           {quotes && (
-            <NamedSection title="Quotes">
+            <RevealSection
+              storageKey={`quotes-revealed:${book.slug}`}
+              buttonLabel="Show quotes"
+              expandedTitle="Quotes"
+            >
               <Markdown source={quotes} />
-            </NamedSection>
+            </RevealSection>
           )}
+
+          {book.hasSummary && (
+            <RevealSection
+              storageKey={`summary-revealed:${book.slug}`}
+              buttonLabel="Show synopsis"
+              expandedTitle="Synopsis"
+            >
+              <SummaryPlaceholder />
+            </RevealSection>
+          )}
+
+          <DeepNotes slug={book.slug} />
         </div>
       </div>
     </main>
   );
 }
 
-function BookHeader({ book, editor }: { book: Book; editor: boolean }) {
+function BookHeader({ book }: { book: Book }) {
   return (
     <header className="border-rule mb-12 grid grid-cols-1 gap-8 border-b pb-8 sm:grid-cols-[180px_1fr]">
-      <Cover
-        src={book.cover}
-        title={book.title}
-        width={180}
-        height={270}
-        hatched={!book.public && editor}
-      />
+      <Cover src={book.cover} title={book.title} width={180} height={270} />
       <div className="min-w-0">
         <div className="text-ink-soft mb-4 flex flex-wrap items-center gap-2 text-[10px] tracking-[0.16em] uppercase">
           {book.bingoSquares.length > 0 && (
@@ -114,10 +116,19 @@ function BookHeader({ book, editor }: { book: Book; editor: boolean }) {
           <span className={book.status === "reading" ? "text-accent" : "text-star"}>
             {book.status}
           </span>
-          {!book.public && editor && (
+          {book.rating !== null && (
             <>
               <span>·</span>
-              <span className="text-ink-soft">◉ private</span>
+              <span className="text-star">
+                {"★".repeat(Math.floor(book.rating))}
+                {book.rating % 1 >= 0.5 ? "½" : ""}
+              </span>
+            </>
+          )}
+          {book.wouldReread === true && (
+            <>
+              <span>·</span>
+              <span>would re-read</span>
             </>
           )}
           {book.lastEdited && (
@@ -148,58 +159,23 @@ function BookHeader({ book, editor }: { book: Book; editor: boolean }) {
   );
 }
 
-function Toc({
-  headings,
-  seeAlso,
-  editor,
-}: {
-  headings: Heading[];
-  seeAlso: Book[];
-  editor: boolean;
-}) {
+function Toc({ seeAlso }: { seeAlso: Book[] }) {
+  if (seeAlso.length === 0) return <aside className="hidden md:block" />;
   return (
     <aside className="self-start md:sticky md:top-6">
-      {headings.length > 0 && (
-        <>
-          <div className="text-ink-soft mb-3 text-[10px] tracking-[0.18em] uppercase">
-            On this page
-          </div>
-          <ul className="font-serif m-0 list-none p-0 text-[14px] leading-[1.6]">
-            {headings.map((h, i) => (
-              <li
-                key={h.slug}
-                className={`mb-1.5 border-l-2 pl-3 ${i === 0 ? "border-accent text-ink" : "border-rule text-ink-soft"}`}
-              >
-                <a href={`#${h.slug}`} className="hover:text-ink">
-                  {h.text}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      {seeAlso.length > 0 && (
-        <div className="mt-7">
-          <div className="text-ink-soft mb-3 text-[10px] tracking-[0.18em] uppercase">See also</div>
-          <ul className="m-0 list-none p-0">
-            {seeAlso.map((b) => (
-              <li key={b.slug} className="mb-2">
-                <Link
-                  href={
-                    editor
-                      ? `/books/${encodeURIComponent(b.slug)}?editor=1`
-                      : `/books/${encodeURIComponent(b.slug)}`
-                  }
-                  className="font-serif text-accent decoration-accent-soft hover:decoration-accent text-[13px] leading-[1.45] underline italic underline-offset-2"
-                >
-                  {b.title}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <div className="text-ink-soft mb-3 text-[10px] tracking-[0.18em] uppercase">See also</div>
+      <ul className="m-0 list-none p-0">
+        {seeAlso.map((b) => (
+          <li key={b.slug} className="mb-2">
+            <Link
+              href={`/books/${encodeURIComponent(b.slug)}`}
+              className="font-serif text-accent decoration-accent-soft hover:decoration-accent text-[13px] leading-[1.45] underline italic underline-offset-2"
+            >
+              {b.title}
+            </Link>
+          </li>
+        ))}
+      </ul>
     </aside>
   );
 }
@@ -219,14 +195,12 @@ function Pullquote({ text, source }: { text: string; source: string | null }) {
   );
 }
 
-function NamedSection({ title, children }: { title: string; children: React.ReactNode }) {
+function SummaryPlaceholder() {
   return (
-    <section className="mt-12">
-      <h2 className="font-serif m-0 mb-4 text-[26px] leading-tight font-medium tracking-[-0.012em]">
-        {title}
-      </h2>
-      {children}
-    </section>
+    <p className="text-ink-soft text-sm italic">
+      A separate synopsis file exists for this book; loading the file in this view isn&rsquo;t wired
+      up yet.
+    </p>
   );
 }
 
@@ -236,38 +210,23 @@ function Markdown({ source }: { source: string }) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkDirective, remarkSpoilerDirective]}
         components={{
-          h2: ({ children, ...props }) => {
+          h2: ({ children }) => {
             const text = String(children);
             return (
               <h2
                 id={slugify(text)}
                 className="font-serif text-ink mt-10 mb-4 scroll-mt-8 text-[28px] leading-tight font-medium tracking-[-0.015em]"
-                {...props}
               >
                 {children}
               </h2>
             );
           },
-          h3: ({ children, ...props }) => (
-            <h3 className="font-serif text-ink mt-6 mb-2 text-[18px] font-medium" {...props}>
-              {children}
-            </h3>
+          h3: ({ children }) => (
+            <h3 className="font-serif text-ink mt-6 mb-2 text-[18px] font-medium">{children}</h3>
           ),
-          p: ({ children, ...props }) => (
-            <p className="my-4 leading-[1.65]" {...props}>
-              {children}
-            </p>
-          ),
-          ul: ({ children, ...props }) => (
-            <ul className="my-3 list-disc space-y-1.5 pl-6" {...props}>
-              {children}
-            </ul>
-          ),
-          ol: ({ children, ...props }) => (
-            <ol className="my-3 list-decimal space-y-1.5 pl-6" {...props}>
-              {children}
-            </ol>
-          ),
+          p: ({ children }) => <p className="my-4 leading-[1.65]">{children}</p>,
+          ul: ({ children }) => <ul className="my-3 list-disc space-y-1.5 pl-6">{children}</ul>,
+          ol: ({ children }) => <ol className="my-3 list-decimal space-y-1.5 pl-6">{children}</ol>,
           a: ({ children, ...props }) => (
             <a className="text-accent underline underline-offset-2" {...props}>
               {children}
@@ -278,15 +237,11 @@ function Markdown({ source }: { source: string }) {
               {children}
             </code>
           ),
-          blockquote: ({ children, ...props }) => (
-            <blockquote
-              className="border-rule text-ink-soft my-4 border-l-2 pl-4 italic"
-              {...props}
-            >
+          blockquote: ({ children }) => (
+            <blockquote className="border-rule text-ink-soft my-4 border-l-2 pl-4 italic">
               {children}
             </blockquote>
           ),
-          // Spoiler containers and inline spans (output of remarkSpoilerDirective).
           div: (props) => {
             if ((props as Record<string, unknown>)["data-spoiler"]) {
               return <Spoiler>{props.children}</Spoiler>;

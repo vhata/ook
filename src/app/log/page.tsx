@@ -4,8 +4,6 @@ import type { LogEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ editor?: string }>;
-
 const MONTH_NAMES = [
   "January",
   "February",
@@ -39,10 +37,8 @@ export const metadata = {
   title: "Reading log",
 };
 
-export default async function LogPage({ searchParams }: { searchParams: SearchParams }) {
-  const sp = await searchParams;
-  const editor = sp.editor === "1";
-  const log = await getReadingLog(undefined, { editor });
+export default async function LogPage() {
+  const log = await getReadingLog();
 
   const byMonth = new Map<string, LogEntry[]>();
   for (const e of log) {
@@ -56,7 +52,7 @@ export default async function LogPage({ searchParams }: { searchParams: SearchPa
   return (
     <main className="mx-auto box-border w-full max-w-[800px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
       <Link
-        href={editor ? "/?editor=1" : "/"}
+        href="/"
         className="border-rule text-ink-soft hover:text-ink mb-9 inline-block rounded-full border px-3 py-1.5 text-xs whitespace-nowrap"
       >
         ← back
@@ -80,23 +76,13 @@ export default async function LogPage({ searchParams }: { searchParams: SearchPa
           No log entries yet.
         </div>
       ) : (
-        months.map((m) => (
-          <MonthSection key={m} month={m} entries={byMonth.get(m) ?? []} editor={editor} />
-        ))
+        months.map((m) => <MonthSection key={m} month={m} entries={byMonth.get(m) ?? []} />)
       )}
     </main>
   );
 }
 
-function MonthSection({
-  month,
-  entries,
-  editor,
-}: {
-  month: string;
-  entries: LogEntry[];
-  editor: boolean;
-}) {
+function MonthSection({ month, entries }: { month: string; entries: LogEntry[] }) {
   const [year, mm] = month.split("-");
   const label = `${MONTH_NAMES[+mm - 1]} ${year}`;
   return (
@@ -110,14 +96,14 @@ function MonthSection({
       </h2>
       <ol className="m-0 list-none p-0">
         {entries.map((e, i) => (
-          <Entry key={i} entry={e} editor={editor} />
+          <Entry key={i} entry={e} />
         ))}
       </ol>
     </section>
   );
 }
 
-function Entry({ entry, editor }: { entry: LogEntry; editor: boolean }) {
+function Entry({ entry }: { entry: LogEntry }) {
   const day = entry.date.slice(8, 10);
   const monthIdx = +entry.date.slice(5, 7) - 1;
   const monthShort = MONTH_SHORT[monthIdx];
@@ -136,11 +122,7 @@ function Entry({ entry, editor }: { entry: LogEntry; editor: boolean }) {
     reread: "reread pile",
     committed: "committed",
   };
-  const href = entry.slug
-    ? editor
-      ? `/books/${encodeURIComponent(entry.slug)}?editor=1`
-      : `/books/${encodeURIComponent(entry.slug)}`
-    : null;
+  const href = entry.slug ? `/books/${encodeURIComponent(entry.slug)}` : null;
   return (
     <li className="border-rule grid grid-cols-[54px_1fr] gap-5 border-t py-3.5">
       <div className="text-ink-soft pt-0.5 font-mono text-[11px] tracking-[0.04em]">

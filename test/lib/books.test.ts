@@ -8,7 +8,6 @@ import {
   getReadingLog,
   getRecentlyFinished,
   getTbr,
-  isPublicVisible,
 } from "../../src/lib/books";
 
 const FIXTURE_VAULT = path.resolve(__dirname, "..", "fixtures", "vault");
@@ -50,28 +49,14 @@ describe("getAllBooks", () => {
 });
 
 describe("getCurrentlyReading", () => {
-  it("returns reading books outside production (private included)", async () => {
+  it("returns reading books regardless of public flag", async () => {
     const reading = await getCurrentlyReading();
     expect(reading.map((b) => b.slug)).toEqual(["PrivateBook"]);
-  });
-
-  it("hides private reading books in production", async () => {
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("OOK_SHOW_PRIVATE", "");
-    const reading = await getCurrentlyReading();
-    expect(reading).toEqual([]);
   });
 });
 
 describe("getRecentlyFinished", () => {
   it("returns finished books sorted by finished date desc", async () => {
-    const finished = await getRecentlyFinished(5);
-    expect(finished.map((b) => b.slug)).toEqual(["TestBook"]);
-  });
-
-  it("hides private finished books in production", async () => {
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("OOK_SHOW_PRIVATE", "");
     const finished = await getRecentlyFinished(5);
     expect(finished.map((b) => b.slug)).toEqual(["TestBook"]);
   });
@@ -185,33 +170,5 @@ describe("YAML date frontmatter", () => {
     const test = books.find((b) => b.slug === "TestBook");
     expect(test?.started).toBe("2026-01-15");
     expect(test?.finished).toBe("2026-02-20");
-  });
-});
-
-describe("isPublicVisible", () => {
-  function bookWith(publicFlag: boolean) {
-    return { public: publicFlag } as Parameters<typeof isPublicVisible>[0];
-  }
-
-  it("public books are always visible", () => {
-    vi.stubEnv("NODE_ENV", "production");
-    expect(isPublicVisible(bookWith(true))).toBe(true);
-  });
-
-  it("private books are visible outside production", () => {
-    vi.stubEnv("NODE_ENV", "development");
-    expect(isPublicVisible(bookWith(false))).toBe(true);
-  });
-
-  it("private books are hidden in production by default", () => {
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("OOK_SHOW_PRIVATE", "");
-    expect(isPublicVisible(bookWith(false))).toBe(false);
-  });
-
-  it("OOK_SHOW_PRIVATE=1 reveals private books in production", () => {
-    vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("OOK_SHOW_PRIVATE", "1");
-    expect(isPublicVisible(bookWith(false))).toBe(true);
   });
 });

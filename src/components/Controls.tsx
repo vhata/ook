@@ -2,7 +2,6 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type Theme = "light" | "dark" | null;
 
@@ -30,34 +29,19 @@ function applyTheme(theme: Theme) {
 }
 
 export default function Controls() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
   const theme = useSyncExternalStore(subscribeStorage, getThemeSnapshot, getThemeServerSnapshot);
 
-  // Keep the html data-theme attribute in sync with the stored preference.
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
-
-  const editor = params.get("editor") === "1";
 
   const flipTheme = () => {
     const next: Theme = theme === "dark" ? "light" : "dark";
     if (typeof window !== "undefined") {
       window.localStorage.setItem("ook_theme", next);
-      // Dispatch a storage event manually so useSyncExternalStore re-reads.
       window.dispatchEvent(new StorageEvent("storage", { key: "ook_theme", newValue: next }));
     }
     applyTheme(next);
-  };
-
-  const flipEditor = () => {
-    const next = new URLSearchParams(params.toString());
-    if (editor) next.delete("editor");
-    else next.set("editor", "1");
-    const qs = next.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
   };
 
   const themeLabel = theme === "dark" ? "☾ dark" : theme === "light" ? "☀ light" : "auto";
@@ -80,19 +64,6 @@ export default function Controls() {
       >
         <span className="hidden sm:inline">{themeLabel}</span>
         <span className="sm:hidden">{theme === "light" ? "☀" : "☾"}</span>
-      </button>
-      <button
-        type="button"
-        onClick={flipEditor}
-        className={`rounded-full border px-2.5 py-1 whitespace-nowrap tracking-[0.16em] uppercase sm:px-3 ${
-          editor
-            ? "border-accent bg-accent-soft text-accent"
-            : "border-rule text-ink-soft hover:border-accent hover:text-accent"
-        }`}
-        title={editor ? "Hide private (public view)" : "Show private (editor mode)"}
-      >
-        <span className="hidden sm:inline">{editor ? "◉ editor" : "◇ public"}</span>
-        <span className="sm:hidden">{editor ? "◉" : "◇"}</span>
       </button>
     </div>
   );

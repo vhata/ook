@@ -150,17 +150,15 @@ export async function getAllBooks(): Promise<Book[]> {
   return books.filter((b): b is Book => b !== null);
 }
 
-export type ViewOpts = { editor?: boolean };
-
-export async function getCurrentlyReading(opts: ViewOpts = {}): Promise<Book[]> {
+export async function getCurrentlyReading(): Promise<Book[]> {
   const all = await getAllBooks();
-  return all.filter((b) => b.status === "reading" && isPublicVisible(b, opts));
+  return all.filter((b) => b.status === "reading");
 }
 
-export async function getRecentlyFinished(limit = 5, opts: ViewOpts = {}): Promise<Book[]> {
+export async function getRecentlyFinished(limit = 5): Promise<Book[]> {
   const all = await getAllBooks();
   return all
-    .filter((b) => b.status === "finished" && isPublicVisible(b, opts))
+    .filter((b) => b.status === "finished")
     .sort((a, b) => {
       const aDate = a.finished ?? "0000-00-00";
       const bDate = b.finished ?? "0000-00-00";
@@ -239,14 +237,6 @@ async function readOptionalFile(p: string): Promise<string | null> {
   if (!(await fileExists(p))) return null;
   const raw = await fs.readFile(p, "utf8");
   return raw.trim();
-}
-
-export function isPublicVisible(book: Book, opts: ViewOpts = {}): boolean {
-  if (book.public) return true;
-  if (opts.editor) return true;
-  if (process.env.NODE_ENV !== "production") return true;
-  if (process.env.OOK_SHOW_PRIVATE === "1") return true;
-  return false;
 }
 
 export async function getTbr(): Promise<Tbr | null> {
@@ -346,9 +336,9 @@ function parseTbrEntry(text: string): TbrEntry | null {
 // Reading log derived from book frontmatter dates. Returns most-recent first.
 // Each book with a `started` date emits a "started" entry; with `finished`,
 // a "finished" entry. Future: merge with manual entries from _meta/log.md.
-export async function getReadingLog(limit?: number, opts: ViewOpts = {}): Promise<LogEntry[]> {
+export async function getReadingLog(limit?: number): Promise<LogEntry[]> {
   const books = await getAllBooks();
-  const visible = books.filter((b) => isPublicVisible(b, opts));
+  const visible = books;
   const entries: LogEntry[] = [];
   for (const b of visible) {
     if (b.started) {

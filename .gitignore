@@ -62,3 +62,4 @@ dist/
 test-results/
 playwright-report/
 *.log
+AUDIT.md
