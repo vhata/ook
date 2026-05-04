@@ -16,7 +16,6 @@ export type Book = {
   finished: string | null;
   rating: number | null;
   wouldReread: boolean | null;
-  public: boolean;
   bingoSquares: string[];
   tags: string[];
   cover: string | null;

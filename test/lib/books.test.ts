@@ -36,7 +36,6 @@ describe("getAllBooks", () => {
     expect(test?.status).toBe("finished");
     expect(test?.rating).toBe(4.5);
     expect(test?.wouldReread).toBe(true);
-    expect(test?.public).toBe(true);
     expect(test?.bingoSquares).toEqual(["a1"]);
     expect(test?.tags).toEqual(["scifi", "test"]);
     expect(test?.cover).toBe("covers/test-book.svg");
@@ -49,7 +48,7 @@ describe("getAllBooks", () => {
 });
 
 describe("getCurrentlyReading", () => {
-  it("returns reading books regardless of public flag", async () => {
+  it("returns books with status: reading", async () => {
     const reading = await getCurrentlyReading();
     expect(reading.map((b) => b.slug)).toEqual(["PrivateBook"]);
   });
@@ -148,8 +147,8 @@ describe("getTbr", () => {
 describe("getReadingLog", () => {
   it("derives entries from book started/finished dates, newest first", async () => {
     const log = await getReadingLog();
-    // TestBook: started 2026-01-15, finished 2026-02-20, public:true → both visible
-    // PrivateBook: started 2026-04-01, no finished, public:false but visible in dev
+    // TestBook: started 2026-01-15, finished 2026-02-20 → both entries
+    // PrivateBook: started 2026-04-01, no finished → started entry only
     const dates = log.map((e) => `${e.date}/${e.kind}`);
     expect(dates).toContain("2026-01-15/started");
     expect(dates).toContain("2026-02-20/finished");

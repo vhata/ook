@@ -120,7 +120,6 @@ async function readBookDir(slug: string): Promise<Book | null> {
     finished: parseNullableString(data.finished),
     rating: parseNullableNumber(data.rating),
     wouldReread: parseNullableBoolean(data.would_reread),
-    public: data.public === true,
     bingoSquares: parseStringList(data.bingo_squares),
     tags: parseStringList(data.tags),
     cover: parseNullableString(data.cover),

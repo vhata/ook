@@ -10,7 +10,7 @@ export default function NotFound() {
           </p>
           <h1 className="text-3xl font-semibold tracking-tight">Not on this shelf.</h1>
           <p className="text-zinc-600 dark:text-zinc-400">
-            That book either doesn&rsquo;t exist or hasn&rsquo;t been made public yet.
+            Nothing here. Probably a typo, or the book hasn&rsquo;t been added to the vault yet.
           </p>
           <Link
             href="/"

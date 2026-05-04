@@ -5,11 +5,10 @@ type Props = {
   title: string;
   width: number | string;
   height: number | string;
-  hatched?: boolean;
   rounded?: number;
 };
 
-export function Cover({ src, title, width, height, hatched, rounded = 2 }: Props) {
+export function Cover({ src, title, width, height, rounded = 2 }: Props) {
   return (
     <div
       className="bg-surface-mute relative shrink-0 overflow-hidden shadow-[0_4px_14px_rgba(0,0,0,0.18)]"
@@ -30,15 +29,6 @@ export function Cover({ src, title, width, height, hatched, rounded = 2 }: Props
         >
           {title}
         </div>
-      )}
-      {hatched && (
-        <div
-          className="pointer-events-none absolute inset-0 mix-blend-overlay"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(135deg, transparent 0 4px, rgba(255,255,255,0.08) 4px 5px)",
-          }}
-        />
       )}
     </div>
   );

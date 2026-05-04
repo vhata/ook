@@ -8,7 +8,6 @@ started: 2026-04-01
 finished: null
 rating: null
 would_reread: null
-public: false
 bingo_squares: []
 tags: []
 ---

@@ -8,7 +8,6 @@ started: 2026-01-15
 finished: 2026-02-20
 rating: 4.5
 would_reread: true
-public: true
 bingo_squares: [a1]
 tags: [scifi, test]
 cover: covers/test-book.svg
