@@ -403,18 +403,28 @@ function BingoCellEl({ square }: { square: BingoSquare }) {
   const baseClasses =
     "relative aspect-[0.7/1] overflow-hidden rounded border bg-surface transition-transform hover:-translate-y-0.5";
   const ringClasses = square.reading ? "border-accent ring-2 ring-accent" : "border-rule";
+  const tooltip =
+    square.authors.length > 0
+      ? `${square.title ?? ""} — ${square.authors.join(", ")}`
+      : (square.title ?? "");
 
   if (square.book) {
     return (
       <Link
         href={`/books/${encodeURIComponent(square.book)}`}
         className={`${baseClasses} ${ringClasses}`}
+        title={tooltip}
+        aria-label={tooltip}
       >
         {inner}
       </Link>
     );
   }
-  return <div className={`${baseClasses} ${ringClasses}`}>{inner}</div>;
+  return (
+    <div className={`${baseClasses} ${ringClasses}`} title={tooltip} aria-label={tooltip}>
+      {inner}
+    </div>
+  );
 }
 
 function PileFilter({ piles, selected }: { piles: string[]; selected: string }) {
