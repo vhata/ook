@@ -11,6 +11,8 @@ import type {
   ExternalLink,
   LogEntry,
   Pullquote,
+  SeriesGroup,
+  SeriesMember,
   Tbr,
   TbrEntry,
   TbrPile,
@@ -496,6 +498,60 @@ export async function getManualLogEntries(): Promise<LogEntry[]> {
     entries.push({ date: currentDate, kind, slug: null, title: null, detail });
   }
   return entries;
+}
+
+// Parses a series field like "Realm of the Elderlings #3" into name + index.
+// Bare series names ("The Library at Mount Char") return `null` index.
+// Decimal indices (#1.5 — for novellas) are accepted.
+export function parseSeriesField(raw: string): { name: string; index: number | null } {
+  const m = /^(.+?)\s*#(\d+(?:\.\d+)?)\s*$/.exec(raw);
+  if (m) {
+    const idx = Number(m[2]);
+    return { name: m[1].trim(), index: Number.isFinite(idx) ? idx : null };
+  }
+  return { name: raw.trim(), index: null };
+}
+
+// Group every book that has a `series` field into a series catalogue.
+// Members within each series are sorted by parsed index (nulls last), then
+// by finish date, then by start date — falling back to title as a tiebreak.
+// Series themselves are sorted by name.
+export async function getAllSeries(): Promise<SeriesGroup[]> {
+  const books = await getAllBooks();
+  const groups = new Map<string, SeriesMember[]>();
+  for (const b of books) {
+    if (!b.series) continue;
+    const { name, index } = parseSeriesField(b.series);
+    const member: SeriesMember = {
+      slug: b.slug,
+      title: b.title,
+      authors: b.authors,
+      status: b.status,
+      rating: b.rating,
+      finished: b.finished,
+      started: b.started,
+      cover: b.cover,
+      index,
+    };
+    const existing = groups.get(name);
+    if (existing) existing.push(member);
+    else groups.set(name, [member]);
+  }
+  const result: SeriesGroup[] = [];
+  for (const [name, members] of groups) {
+    members.sort((a, b) => {
+      if (a.index !== null && b.index !== null) return a.index - b.index;
+      if (a.index !== null) return -1;
+      if (b.index !== null) return 1;
+      const aDate = a.finished ?? a.started ?? "";
+      const bDate = b.finished ?? b.started ?? "";
+      if (aDate && bDate) return aDate.localeCompare(bDate);
+      return a.title.localeCompare(b.title);
+    });
+    result.push({ name, members });
+  }
+  result.sort((a, b) => a.name.localeCompare(b.name));
+  return result;
 }
 
 // Years (descending) that have at least one book event — finished, started,

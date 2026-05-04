@@ -102,7 +102,7 @@ Vault-only stats; no external API needed. All extend the existing `/stats/[year]
 - **Pages-per-month chart**: contingent on `pages` frontmatter. `#feature #stats #pages`
 - **Weekday vs weekend reading split**: derived from log events. `#feature #stats`
 - **Most-annotated book signal**: quote count + review length, surfaced as a "this one stuck" badge per finished card. `#feature #stats #per-book`
-- **Series progress bars at `/series`**: "Realm of the Elderlings · 3 of 16," for every series in vault. Total count needs Open Library / Hardcover lookup. `#feature #series`
+- **Series progress bars on `/series`**: total-count denominator from Open Library / Hardcover ("3 of 16 read") rather than the current "N read in vault" — the route already groups by series, just needs the external lookup. `#feature #series #hardcover`
 - **Author depth chart**: per author, books-read / books-written. Denominator from Hardcover or Open Library. `#feature #stats #authors #hardcover`
 - **Reading-velocity projection**: given current `started` date and historical pace, project a finish window for currently-reading. Surface on home or per-book. `#feature #stats #currently-reading`
 

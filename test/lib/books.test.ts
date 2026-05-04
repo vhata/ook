@@ -5,6 +5,7 @@ import {
   findBingoYearForBook,
   getAllBingoCards,
   getAllBooks,
+  getAllSeries,
   getBingo,
   getBingoYears,
   getBookBySlug,
@@ -16,6 +17,7 @@ import {
   getStatsYears,
   getTbr,
   getYearStats,
+  parseSeriesField,
 } from "../../src/lib/books";
 import type { Book } from "../../src/lib/types";
 
@@ -295,6 +297,44 @@ describe("externalLinks", () => {
       }),
     );
     expect(links.map((l) => l.label)).toEqual(["Goodreads", "Hardcover", "Storygraph", "Bookwyrm"]);
+  });
+});
+
+describe("parseSeriesField", () => {
+  it("extracts name and integer index", () => {
+    expect(parseSeriesField("Realm of the Elderlings #3")).toEqual({
+      name: "Realm of the Elderlings",
+      index: 3,
+    });
+  });
+
+  it("accepts decimal indices for novellas", () => {
+    expect(parseSeriesField("Mistborn #1.5")).toEqual({ name: "Mistborn", index: 1.5 });
+  });
+
+  it("returns a null index when no #N marker is present", () => {
+    expect(parseSeriesField("The Library at Mount Char")).toEqual({
+      name: "The Library at Mount Char",
+      index: null,
+    });
+  });
+
+  it("trims whitespace around the name", () => {
+    expect(parseSeriesField("  Hyperion Cantos  #2  ")).toEqual({
+      name: "Hyperion Cantos",
+      index: 2,
+    });
+  });
+});
+
+describe("getAllSeries", () => {
+  it("groups books with a series field", async () => {
+    const series = await getAllSeries();
+    expect(series.map((s) => s.name)).toEqual(["Test Series"]);
+    const ts = series[0];
+    expect(ts.members).toHaveLength(1);
+    expect(ts.members[0].slug).toBe("TestBook");
+    expect(ts.members[0].index).toBe(1);
   });
 });
 

@@ -111,3 +111,23 @@ export type YearStats = {
   topAuthors: AuthorCount[];
   wouldReread: number;
 };
+
+export type SeriesMember = {
+  // Book reference, kept lean — pages list only the catalog facts.
+  slug: string;
+  title: string;
+  authors: string[];
+  status: BookStatus;
+  rating: number | null;
+  finished: string | null;
+  started: string | null;
+  cover: string | null;
+  // Parsed series index ("Realm of the Elderlings #3" → 3). Null when the
+  // series field has no `#N` marker.
+  index: number | null;
+};
+
+export type SeriesGroup = {
+  name: string;
+  members: SeriesMember[];
+};
