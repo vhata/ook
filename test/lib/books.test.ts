@@ -12,7 +12,9 @@ import {
   getCurrentlyReading,
   getReadingLog,
   getRecentlyFinished,
+  getStatsYears,
   getTbr,
+  getYearStats,
 } from "../../src/lib/books";
 import type { Book } from "../../src/lib/types";
 
@@ -261,6 +263,53 @@ describe("externalLinks", () => {
       }),
     );
     expect(links.map((l) => l.label)).toEqual(["Goodreads", "Hardcover", "Storygraph", "Bookwyrm"]);
+  });
+});
+
+describe("getStatsYears", () => {
+  it("returns descending years that have any started or finished date", async () => {
+    // TestBook started 2026-01-15, finished 2026-02-20. PrivateBook started 2026-04-01.
+    const years = await getStatsYears();
+    expect(years).toEqual([2026]);
+  });
+});
+
+describe("getYearStats", () => {
+  it("aggregates counts and averages for the given year", async () => {
+    const stats = await getYearStats(2026);
+    // TestBook is the only finished book in 2026 (rating 4.5).
+    expect(stats.finished).toBe(1);
+    expect(stats.abandoned).toBe(0);
+    // TestBook started 2026; PrivateBook started 2026 → both count.
+    expect(stats.startedInYear).toBe(2);
+    expect(stats.rated).toBe(1);
+    expect(stats.averageRating).toBeCloseTo(4.5, 5);
+    expect(stats.wouldReread).toBe(1);
+  });
+
+  it("rounds half-star ratings into the nearest histogram bucket", async () => {
+    const stats = await getYearStats(2026);
+    // 4.5 rounds to 5.
+    const five = stats.ratingDistribution.find((b) => b.rating === 5);
+    expect(five?.count).toBe(1);
+    const buckets = stats.ratingDistribution.map((b) => b.rating);
+    expect(buckets).toEqual([5, 4, 3, 2, 1]);
+  });
+
+  it("returns top tags and authors sorted by count", async () => {
+    const stats = await getYearStats(2026);
+    expect(stats.topTags.map((t) => t.tag)).toEqual(["scifi", "test"]);
+    expect(stats.topAuthors.map((a) => a.author).sort()).toEqual(["Author One", "Author Two"]);
+  });
+
+  it("returns empty stats for a year with no activity", async () => {
+    const stats = await getYearStats(1999);
+    expect(stats.finished).toBe(0);
+    expect(stats.abandoned).toBe(0);
+    expect(stats.startedInYear).toBe(0);
+    expect(stats.averageRating).toBeNull();
+    expect(stats.topTags).toEqual([]);
+    expect(stats.topAuthors).toEqual([]);
   });
 });
 

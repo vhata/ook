@@ -82,3 +82,32 @@ export type LogEntry = {
   title: string | null;
   detail: string;
 };
+
+export type RatingBucket = {
+  // Rating bucket label (1..5). Half-star ratings round to nearest whole.
+  rating: number;
+  count: number;
+};
+
+export type TagCount = {
+  tag: string;
+  count: number;
+};
+
+export type AuthorCount = {
+  author: string;
+  count: number;
+};
+
+export type YearStats = {
+  year: number;
+  finished: number;
+  abandoned: number;
+  startedInYear: number;
+  rated: number;
+  averageRating: number | null;
+  ratingDistribution: RatingBucket[];
+  topTags: TagCount[];
+  topAuthors: AuthorCount[];
+  wouldReread: number;
+};

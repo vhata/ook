@@ -32,3 +32,4 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ Auto-promote bingo and Goodreads-only entries to vault directories on first mutation. Verification prompt for GR-claimed status / rating / date.
 - ✓ Multi-year bingo support: current year derived from the highest `_meta/bingo-YYYY.md` filename; per-book pages attribute to whichever card actually references the book.
 - ✓ External-link row on per-book pages — "View on Goodreads · Hardcover · Storygraph · Bookwyrm" rendered from optional `goodreads_id`, `hardcover_slug`, `storygraph_slug`, `bookwyrm_url` frontmatter fields. Missing fields produce no link; nothing is guessed.
+- ✓ `/stats/[year]` route: yearly reading stats derived from frontmatter — finished count, abandoned, started-in-year, average rating with histogram, top tags, top authors, would-reread count. `/stats` index redirects to the most recent year with activity. Header includes a year-picker across all years that have data. Reachable from the controls bar.

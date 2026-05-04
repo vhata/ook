@@ -14,6 +14,7 @@ import type {
   Tbr,
   TbrEntry,
   TbrPile,
+  YearStats,
 } from "./types";
 
 const execFileAsync = promisify(execFile);
@@ -451,4 +452,76 @@ export async function getReadingLog(limit?: number): Promise<LogEntry[]> {
   }
   entries.sort((a, b) => b.date.localeCompare(a.date));
   return typeof limit === "number" ? entries.slice(0, limit) : entries;
+}
+
+// Years (descending) that have at least one book event — finished, started,
+// or both. Powers the `/stats` index and any year-picker UI.
+export async function getStatsYears(): Promise<number[]> {
+  const books = await getAllBooks();
+  const years = new Set<number>();
+  for (const b of books) {
+    if (b.finished) years.add(Number(b.finished.slice(0, 4)));
+    if (b.started) years.add(Number(b.started.slice(0, 4)));
+  }
+  return [...years].filter((y) => Number.isFinite(y)).sort((a, b) => b - a);
+}
+
+// Aggregate every available stat for one calendar year. Pure derivation
+// from frontmatter — pages-read / longest-book are intentionally absent
+// (no `pages` field in the schema yet, and we don't pull from external
+// APIs without an explicit token).
+export async function getYearStats(year: number): Promise<YearStats> {
+  const books = await getAllBooks();
+  const inYear = (date: string | null) => date?.startsWith(`${year}-`);
+
+  const finishedThisYear = books.filter((b) => inYear(b.finished) && b.status === "finished");
+  const abandonedThisYear = books.filter((b) => inYear(b.finished) && b.status === "abandoned");
+  const startedInYear = books.filter((b) => inYear(b.started));
+
+  const rated = finishedThisYear.filter((b) => b.rating !== null);
+  const averageRating =
+    rated.length > 0 ? rated.reduce((sum, b) => sum + (b.rating ?? 0), 0) / rated.length : null;
+
+  // Histogram buckets 1..5; half-stars round to nearest whole.
+  const distMap = new Map<number, number>();
+  for (let r = 1; r <= 5; r++) distMap.set(r, 0);
+  for (const b of rated) {
+    if (b.rating === null) continue;
+    const bucket = Math.max(1, Math.min(5, Math.round(b.rating)));
+    distMap.set(bucket, (distMap.get(bucket) ?? 0) + 1);
+  }
+  const ratingDistribution = [...distMap.entries()]
+    .map(([rating, count]) => ({ rating, count }))
+    .sort((a, b) => b.rating - a.rating);
+
+  const tagCounts = new Map<string, number>();
+  for (const b of finishedThisYear) {
+    for (const t of b.tags) tagCounts.set(t, (tagCounts.get(t) ?? 0) + 1);
+  }
+  const topTags = [...tagCounts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+    .slice(0, 8);
+
+  const authorCounts = new Map<string, number>();
+  for (const b of finishedThisYear) {
+    for (const a of b.authors) authorCounts.set(a, (authorCounts.get(a) ?? 0) + 1);
+  }
+  const topAuthors = [...authorCounts.entries()]
+    .map(([author, count]) => ({ author, count }))
+    .sort((a, b) => b.count - a.count || a.author.localeCompare(b.author))
+    .slice(0, 8);
+
+  return {
+    year,
+    finished: finishedThisYear.length,
+    abandoned: abandonedThisYear.length,
+    startedInYear: startedInYear.length,
+    rated: rated.length,
+    averageRating,
+    ratingDistribution,
+    topTags,
+    topAuthors,
+    wouldReread: finishedThisYear.filter((b) => b.wouldReread === true).length,
+  };
 }

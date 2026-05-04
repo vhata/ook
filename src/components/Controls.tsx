@@ -55,6 +55,12 @@ export default function Controls() {
       >
         log
       </Link>
+      <Link
+        href="/stats"
+        className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
+      >
+        stats
+      </Link>
       <button
         type="button"
         onClick={flipTheme}
