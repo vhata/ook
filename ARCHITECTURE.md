@@ -26,6 +26,7 @@ Live in production at https://b-ook.vercel.app. Vault (`vhata/books`) is a priva
 - **`src/app/`** — Next.js App Router pages (home, `/books/[slug]`, `/log`, `/stats`, `/stats/[year]`, `/api/books/[slug]/notes`). Server components only; data is read at request/build time via the vault reader.
 - **`src/app/api/books/[slug]/notes/route.ts`** — tier 2 endpoint. Returns the deep reference-notes markdown as JSON. Lives outside SSR so the body never appears in initial HTML.
 - **`src/components/`** — client components for tiered reveals (`RevealSection`, `DeepNotes`), inline spoiler blur (`Spoiler`), the cover image (`Cover`), and the top-right theme/log controls (`Controls`).
+- **`src/app/opengraph-image.tsx`** + **`src/app/books/[slug]/opengraph-image.tsx`** — per-route Open Graph share images via Next 16's file convention. Use `next/og` `ImageResponse` with Source Serif 4 fetched from Google Fonts at generation time (`src/lib/og-fonts.ts`). Statically optimised by Next.
 - **`scripts/fetch-vault.mjs`** — prebuild step that clones `vhata/books` into `./.vault/` on the build server using `BOOKS_DEPLOY_KEY`. Local dev no-ops.
 - **The vault** — external to this repo, lives at `BOOKS_DIR` (or `<cwd>/.vault` in production). This project never writes to it; it only reads. Schema and write conventions are owned by `books/CLAUDE.md` in the vault.
 
