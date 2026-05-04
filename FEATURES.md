@@ -40,3 +40,4 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ `/series` browser — every book with a `series` frontmatter, grouped by name, ordered by `#N` index when present. Each row shows cover thumb, status, rating, finish date. Reachable from the controls bar.
 - ✓ Reading-day heatmap on `/stats/[year]` — GitHub-contribution-style calendar grid, 7×52 cells, intensity ramped by event count per day (started + finished + manual log entries). Tooltip shows date and count.
 - ✓ "On this day" strip on the home page — surfaces reading-log events from past years that share today's month-and-day (started/finished/notes). Renders only when there's something to show; year tag + kind label + linked book title.
+- ✓ `/stats` index now renders "Years in reading" — each year's first finished book and last finished book with rating + finish date, linking through to the year's full stats. Falls through to `/stats/[currentYear]` only when no year has data yet.
