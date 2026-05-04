@@ -147,12 +147,13 @@ function BookHeader({ book, bingoYear }: { book: Book; bingoYear: number | null 
         {book.tags.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {book.tags.map((tag) => (
-              <span
+              <Link
                 key={tag}
-                className="bg-surface-mute text-ink-soft rounded-full px-2 py-0.5 text-xs"
+                href={`/tags/${encodeURIComponent(tag)}`}
+                className="bg-surface-mute text-ink-soft hover:text-accent rounded-full px-2 py-0.5 text-xs"
               >
                 {tag}
-              </span>
+              </Link>
             ))}
           </div>
         )}

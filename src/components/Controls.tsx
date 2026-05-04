@@ -47,7 +47,7 @@ export default function Controls() {
   const themeLabel = theme === "dark" ? "☾ dark" : theme === "light" ? "☀ light" : "auto";
 
   return (
-    <div className="border-rule bg-bg-raised fixed top-3 right-3 z-50 flex items-center gap-1.5 rounded-full border py-1 pr-1 pl-2.5 text-[11px] shadow-[0_4px_16px_rgba(0,0,0,0.18)] sm:top-4 sm:right-4 sm:gap-2 sm:pl-3">
+    <div className="border-rule bg-bg-raised fixed top-3 right-3 z-50 flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center justify-end gap-1.5 rounded-2xl border py-1 pr-1 pl-2.5 text-[11px] shadow-[0_4px_16px_rgba(0,0,0,0.18)] sm:top-4 sm:right-4 sm:max-w-none sm:flex-nowrap sm:gap-2 sm:rounded-full sm:pl-3">
       <span className="text-ink-soft hidden tracking-[0.14em] uppercase sm:inline">ook</span>
       <Link
         href="/log"
@@ -66,6 +66,12 @@ export default function Controls() {
         className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
       >
         discover
+      </Link>
+      <Link
+        href="/tags"
+        className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
+      >
+        tags
       </Link>
       <Link
         href="/stats"

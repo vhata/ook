@@ -146,6 +146,15 @@ export type ConnectionReason = {
   detail: string;
 };
 
+export type TagSummary = {
+  tag: string;
+  count: number;
+  bookSlugs: string[];
+  // Top co-occurring tags (limited to 3) — "if you click this tag, you
+  // tend to also see these alongside it".
+  coOccurring: Array<{ tag: string; count: number }>;
+};
+
 export type Connection = {
   a: { slug: string; title: string; authors: string[]; cover: string | null };
   b: { slug: string; title: string; authors: string[]; cover: string | null };

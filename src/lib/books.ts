@@ -16,6 +16,7 @@ import type {
   Pullquote,
   SeriesGroup,
   SeriesMember,
+  TagSummary,
   Tbr,
   TbrEntry,
   TbrPile,
@@ -567,6 +568,66 @@ export async function getStatsYears(): Promise<number[]> {
     if (b.started) years.add(Number(b.started.slice(0, 4)));
   }
   return [...years].filter((y) => Number.isFinite(y)).sort((a, b) => b - a);
+}
+
+// Tag taxonomy: every tag in the vault, with its book count and the top
+// co-occurring tags. Powers the /tags index browse view.
+export async function getTagIndex(): Promise<TagSummary[]> {
+  const books = await getAllBooks();
+  // count[tag] = books with that tag
+  const counts = new Map<string, Set<string>>(); // tag -> set of book slugs
+  // co[tag] = Map<otherTag, count>
+  const co = new Map<string, Map<string, number>>();
+
+  for (const b of books) {
+    if (b.tags.length === 0) continue;
+    for (const t of b.tags) {
+      if (!counts.has(t)) counts.set(t, new Set());
+      counts.get(t)!.add(b.slug);
+      if (!co.has(t)) co.set(t, new Map());
+    }
+    // Pairwise co-occurrence within this book.
+    for (let i = 0; i < b.tags.length; i++) {
+      for (let j = 0; j < b.tags.length; j++) {
+        if (i === j) continue;
+        const a = b.tags[i];
+        const c = b.tags[j];
+        const m = co.get(a)!;
+        m.set(c, (m.get(c) ?? 0) + 1);
+      }
+    }
+  }
+
+  const summaries: TagSummary[] = [];
+  for (const [tag, slugSet] of counts) {
+    const coMap = co.get(tag) ?? new Map();
+    const coOccurring = [...coMap.entries()]
+      .map(([t, n]) => ({ tag: t, count: n }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+      .slice(0, 3);
+    summaries.push({
+      tag,
+      count: slugSet.size,
+      bookSlugs: [...slugSet].sort(),
+      coOccurring,
+    });
+  }
+  summaries.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+  return summaries;
+}
+
+// Books that carry a specific tag, returned in finish-date desc order
+// then by title. Powers /tags/[tag].
+export async function getBooksByTag(tag: string): Promise<Book[]> {
+  const books = await getAllBooks();
+  return books
+    .filter((b) => b.tags.includes(tag))
+    .sort((a, b) => {
+      const ad = a.finished ?? a.started ?? "";
+      const bd = b.finished ?? b.started ?? "";
+      if (ad && bd && ad !== bd) return bd.localeCompare(ad);
+      return a.title.localeCompare(b.title);
+    });
 }
 
 // Score the similarity between two books from vault data alone. Reasons

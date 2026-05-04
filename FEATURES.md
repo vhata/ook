@@ -42,3 +42,4 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ "On this day" strip on the home page — surfaces reading-log events from past years that share today's month-and-day (started/finished/notes). Renders only when there's something to show; year tag + kind label + linked book title.
 - ✓ `/stats` index now renders "Years in reading" — each year's first finished book and last finished book with rating + finish date, linking through to the year's full stats. Falls through to `/stats/[currentYear]` only when no year has data yet.
 - ✓ `/discover` route — top-N most-connected book pairs in the vault, scored by see-also links, shared series, shared author, and overlapping tags. Per-pair reason chips explain the connection. Pure vault derivation, no external recommender.
+- ✓ `/tags` index + `/tags/[tag]` — tag taxonomy with sized tag cloud, per-tag co-occurrence chips, and a per-tag book grid. Tag chips on per-book pages now link into the matching tag page.

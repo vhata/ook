@@ -3,7 +3,9 @@ import path from "node:path";
 import {
   externalLinks,
   findBingoYearForBook,
+  getBooksByTag,
   getConnections,
+  getTagIndex,
   getAllBingoCards,
   getAllBooks,
   getAllSeries,
@@ -385,6 +387,34 @@ describe("getYearStats", () => {
     expect(stats.averageRating).toBeNull();
     expect(stats.topTags).toEqual([]);
     expect(stats.topAuthors).toEqual([]);
+  });
+});
+
+describe("getTagIndex", () => {
+  it("returns each tag with count and co-occurring tags, sorted by count desc", async () => {
+    const tags = await getTagIndex();
+    // TestBook has tags [scifi, test]; PrivateBook has []. Both tags appear once.
+    const summary = tags.map((t) => ({ tag: t.tag, count: t.count }));
+    expect(summary).toEqual(
+      expect.arrayContaining([
+        { tag: "scifi", count: 1 },
+        { tag: "test", count: 1 },
+      ]),
+    );
+    const scifi = tags.find((t) => t.tag === "scifi");
+    expect(scifi?.bookSlugs).toEqual(["TestBook"]);
+    expect(scifi?.coOccurring.map((c) => c.tag)).toEqual(["test"]);
+  });
+});
+
+describe("getBooksByTag", () => {
+  it("returns books that carry the tag, finish-date desc", async () => {
+    const books = await getBooksByTag("scifi");
+    expect(books.map((b) => b.slug)).toEqual(["TestBook"]);
+  });
+
+  it("returns an empty array for an unknown tag", async () => {
+    expect(await getBooksByTag("unknown-tag")).toEqual([]);
   });
 });
 
