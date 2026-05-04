@@ -61,6 +61,15 @@ export default function Controls() {
       >
         stats
       </Link>
+      <Link
+        href="/random"
+        prefetch={false}
+        className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
+        title="A random finished book"
+        aria-label="Open a random finished book"
+      >
+        🎲
+      </Link>
       <button
         type="button"
         onClick={flipTheme}

@@ -110,7 +110,6 @@ Vault-only stats; no external API needed. All extend the existing `/stats/[year]
 
 Surface your own past back to you. All vault-only.
 
-- **`/random` route**: pick a random finished book, redirect. Wikipedia-stunt joy. Twenty-line route. `#feature #route #discovery`
 - **`/discover` from vault data alone**: `see_also` chain traversal + tag-overlap recommendations, no Hardcover required. Cousin of the existing Hardcover-driven `/discover` entry. `#feature #route #discovery`
 - **Serendipity engine on home page**: surfaces a finished book you haven't touched in over a year, in a quiet sidebar. `#feature #discovery #home`
 - **"On this day" strip**: what you started/finished on this calendar day in past years, on home or `/log`. Pure derivation. `#feature #discovery #log`
