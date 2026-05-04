@@ -8,6 +8,8 @@ import type {
   BookStatus,
   BingoCard,
   BingoSquare,
+  Connection,
+  ConnectionReason,
   DayActivity,
   ExternalLink,
   LogEntry,
@@ -565,6 +567,77 @@ export async function getStatsYears(): Promise<number[]> {
     if (b.started) years.add(Number(b.started.slice(0, 4)));
   }
   return [...years].filter((y) => Number.isFinite(y)).sort((a, b) => b - a);
+}
+
+// Score the similarity between two books from vault data alone. Reasons
+// are returned alongside the score so the UI can explain the connection
+// rather than just presenting a number.
+//
+// Weights tuned by feel: explicit links (see_also, series) are worth more
+// than incidental overlap (shared tags), since the user has put thought
+// into the explicit ones. Score zero means "no signal" — caller filters.
+function scorePair(a: Book, b: Book): { score: number; reasons: ConnectionReason[] } {
+  const reasons: ConnectionReason[] = [];
+  let score = 0;
+
+  const aLinksB = a.seeAlso.includes(b.slug);
+  const bLinksA = b.seeAlso.includes(a.slug);
+  if (aLinksB && bLinksA) {
+    score += 6;
+    reasons.push({ kind: "see-also", detail: "linked both ways" });
+  } else if (aLinksB || bLinksA) {
+    score += 4;
+    reasons.push({ kind: "see-also", detail: "linked" });
+  }
+
+  if (a.series && a.series === b.series) {
+    score += 5;
+    reasons.push({ kind: "series", detail: a.series });
+  }
+
+  const sharedAuthors = a.authors.filter((x) => b.authors.includes(x));
+  if (sharedAuthors.length > 0) {
+    score += 3 * sharedAuthors.length;
+    reasons.push({ kind: "author", detail: sharedAuthors.join(", ") });
+  }
+
+  const sharedTags = a.tags.filter((t) => b.tags.includes(t));
+  if (sharedTags.length > 0) {
+    // Cap tag contribution so a long shared-tag list doesn't dominate
+    // explicit signals; render up to three tags in the reason.
+    score += Math.min(sharedTags.length, 5);
+    reasons.push({ kind: "tag", detail: sharedTags.slice(0, 3).join(", ") });
+  }
+
+  return { score, reasons };
+}
+
+// Top-N most-connected book pairs in the vault, ranked by similarity.
+// Considers finished + currently-reading books only — TBR entries don't
+// have tags or full schema, and abandoned books would clutter "what
+// else might I like" surfaces. Symmetric: each pair counted once.
+export async function getConnections(limit = 20): Promise<Connection[]> {
+  const books = await getAllBooks();
+  const pool = books.filter((b) => b.status === "finished" || b.status === "reading");
+  const connections: Connection[] = [];
+  for (let i = 0; i < pool.length; i++) {
+    for (let j = i + 1; j < pool.length; j++) {
+      const { score, reasons } = scorePair(pool[i], pool[j]);
+      if (score === 0) continue;
+      connections.push({
+        a: lite(pool[i]),
+        b: lite(pool[j]),
+        score,
+        reasons,
+      });
+    }
+  }
+  connections.sort((a, b) => b.score - a.score || a.a.title.localeCompare(b.a.title));
+  return connections.slice(0, limit);
+}
+
+function lite(b: Book): Connection["a"] {
+  return { slug: b.slug, title: b.title, authors: b.authors, cover: b.cover };
 }
 
 // Reading-log entries from past years that share today's month-and-day.

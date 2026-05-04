@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   externalLinks,
   findBingoYearForBook,
+  getConnections,
   getAllBingoCards,
   getAllBooks,
   getAllSeries,
@@ -384,6 +385,20 @@ describe("getYearStats", () => {
     expect(stats.averageRating).toBeNull();
     expect(stats.topTags).toEqual([]);
     expect(stats.topAuthors).toEqual([]);
+  });
+});
+
+describe("getConnections", () => {
+  it("connects TestBook and PrivateBook via the see-also link", async () => {
+    // TestBook lists `see_also: [PrivateBook]`. PrivateBook is reading,
+    // TestBook is finished — both are in the pool, so they should pair.
+    const conns = await getConnections();
+    expect(conns).toHaveLength(1);
+    const c = conns[0];
+    const slugs = [c.a.slug, c.b.slug].sort();
+    expect(slugs).toEqual(["PrivateBook", "TestBook"]);
+    expect(c.reasons.some((r) => r.kind === "see-also")).toBe(true);
+    expect(c.score).toBeGreaterThan(0);
   });
 });
 

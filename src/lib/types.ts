@@ -140,3 +140,15 @@ export type DayActivity = {
   // Total events on this date — started + finished + manual log entries.
   count: number;
 };
+
+export type ConnectionReason = {
+  kind: "see-also" | "series" | "author" | "tag";
+  detail: string;
+};
+
+export type Connection = {
+  a: { slug: string; title: string; authors: string[]; cover: string | null };
+  b: { slug: string; title: string; authors: string[]; cover: string | null };
+  score: number;
+  reasons: ConnectionReason[];
+};
