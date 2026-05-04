@@ -31,3 +31,4 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ `bin/book` Node CLI in the vault for deterministic frontmatter mutations + `book list` (with vault / bingo / Goodreads sources, filters by status, tag, bingo, rated) + `book covers` (HTML grid of Open Library editions in the browser) + `book cover` (set chosen URL) + `book import-goodreads` (parse CSV, write to `_meta/goodreads.md`).
 - ✓ Auto-promote bingo and Goodreads-only entries to vault directories on first mutation. Verification prompt for GR-claimed status / rating / date.
 - ✓ Multi-year bingo support: current year derived from the highest `_meta/bingo-YYYY.md` filename; per-book pages attribute to whichever card actually references the book.
+- ✓ External-link row on per-book pages — "View on Goodreads · Hardcover · Storygraph · Bookwyrm" rendered from optional `goodreads_id`, `hardcover_slug`, `storygraph_slug`, `bookwyrm_url` frontmatter fields. Missing fields produce no link; nothing is guessed.

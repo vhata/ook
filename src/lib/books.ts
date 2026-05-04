@@ -8,6 +8,7 @@ import type {
   BookStatus,
   BingoCard,
   BingoSquare,
+  ExternalLink,
   LogEntry,
   Pullquote,
   Tbr,
@@ -67,6 +68,14 @@ async function fileExists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// Goodreads IDs are numeric but YAML may parse them as string or number.
+// Coerce to a non-empty string; null on anything else.
+function parseId(value: unknown): string | null {
+  if (typeof value === "string" && value.length > 0) return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
 }
 
 function parsePullquote(value: unknown): Pullquote | null {
@@ -129,7 +138,37 @@ async function readBookDir(slug: string): Promise<Book | null> {
     hasReview,
     hasQuotes,
     hasSummary,
+    goodreadsId: parseId(data.goodreads_id),
+    hardcoverSlug: parseNullableString(data.hardcover_slug),
+    storygraphSlug: parseNullableString(data.storygraph_slug),
+    bookwyrmUrl: parseNullableString(data.bookwyrm_url),
   };
+}
+
+// Build the list of outbound links the book actually has IDs for. Order is
+// fixed (Goodreads, Hardcover, Storygraph, Bookwyrm); missing fields drop
+// out, never guessed. Returns [] if no IDs are populated.
+export function externalLinks(book: Book): ExternalLink[] {
+  const links: ExternalLink[] = [];
+  if (book.goodreadsId) {
+    links.push({
+      label: "Goodreads",
+      url: `https://www.goodreads.com/book/show/${book.goodreadsId}`,
+    });
+  }
+  if (book.hardcoverSlug) {
+    links.push({ label: "Hardcover", url: `https://hardcover.app/books/${book.hardcoverSlug}` });
+  }
+  if (book.storygraphSlug) {
+    links.push({
+      label: "Storygraph",
+      url: `https://app.thestorygraph.com/books/${book.storygraphSlug}`,
+    });
+  }
+  if (book.bookwyrmUrl) {
+    links.push({ label: "Bookwyrm", url: book.bookwyrmUrl });
+  }
+  return links;
 }
 
 export async function getAllBooks(): Promise<Book[]> {

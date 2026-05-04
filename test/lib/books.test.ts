@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import path from "node:path";
 import {
+  externalLinks,
   findBingoYearForBook,
   getAllBingoCards,
   getAllBooks,
@@ -13,6 +14,7 @@ import {
   getRecentlyFinished,
   getTbr,
 } from "../../src/lib/books";
+import type { Book } from "../../src/lib/types";
 
 const FIXTURE_VAULT = path.resolve(__dirname, "..", "fixtures", "vault");
 
@@ -48,6 +50,19 @@ describe("getAllBooks", () => {
     expect(test?.hasReview).toBe(true);
     expect(test?.hasQuotes).toBe(true);
     expect(test?.hasSummary).toBe(false);
+  });
+
+  it("coerces a numeric goodreads_id to a string and reads other external IDs", async () => {
+    const books = await getAllBooks();
+    const test = books.find((b) => b.slug === "TestBook");
+    expect(test?.goodreadsId).toBe("12345");
+    expect(test?.hardcoverSlug).toBe("test-book");
+    expect(test?.storygraphSlug).toBe("test-book-sg");
+    expect(test?.bookwyrmUrl).toBe("https://bookwyrm.social/book/9001/test-book");
+
+    const priv = books.find((b) => b.slug === "PrivateBook");
+    expect(priv?.goodreadsId).toBeNull();
+    expect(priv?.hardcoverSlug).toBeNull();
   });
 });
 
@@ -186,6 +201,66 @@ describe("getReadingLog", () => {
   it("respects limit", async () => {
     const log = await getReadingLog(2);
     expect(log).toHaveLength(2);
+  });
+});
+
+describe("externalLinks", () => {
+  function makeBook(overrides: Partial<Book> = {}): Book {
+    return {
+      slug: "x",
+      title: "x",
+      authors: [],
+      series: null,
+      status: "tbr",
+      progress: "",
+      started: null,
+      finished: null,
+      rating: null,
+      wouldReread: null,
+      bingoSquares: [],
+      tags: [],
+      cover: null,
+      pullquote: null,
+      seeAlso: [],
+      lastEdited: null,
+      hasReview: false,
+      hasQuotes: false,
+      hasSummary: false,
+      goodreadsId: null,
+      hardcoverSlug: null,
+      storygraphSlug: null,
+      bookwyrmUrl: null,
+      ...overrides,
+    };
+  }
+
+  it("returns nothing when no IDs are populated", () => {
+    expect(externalLinks(makeBook())).toEqual([]);
+  });
+
+  it("includes only the links a book actually has", () => {
+    const links = externalLinks(makeBook({ goodreadsId: "12345", storygraphSlug: "dune" }));
+    expect(links).toEqual([
+      { label: "Goodreads", url: "https://www.goodreads.com/book/show/12345" },
+      { label: "Storygraph", url: "https://app.thestorygraph.com/books/dune" },
+    ]);
+  });
+
+  it("uses the Bookwyrm URL verbatim (per-instance)", () => {
+    const links = externalLinks(makeBook({ bookwyrmUrl: "https://bookwyrm.social/book/42/dune" }));
+    expect(links).toEqual([{ label: "Bookwyrm", url: "https://bookwyrm.social/book/42/dune" }]);
+  });
+
+  it("orders Goodreads, Hardcover, Storygraph, Bookwyrm", () => {
+    const links = externalLinks(
+      makeBook({
+        goodreadsId: "1",
+        hardcoverSlug: "h",
+        storygraphSlug: "s",
+        bookwyrmUrl: "https://bw.example/book/1",
+      }),
+    );
+    expect(links.map((l) => l.label)).toEqual(["Goodreads", "Hardcover", "Storygraph", "Bookwyrm"]);
   });
 });
 

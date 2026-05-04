@@ -8,7 +8,7 @@ import { Cover } from "@/components/Cover";
 import DeepNotes from "@/components/DeepNotes";
 import RevealSection from "@/components/RevealSection";
 import Spoiler from "@/components/Spoiler";
-import { findBingoYearForBook, getAllBooks, getBookBySlug } from "@/lib/books";
+import { externalLinks, findBingoYearForBook, getAllBooks, getBookBySlug } from "@/lib/books";
 import { remarkSpoilerDirective, slugify } from "@/lib/markdown";
 import type { Book } from "@/lib/types";
 
@@ -156,8 +156,32 @@ function BookHeader({ book, bingoYear }: { book: Book; bingoYear: number | null 
             ))}
           </div>
         )}
+        <ExternalLinkRow book={book} />
       </div>
     </header>
+  );
+}
+
+function ExternalLinkRow({ book }: { book: Book }) {
+  const links = externalLinks(book);
+  if (links.length === 0) return null;
+  return (
+    <div className="text-ink-soft mt-4 flex flex-wrap items-center gap-2 text-[11px] tracking-[0.08em] uppercase">
+      <span className="text-ink-dim">View on</span>
+      {links.map((link, i) => (
+        <span key={link.label} className="contents">
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink hover:text-accent decoration-rule hover:decoration-accent underline underline-offset-[3px]"
+          >
+            {link.label}
+          </a>
+          {i < links.length - 1 && <span className="text-ink-dim">·</span>}
+        </span>
+      ))}
+    </div>
   );
 }
 

@@ -25,6 +25,15 @@ export type Book = {
   hasReview: boolean;
   hasQuotes: boolean;
   hasSummary: boolean;
+  goodreadsId: string | null;
+  hardcoverSlug: string | null;
+  storygraphSlug: string | null;
+  bookwyrmUrl: string | null;
+};
+
+export type ExternalLink = {
+  label: string;
+  url: string;
 };
 
 export type BingoSquare = {

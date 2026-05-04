@@ -15,6 +15,10 @@ pullquote:
   text: A short, memorable line.
   source: Ch. 5
 see_also: [PrivateBook]
+goodreads_id: 12345
+hardcover_slug: test-book
+storygraph_slug: test-book-sg
+bookwyrm_url: https://bookwyrm.social/book/9001/test-book
 ---
 
 ## Notes
