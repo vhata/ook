@@ -673,6 +673,29 @@ function scorePair(a: Book, b: Book): { score: number; reasons: ConnectionReason
   return { score, reasons };
 }
 
+// Top-N books most similar to the given slug, by the same scoring used
+// for /discover. Excludes the book itself; null score (no signal) drops
+// out. Returns lite summaries — the per-book sidebar only renders
+// title/author/cover.
+export async function getSimilarBooks(
+  slug: string,
+  limit = 3,
+): Promise<Array<{ book: Connection["a"]; score: number; reasons: ConnectionReason[] }>> {
+  const books = await getAllBooks();
+  const target = books.find((b) => b.slug === slug);
+  if (!target) return [];
+  const pool = books.filter((b) => b.slug !== slug);
+
+  const scored = pool
+    .map((b) => {
+      const { score, reasons } = scorePair(target, b);
+      return { book: lite(b), score, reasons };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score || a.book.title.localeCompare(b.book.title));
+  return scored.slice(0, limit);
+}
+
 // Top-N most-connected book pairs in the vault, ranked by similarity.
 // Considers finished + currently-reading books only — TBR entries don't
 // have tags or full schema, and abandoned books would clutter "what

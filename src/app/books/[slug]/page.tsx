@@ -8,9 +8,15 @@ import { Cover } from "@/components/Cover";
 import DeepNotes from "@/components/DeepNotes";
 import RevealSection from "@/components/RevealSection";
 import Spoiler from "@/components/Spoiler";
-import { externalLinks, findBingoYearForBook, getAllBooks, getBookBySlug } from "@/lib/books";
+import {
+  externalLinks,
+  findBingoYearForBook,
+  getAllBooks,
+  getBookBySlug,
+  getSimilarBooks,
+} from "@/lib/books";
 import { remarkSpoilerDirective, slugify } from "@/lib/markdown";
-import type { Book } from "@/lib/types";
+import type { Book, Connection, ConnectionReason } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -36,9 +42,10 @@ export default async function BookPage({ params }: { params: Params }) {
 
   const { book, review, quotes } = page;
 
-  const [allBooks, bingoYear] = await Promise.all([
+  const [allBooks, bingoYear, similar] = await Promise.all([
     getAllBooks(),
     book.bingoSquares.length > 0 ? findBingoYearForBook(book.slug) : Promise.resolve(null),
+    getSimilarBooks(book.slug, 3),
   ]);
   const seeAlso = book.seeAlso
     .map((s) => allBooks.find((b) => b.slug === s))
@@ -56,7 +63,7 @@ export default async function BookPage({ params }: { params: Params }) {
       <BookHeader book={book} bingoYear={bingoYear} />
 
       <div className="grid grid-cols-1 gap-9 md:grid-cols-[180px_1fr]">
-        <Toc seeAlso={seeAlso} />
+        <Toc seeAlso={seeAlso} similar={similar} />
 
         <div className="min-w-0">
           {book.pullquote && (
@@ -186,25 +193,74 @@ function ExternalLinkRow({ book }: { book: Book }) {
   );
 }
 
-function Toc({ seeAlso }: { seeAlso: Book[] }) {
-  if (seeAlso.length === 0) return <aside className="hidden md:block" />;
+function Toc({
+  seeAlso,
+  similar,
+}: {
+  seeAlso: Book[];
+  similar: Array<{ book: Connection["a"]; score: number; reasons: ConnectionReason[] }>;
+}) {
+  if (seeAlso.length === 0 && similar.length === 0) return <aside className="hidden md:block" />;
   return (
     <aside className="self-start md:sticky md:top-6">
-      <div className="text-ink-soft mb-3 text-[10px] tracking-[0.18em] uppercase">See also</div>
-      <ul className="m-0 list-none p-0">
-        {seeAlso.map((b) => (
-          <li key={b.slug} className="mb-2">
+      {seeAlso.length > 0 && (
+        <>
+          <div className="text-ink-soft mb-3 text-[10px] tracking-[0.18em] uppercase">See also</div>
+          <ul className="m-0 mb-7 list-none p-0">
+            {seeAlso.map((b) => (
+              <li key={b.slug} className="mb-2">
+                <Link
+                  href={`/books/${encodeURIComponent(b.slug)}`}
+                  className="font-serif text-accent decoration-accent-soft hover:decoration-accent text-[13px] leading-[1.45] underline italic underline-offset-2"
+                >
+                  {b.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {similar.length > 0 && (
+        <>
+          <div className="text-ink-soft mb-3 text-[10px] tracking-[0.18em] uppercase">
+            Threads
             <Link
-              href={`/books/${encodeURIComponent(b.slug)}`}
-              className="font-serif text-accent decoration-accent-soft hover:decoration-accent text-[13px] leading-[1.45] underline italic underline-offset-2"
+              href="/discover"
+              className="text-ink-dim hover:text-accent ml-1 normal-case tracking-normal italic"
             >
-              {b.title}
+              · all
             </Link>
-          </li>
-        ))}
-      </ul>
+          </div>
+          <ul className="m-0 list-none p-0">
+            {similar.map((s) => (
+              <li key={s.book.slug} className="mb-3">
+                <Link
+                  href={`/books/${encodeURIComponent(s.book.slug)}`}
+                  className="font-serif text-ink hover:text-accent block text-[13px] leading-[1.35]"
+                >
+                  {s.book.title}
+                </Link>
+                <div className="text-ink-dim mt-0.5 text-[10px] tracking-[0.04em]">
+                  {primaryReason(s.reasons)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </aside>
   );
+}
+
+function primaryReason(reasons: ConnectionReason[]): string {
+  // Pick the strongest signal to label the connection. Order matches the
+  // weights in scorePair: see-also > series > author > tag.
+  const order: ConnectionReason["kind"][] = ["see-also", "series", "author", "tag"];
+  for (const k of order) {
+    const r = reasons.find((x) => x.kind === k);
+    if (r) return r.detail ? `${k} · ${r.detail}` : k;
+  }
+  return "";
 }
 
 function Pullquote({ text, source }: { text: string; source: string | null }) {
