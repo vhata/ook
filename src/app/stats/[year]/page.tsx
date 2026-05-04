@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getStatsYears, getYearStats } from "@/lib/books";
-import type { RatingBucket, YearStats } from "@/lib/types";
+import { getStatsYears, getYearActivity, getYearStats } from "@/lib/books";
+import type { DayActivity, RatingBucket, YearStats } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,12 @@ export default async function StatsYearPage({ params }: { params: Params }) {
   const year = Number(yearParam);
   if (!Number.isInteger(year) || year < 1900 || year > 2999) notFound();
 
-  const [stats, allYears] = await Promise.all([getYearStats(year), getStatsYears()]);
+  const [stats, allYears, activity] = await Promise.all([
+    getYearStats(year),
+    getStatsYears(),
+    getYearActivity(year),
+  ]);
+  const totalEvents = activity.reduce((sum, d) => sum + d.count, 0);
 
   return (
     <main className="mx-auto box-border w-full max-w-[900px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
@@ -35,6 +40,7 @@ export default async function StatsYearPage({ params }: { params: Params }) {
       ) : (
         <>
           <Topline stats={stats} />
+          {totalEvents > 0 && <Heatmap activity={activity} totalEvents={totalEvents} />}
           {stats.rated > 0 && <RatingHistogram stats={stats} />}
           <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-2">
             <TopList
@@ -141,6 +147,89 @@ function Topline({ stats }: { stats: YearStats }) {
           {item.hint && <div className="text-ink-soft text-[11px] md:text-xs">{item.hint}</div>}
         </div>
       ))}
+    </section>
+  );
+}
+
+function Heatmap({ activity, totalEvents }: { activity: DayActivity[]; totalEvents: number }) {
+  // Five-bucket intensity ramp using the rust accent colour. Picked by eye:
+  // 0 events stays neutral; 1–2 light, 3–4 medium, 5–6 strong, 7+ saturated.
+  // Tuned to the realistic personal-site cadence — most days zero, peaks
+  // around finish-days where multiple events cluster.
+  const intensity = (count: number): string => {
+    if (count === 0) return "var(--surface-mute)";
+    if (count <= 2) return "color-mix(in srgb, var(--accent) 30%, transparent)";
+    if (count <= 4) return "color-mix(in srgb, var(--accent) 55%, transparent)";
+    if (count <= 6) return "color-mix(in srgb, var(--accent) 75%, transparent)";
+    return "var(--accent)";
+  };
+
+  const monthLabels: Array<{ index: number; label: string }> = [];
+  for (let m = 0; m < 12; m++) {
+    // Index of the first day of each month in the activity array.
+    const target = `${activity[0].date.slice(0, 4)}-${String(m + 1).padStart(2, "0")}-01`;
+    const idx = activity.findIndex((d) => d.date === target);
+    if (idx >= 0) {
+      const date = new Date(`${target}T00:00:00Z`);
+      monthLabels.push({
+        index: idx,
+        label: date.toLocaleString("en", { month: "short", timeZone: "UTC" }),
+      });
+    }
+  }
+
+  return (
+    <section className="mt-12">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
+        <h2 className="font-serif text-ink m-0 text-[22px] leading-tight font-medium tracking-[-0.012em]">
+          Reading days
+        </h2>
+        <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
+          {totalEvents} {totalEvents === 1 ? "event" : "events"}
+        </span>
+      </div>
+      <div className="bg-surface border-rule overflow-x-auto rounded border p-5">
+        <div
+          className="grid"
+          style={{
+            gridAutoFlow: "column",
+            gridTemplateRows: "repeat(7, 12px)",
+            gridAutoColumns: "12px",
+            gap: "3px",
+          }}
+        >
+          {activity.map((d) => (
+            <div
+              key={d.date}
+              title={`${d.date} — ${d.count} ${d.count === 1 ? "event" : "events"}`}
+              style={{
+                gridRowStart: d.weekday + 1,
+                background: intensity(d.count),
+                borderRadius: 2,
+              }}
+            />
+          ))}
+        </div>
+        <div className="text-ink-soft mt-3 flex items-center gap-2 text-[10px] tracking-[0.14em] uppercase">
+          <span>less</span>
+          {[0, 1, 3, 5, 7].map((n) => (
+            <span
+              key={n}
+              style={{
+                width: 12,
+                height: 12,
+                background: intensity(n),
+                borderRadius: 2,
+                display: "inline-block",
+              }}
+            />
+          ))}
+          <span>more</span>
+          <span className="text-ink-dim ml-auto hidden sm:inline">
+            {monthLabels.map((m) => m.label).join(" · ")}
+          </span>
+        </div>
+      </div>
     </section>
   );
 }

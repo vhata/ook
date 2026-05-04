@@ -90,7 +90,6 @@ Cosmetic and atmospheric ideas. Mostly low-stakes; pick whichever delights.
 
 Vault-only stats; no external API needed. All extend the existing `/stats/[year]` route.
 
-- **Reading heatmap on `/stats/[year]`**: GitHub-contribution-style calendar grid coloured by event density (started, finished, progress). `#feature #stats #visual`
 - **Rating-over-time line chart**: across all finished books, plot rating; reveals taste drift, harshening, kindening. `#feature #stats`
 - **Tag overlap Sankey across years**: flows between top tags year-on-year. Reveals genre migrations. `#feature #stats #visual`
 - **First book of every year list**: a small annual ritual surfaced at `/stats`. `#feature #stats #ritual`

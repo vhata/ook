@@ -38,3 +38,4 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ `/random` route — redirects to a random finished book; reachable via the 🎲 button in the controls bar. Empty-vault fallback redirects home.
 - ✓ `/feed.xml` Atom and `/feed.json` JSON Feed of finished books — discoverable from `<head>` so RSS readers auto-detect. Pullquote (or first review paragraph) used as each entry summary; finish date as `<updated>`/`date_published`. Cached for an hour.
 - ✓ `/series` browser — every book with a `series` frontmatter, grouped by name, ordered by `#N` index when present. Each row shows cover thumb, status, rating, finish date. Reachable from the controls bar.
+- ✓ Reading-day heatmap on `/stats/[year]` — GitHub-contribution-style calendar grid, 7×52 cells, intensity ramped by event count per day (started + finished + manual log entries). Tooltip shows date and count.

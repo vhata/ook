@@ -131,3 +131,12 @@ export type SeriesGroup = {
   name: string;
   members: SeriesMember[];
 };
+
+export type DayActivity = {
+  // ISO date string (YYYY-MM-DD).
+  date: string;
+  // Day of week, 0=Sun..6=Sat (UTC).
+  weekday: number;
+  // Total events on this date — started + finished + manual log entries.
+  count: number;
+};

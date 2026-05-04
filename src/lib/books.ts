@@ -8,6 +8,7 @@ import type {
   BookStatus,
   BingoCard,
   BingoSquare,
+  DayActivity,
   ExternalLink,
   LogEntry,
   Pullquote,
@@ -564,6 +565,34 @@ export async function getStatsYears(): Promise<number[]> {
     if (b.started) years.add(Number(b.started.slice(0, 4)));
   }
   return [...years].filter((y) => Number.isFinite(y)).sort((a, b) => b - a);
+}
+
+// One entry per calendar day in the year, with a count of reading events
+// (started + finished + manual log) on that day. Powers the heatmap on
+// `/stats/[year]`.
+export async function getYearActivity(year: number): Promise<DayActivity[]> {
+  const [books, manual] = await Promise.all([getAllBooks(), getManualLogEntries()]);
+  const counts = new Map<string, number>();
+  const bump = (date: string | null) => {
+    if (!date) return;
+    if (!date.startsWith(`${year}-`)) return;
+    counts.set(date, (counts.get(date) ?? 0) + 1);
+  };
+  for (const b of books) {
+    bump(b.started);
+    bump(b.finished);
+  }
+  for (const m of manual) bump(m.date);
+
+  const days: DayActivity[] = [];
+  const start = Date.UTC(year, 0, 1);
+  const end = Date.UTC(year, 11, 31);
+  for (let t = start; t <= end; t += 86400000) {
+    const d = new Date(t);
+    const date = d.toISOString().slice(0, 10);
+    days.push({ date, weekday: d.getUTCDay(), count: counts.get(date) ?? 0 });
+  }
+  return days;
 }
 
 // Aggregate every available stat for one calendar year. Pure derivation

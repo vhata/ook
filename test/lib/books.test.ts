@@ -16,6 +16,7 @@ import {
   getRecentlyFinished,
   getStatsYears,
   getTbr,
+  getYearActivity,
   getYearStats,
   parseSeriesField,
 } from "../../src/lib/books";
@@ -382,6 +383,37 @@ describe("getYearStats", () => {
     expect(stats.averageRating).toBeNull();
     expect(stats.topTags).toEqual([]);
     expect(stats.topAuthors).toEqual([]);
+  });
+});
+
+describe("getYearActivity", () => {
+  it("returns one entry per day of the year with event counts", async () => {
+    const days = await getYearActivity(2026);
+    // 2026 is not a leap year — 365 days.
+    expect(days).toHaveLength(365);
+    expect(days[0].date).toBe("2026-01-01");
+    expect(days[days.length - 1].date).toBe("2026-12-31");
+
+    // TestBook started 2026-01-15 + manual log "2026-04-15" has 2 entries =
+    // those days should be > 0 events.
+    const jan15 = days.find((d) => d.date === "2026-01-15");
+    expect(jan15?.count).toBe(1);
+    const apr15 = days.find((d) => d.date === "2026-04-15");
+    expect(apr15?.count).toBe(2);
+    // 2026-02-20: TestBook finished. 1 event.
+    const feb20 = days.find((d) => d.date === "2026-02-20");
+    expect(feb20?.count).toBe(1);
+  });
+
+  it("returns 366 days for a leap year", async () => {
+    const days = await getYearActivity(2028);
+    expect(days).toHaveLength(366);
+  });
+
+  it("tags every day with its weekday (0 = Sunday, UTC)", async () => {
+    const days = await getYearActivity(2026);
+    // 2026-01-01 was a Thursday → weekday = 4.
+    expect(days[0].weekday).toBe(4);
   });
 });
 
