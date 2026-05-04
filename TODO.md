@@ -93,7 +93,7 @@ Vault-only stats; no external API needed. All extend the existing `/stats/[year]
 - **Rating-over-time line chart**: across all finished books, plot rating; reveals taste drift, harshening, kindening. `#feature #stats`
 - **Tag overlap Sankey across years**: flows between top tags year-on-year. Reveals genre migrations. `#feature #stats #visual`
 - **Last book before personal milestone**: overlay log on a manually-maintained `_meta/milestones.md` (birthdays, moves, losses). Sentimental. `#feature #stats #personal`
-- **Reading drought detector**: gaps over three weeks flagged on `/log` with a wry "you went silent here" note. `#feature #stats #log`
+- **Reading drought detector — inline gap markers**: the top-of-`/log` quiet-stretch banner is shipped; still wanted is inline "X days quiet" markers between adjacent entries when the gap exceeds the threshold, including across month boundaries. `#feature #log #polish`
 - **Word frequency across reviews**: what _you_ keep saying. Self-portrait. `#feature #stats #introspection`
 - **"Books I rated 5 but never re-read"**: introspection axis; needs `reread_count` schema. `#feature #stats #introspection`
 - **"You always read X before Y" pattern detection**: consecutive-finishes patterns surfaced on `/stats`. `#feature #stats`

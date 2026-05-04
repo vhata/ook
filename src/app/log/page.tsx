@@ -37,6 +37,17 @@ export const metadata = {
   title: "Reading log",
 };
 
+// Threshold for surfacing "quiet" markers between entries. Below this
+// gap, the cadence is normal-life-busyness; above it reads as a real
+// stretch of silence worth flagging visually.
+const DROUGHT_DAYS = 21;
+
+function daysBetween(later: string, earlier: string): number {
+  const a = Date.parse(`${later}T00:00:00Z`);
+  const b = Date.parse(`${earlier}T00:00:00Z`);
+  return Math.round((a - b) / 86400000);
+}
+
 export default async function LogPage() {
   const log = await getReadingLog();
 
@@ -48,6 +59,13 @@ export default async function LogPage() {
     byMonth.set(m, arr);
   }
   const months = [...byMonth.keys()].sort().reverse();
+
+  // Most-recent event in the log. If today is > DROUGHT_DAYS past it, we
+  // surface a short "currently quiet" banner at the top.
+  const newest = log[0]?.date;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const currentDrought =
+    newest && daysBetween(todayIso, newest) > DROUGHT_DAYS ? daysBetween(todayIso, newest) : null;
 
   return (
     <main className="mx-auto box-border w-full max-w-[800px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
@@ -70,6 +88,12 @@ export default async function LogPage() {
           book&rsquo;s frontmatter; everything else lands here from <code>_meta/log.md</code>.
         </p>
       </header>
+
+      {currentDrought !== null && (
+        <div className="border-accent bg-accent-soft font-serif text-ink-soft mb-9 rounded border border-dashed p-4 text-[14px] italic">
+          {currentDrought} days since the last event — quiet stretch.
+        </div>
+      )}
 
       {months.length === 0 ? (
         <div className="border-rule bg-surface-mute font-serif text-ink-soft rounded border border-dashed p-6 text-center text-[15px] italic">
