@@ -79,6 +79,18 @@ html[data-theme="dark"] {
   }
 }
 
+/* Slower, gentler version of ook-pulse for the masthead accent dot:
+   readable as a heartbeat, not a status indicator. */
+@keyframes ook-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
 body {
   background: var(--bg);
   color: var(--ink);

@@ -117,7 +117,13 @@ function Header({ year }: { year: number }) {
           A reading journal · {year}
         </div>
         <h1 className="font-serif m-0 text-[72px] leading-[0.92] font-normal tracking-[-0.035em] sm:text-[96px]">
-          ook<span className="text-accent">.</span>
+          ook
+          <span
+            className="text-accent inline-block"
+            style={{ animation: "ook-breathe 4s ease-in-out infinite" }}
+          >
+            .
+          </span>
         </h1>
       </div>
       <div className="sm:text-right">

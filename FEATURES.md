@@ -44,3 +44,4 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ `/discover` route — top-N most-connected book pairs in the vault, scored by see-also links, shared series, shared author, and overlapping tags. Per-pair reason chips explain the connection. Pure vault derivation, no external recommender.
 - ✓ `/tags` index + `/tags/[tag]` — tag taxonomy with sized tag cloud, per-tag co-occurrence chips, and a per-tag book grid. Tag chips on per-book pages now link into the matching tag page.
 - ✓ Reading-drought banner on `/log` — when the most-recent event is more than 21 days old, the page heads with a soft "X days since the last event — quiet stretch" callout.
+- ✓ Polish: breathing accent dot on the home-page masthead (4-second opacity loop, gentler than the reading-now pulse), and a redesigned 404 page across both root and per-book routes — site palette, dropped-book line-art SVG, restored typography.

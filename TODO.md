@@ -83,8 +83,6 @@ Cosmetic and atmospheric ideas. Mostly low-stakes; pick whichever delights.
 - **Embossed/letterpress alternative theme**: a third theme beyond light/dark, vintage printer's aesthetic. `#feature #visual #theme`
 - **Seasonal accent palette drift**: rust → forest → slate → ochre quarterly; paper-and-ink stays constant. `#polish #visual #theme`
 - **Rating-as-wear-marks**: instead of stars, render condition (pristine for 5, dog-eared for 3, water-damaged for 1). May offend the rated. `#feature #visual #ratings`
-- **Animated "ook." breathing**: 4-second opacity loop on the rust dot in the masthead. Quiet sign-of-life. `#polish #visual #masthead`
-- **Custom 404 illustration**: dropped book, page-down, in line art on the existing 404 page. `#polish #visual #404`
 
 ### Stats & introspection (brainstormed 2026-05-03)
 
