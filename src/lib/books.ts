@@ -173,22 +173,26 @@ export async function getBingo(year: number): Promise<BingoCard | null> {
   const raw = await fs.readFile(file, "utf8");
   const { data } = matter(raw);
 
-  // Look up which books are currently being read so the bingo can render
-  // a "now" pill on those squares.
+  // Look up linked books so we can: (a) render a "now" pill on currently-
+  // reading squares; (b) prefer the book's own frontmatter cover over the
+  // stale copy embedded in the bingo file. The bingo's cover field is the
+  // fallback for squares without a vault directory.
   const allBooks = await getAllBooks();
-  const readingSlugs = new Set(allBooks.filter((b) => b.status === "reading").map((b) => b.slug));
+  const bySlug = new Map(allBooks.map((b) => [b.slug, b]));
 
   const squares = Array.isArray(data.squares)
     ? (data.squares as Array<Record<string, unknown>>).map((s): BingoSquare => {
-        const book = typeof s.book === "string" && s.book.length > 0 ? s.book : null;
+        const bookSlug = typeof s.book === "string" && s.book.length > 0 ? s.book : null;
+        const linked = bookSlug ? bySlug.get(bookSlug) : undefined;
+        const cover = linked?.cover ?? (typeof s.cover === "string" ? s.cover : null);
         return {
           id: typeof s.id === "string" ? s.id : "",
           title: typeof s.title === "string" ? s.title : null,
           authors: parseStringList(s.authors),
-          book,
-          cover: typeof s.cover === "string" ? s.cover : null,
+          book: bookSlug,
+          cover,
           done: s.done === true,
-          reading: book !== null && readingSlugs.has(book),
+          reading: linked?.status === "reading",
           free: s.free === true,
         };
       })
