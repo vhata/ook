@@ -66,8 +66,8 @@ export default async function LogPage() {
           What I did, in order.
         </h1>
         <p className="font-serif text-ink-soft mt-3 max-w-[560px] text-[17px] italic">
-          Started, finished, made notes, added to the pile. Derived from each book&rsquo;s vault
-          frontmatter; entries arrive whenever the vault writes them.
+          Started, finished, made notes, added to the pile. Started/finished events come from each
+          book&rsquo;s frontmatter; everything else lands here from <code>_meta/log.md</code>.
         </p>
       </header>
 
@@ -123,6 +123,10 @@ function Entry({ entry }: { entry: LogEntry }) {
     committed: "committed",
   };
   const href = entry.slug ? `/books/${encodeURIComponent(entry.slug)}` : null;
+  // Manual log entries have no slug/title — the `detail` is the prose. Lift
+  // it into the title slot so non-book events read prominently rather than
+  // being buried as a caption below an empty title.
+  const isManual = !entry.title;
   return (
     <li className="border-rule grid grid-cols-[54px_1fr] gap-5 border-t py-3.5">
       <div className="text-ink-soft pt-0.5 font-mono text-[11px] tracking-[0.04em]">
@@ -149,8 +153,15 @@ function Entry({ entry }: { entry: LogEntry }) {
                 {entry.title}
               </span>
             ))}
+          {isManual && entry.detail && (
+            <span className="font-serif text-ink text-[17px] leading-[1.4] font-medium">
+              {entry.detail}
+            </span>
+          )}
         </div>
-        {entry.detail && <div className="text-ink-soft text-sm leading-[1.5]">{entry.detail}</div>}
+        {!isManual && entry.detail && (
+          <div className="text-ink-soft text-sm leading-[1.5]">{entry.detail}</div>
+        )}
       </div>
     </li>
   );

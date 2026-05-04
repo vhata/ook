@@ -21,7 +21,7 @@ Live in production at https://b-ook.vercel.app. Vault (`vhata/books`) is a priva
 ## Components
 
 - **`src/lib/types.ts`** — domain types: `Book`, `BookStatus`, `BingoCard`, `BingoSquare`, `Tbr`, `LogEntry`, `Pullquote`. The TypeScript projection of the vault's frontmatter schema.
-- **`src/lib/books.ts`** — vault reader. Walks `BOOKS_DIR`, parses per-book reference files, reads `_meta/bingo-<year>.md` and `_meta/tbr.md`. Returns plain typed values; no React, no rendering. The boundary between "data on disk" and "the rest of the app".
+- **`src/lib/books.ts`** — vault reader. Walks `BOOKS_DIR`, parses per-book reference files, reads `_meta/bingo-<year>.md`, `_meta/tbr.md`, and the optional `_meta/log.md` for manual log entries. Returns plain typed values; no React, no rendering. The boundary between "data on disk" and "the rest of the app".
 - **`src/lib/markdown.ts`** — markdown helpers: heading extraction for the per-book TOC, slug generation, the `:::spoiler` remark directive plugin.
 - **`src/app/`** — Next.js App Router pages (home, `/books/[slug]`, `/log`, `/api/books/[slug]/notes`). Server components only; data is read at request/build time via the vault reader.
 - **`src/app/api/books/[slug]/notes/route.ts`** — tier 2 endpoint. Returns the deep reference-notes markdown as JSON. Lives outside SSR so the body never appears in initial HTML.
@@ -40,4 +40,3 @@ Live in production at https://b-ook.vercel.app. Vault (`vhata/books`) is a priva
 ## Open questions
 
 - **`summary.md` content.** The convention says it's a "full-spoiler plot summary," but tier 1 puts it one click away. For books where the summary really is full-spoiler (Ra), one option is moving that content into the reference notes (tier 2) and reserving `summary.md` for tier-1 synopses. Decide as the user populates more.
-- **Manual log entries.** `/log` derives from `started`/`finished` dates only. A future `_meta/log.md` could carry non-book events ("added to TBR", "committed to bingo"). Schema not yet designed.

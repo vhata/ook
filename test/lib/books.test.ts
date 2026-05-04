@@ -10,6 +10,7 @@ import {
   getBookBySlug,
   getCurrentBingoYear,
   getCurrentlyReading,
+  getManualLogEntries,
   getReadingLog,
   getRecentlyFinished,
   getStatsYears,
@@ -196,13 +197,44 @@ describe("getReadingLog", () => {
     expect(dates).toContain("2026-01-15/started");
     expect(dates).toContain("2026-02-20/finished");
     expect(dates).toContain("2026-04-01/started");
-    // Newest first
-    expect(dates[0]).toBe("2026-04-01/started");
+    // Newest first across frontmatter + manual entries.
+    expect(dates[0]).toBe("2026-04-15/committed");
   });
 
   it("respects limit", async () => {
     const log = await getReadingLog(2);
     expect(log).toHaveLength(2);
+  });
+});
+
+describe("getManualLogEntries", () => {
+  it("parses date headings and bold-prefix bullets into typed entries", async () => {
+    const entries = await getManualLogEntries();
+    const summary = entries.map((e) => `${e.date}/${e.kind}`);
+    expect(summary).toEqual([
+      "2026-04-15/committed",
+      "2026-04-15/tbr",
+      "2026-03-22/note",
+      "2026-03-22/reread",
+      "2026-02-10/progress",
+      "2026-02-10/note", // fallback for unrecognised prefix
+    ]);
+    // Manual entries carry no slug/title — the detail is the prose.
+    expect(entries.every((e) => e.slug === null && e.title === null)).toBe(true);
+    expect(entries[0].detail).toContain("24 books named");
+  });
+
+  it("merges with frontmatter-derived log entries in date order", async () => {
+    const log = await getReadingLog();
+    // 2026-04-15 entries (manual) sit above 2026-04-01 (PrivateBook started).
+    const firstFiveDates = log.slice(0, 5).map((e) => e.date);
+    expect(firstFiveDates).toEqual([
+      "2026-04-15",
+      "2026-04-15",
+      "2026-04-01",
+      "2026-03-22",
+      "2026-03-22",
+    ]);
   });
 });
 

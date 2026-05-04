@@ -423,14 +423,13 @@ function parseTbrEntry(text: string): TbrEntry | null {
   return { title, author, why, added };
 }
 
-// Reading log derived from book frontmatter dates. Returns most-recent first.
-// Each book with a `started` date emits a "started" entry; with `finished`,
-// a "finished" entry. Future: merge with manual entries from _meta/log.md.
+// Reading log: frontmatter-derived entries (started/finished dates per
+// book) merged with optional manual entries from `_meta/log.md`.
+// Returns most-recent first.
 export async function getReadingLog(limit?: number): Promise<LogEntry[]> {
-  const books = await getAllBooks();
-  const visible = books;
+  const [books, manual] = await Promise.all([getAllBooks(), getManualLogEntries()]);
   const entries: LogEntry[] = [];
-  for (const b of visible) {
+  for (const b of books) {
     if (b.started) {
       entries.push({
         date: b.started,
@@ -450,8 +449,53 @@ export async function getReadingLog(limit?: number): Promise<LogEntry[]> {
       });
     }
   }
+  entries.push(...manual);
   entries.sort((a, b) => b.date.localeCompare(a.date));
   return typeof limit === "number" ? entries.slice(0, limit) : entries;
+}
+
+// Bold-prefix → LogEntry.kind. Prefix matching is case-insensitive and
+// trimmed; anything not in this table falls back to `note`. Started/
+// finished are intentionally absent: those live on book frontmatter and
+// must not be duplicated in the manual log.
+const MANUAL_LOG_KIND_MAP: Record<string, LogEntry["kind"]> = {
+  note: "note",
+  progress: "progress",
+  reread: "reread",
+  "added to tbr": "tbr",
+  tbr: "tbr",
+  "committed to bingo": "committed",
+  committed: "committed",
+};
+
+// Parse `_meta/log.md` (optional) into typed entries. Body shape:
+//   ## YYYY-MM-DD
+//   - **Note** — free text
+//   - **Committed to bingo** — free text
+// Entries with no date heading or unparseable bullets are skipped.
+export async function getManualLogEntries(): Promise<LogEntry[]> {
+  const file = path.join(booksDir(), META_DIR, "log.md");
+  if (!(await fileExists(file))) return [];
+  const raw = await fs.readFile(file, "utf8");
+  const { content } = matter(raw);
+
+  const entries: LogEntry[] = [];
+  let currentDate: string | null = null;
+  for (const line of content.split("\n")) {
+    const heading = /^##\s+(\d{4}-\d{2}-\d{2})\s*$/.exec(line);
+    if (heading) {
+      currentDate = heading[1];
+      continue;
+    }
+    if (!currentDate) continue;
+    const bullet = /^-\s+\*\*(.+?)\*\*\s*[—–-]?\s*(.*)$/.exec(line.trim());
+    if (!bullet) continue;
+    const prefixKey = bullet[1].trim().toLowerCase();
+    const kind = MANUAL_LOG_KIND_MAP[prefixKey] ?? "note";
+    const detail = bullet[2].trim();
+    entries.push({ date: currentDate, kind, slug: null, title: null, detail });
+  }
+  return entries;
 }
 
 // Years (descending) that have at least one book event — finished, started,
