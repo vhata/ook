@@ -20,12 +20,12 @@ Live in production at https://b-ook.vercel.app. Vault (`vhata/books`) is a priva
 
 ## Components
 
-- **`src/lib/types.ts`** — domain types: `Book`, `BookStatus`, `BingoCard`, `BingoSquare`, `Tbr`, `LogEntry`, `Pullquote`. The TypeScript projection of the vault's frontmatter schema.
+- **`src/lib/types.ts`** — domain types. Catalog (`Book`, `BookStatus`, `Pullquote`), bingo (`BingoCard`, `BingoSquare`), TBR (`Tbr`, `TbrPile`, `TbrEntry`), reading log (`LogEntry`), external links (`ExternalLink`), year stats (`YearStats`, `RatingBucket`, `TagCount`, `AuthorCount`, `DayActivity`), series (`SeriesGroup`, `SeriesMember`), discovery (`Connection`, `ConnectionReason`), and tags (`TagSummary`). The TypeScript projection of the vault's frontmatter schema plus the derived shapes the routes render from.
 - **`src/lib/books.ts`** — vault reader. Walks `BOOKS_DIR`, parses per-book reference files, reads `_meta/bingo-<year>.md`, `_meta/tbr.md`, and the optional `_meta/log.md` for manual log entries. Returns plain typed values; no React, no rendering. The boundary between "data on disk" and "the rest of the app".
 - **`src/lib/markdown.ts`** — markdown helpers: heading extraction for the per-book TOC, slug generation, the `:::spoiler` remark directive plugin.
 - **`src/app/`** — Next.js App Router pages (home, `/books/[slug]`, `/log`, `/stats`, `/stats/[year]`, `/series`, `/discover`, `/tags`, `/tags/[tag]`, `/random`, `/feed.xml`, `/feed.json`, `/api/books/[slug]/notes`). Server components only; data is read at request/build time via the vault reader.
 - **`src/app/api/books/[slug]/notes/route.ts`** — tier 2 endpoint. Returns the deep reference-notes markdown as JSON. Lives outside SSR so the body never appears in initial HTML.
-- **`src/components/`** — client components for tiered reveals (`RevealSection`, `DeepNotes`), inline spoiler blur (`Spoiler`), the cover image (`Cover`), and the top-right theme/log controls (`Controls`).
+- **`src/components/`** — client components for tiered reveals (`RevealSection`, `DeepNotes`), inline spoiler blur (`Spoiler`), the cover image (`Cover`), the top-right navigation/theme controls (`Controls`), and the 404 illustration (`DroppedBook`).
 - **`src/app/opengraph-image.tsx`** + **`src/app/books/[slug]/opengraph-image.tsx`** — per-route Open Graph share images via Next 16's file convention. Use `next/og` `ImageResponse` with Source Serif 4 fetched from Google Fonts at generation time (`src/lib/og-fonts.ts`). Statically optimised by Next.
 - **`scripts/fetch-vault.mjs`** — prebuild step that clones `vhata/books` into `./.vault/` on the build server using `BOOKS_DEPLOY_KEY`. Local dev no-ops.
 - **The vault** — external to this repo, lives at `BOOKS_DIR` (or `<cwd>/.vault` in production). This project never writes to it; it only reads. Schema and write conventions are owned by `books/CLAUDE.md` in the vault.

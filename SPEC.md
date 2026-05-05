@@ -13,14 +13,15 @@ What I'm reading, what I've read, and the bingo card I'm chasing.
 - **Vault** — the Obsidian directory at `~/Google Drive/My Drive/Obsidian/books`, tracked in the `vhata/obsidian` git repo. Holds per-book directories and the `_meta/` infrastructure.
 - **Reference notes** — the per-book Markdown file (`<Title>/<Title>.md`) with YAML frontmatter and a body of structured prose. The primary lookup tool while reading.
 - **Frontmatter schema** — the YAML block at the top of each reference-notes file. Source of structured metadata (status, rating, bingo squares, cover, pullquote, see_also, etc.). Defined in `books/CLAUDE.md`.
-- **Capture flow** — the low-friction agent prompts triggered by reading milestones (finishing a book, claiming a bingo square, adding a TBR). Two or three small questions, never a wall of fields.
+- **Capture flow** — the low-friction agent prompts triggered by reading milestones (finishing a book, starting a book, abandoning or pausing one, claiming a bingo square, adding a TBR, logging a non-book event), plus an on-demand or weekly check-in that surfaces stale fields. Two or three small questions, never a wall of fields. Every prompt offers `(skip)` and the agent stops after three skips in a flow.
 - **Tiered spoiler model** — three levels of content visibility on per-book pages. Tier 0 (catalog: title, author, status, rating, dates, bingo) is always shown. Tier 1 (synopsis, review, quotes) is server-rendered and revealed by a one-click button. Tier 2 (deep reference notes) is fetched client-side from a separate API endpoint only after an explicit opt-in click — never appears in initial HTML, so search engines don't index spoilers.
 - **Bingo square** — one cell in the year's bingo card (`_meta/bingo-<year>.md`). Each square has a designated book; "done" means the book has been read.
 
 ## Functionality
 
-- **Public reading-status site.** Renders three sections: currently-reading books, recently-finished books, and the active year's bingo card.
+- **Public reading-status site.** Home page renders three sections: currently-reading books, recently-finished books, and the active year's bingo card.
 - **Per-book pages.** Every book in the vault has its own page rendering catalog facts in the header (title, author, status, rating, finish date, bingo claim, tags). Synopsis, review, and quotes are click-to-reveal. Deep reference notes load only after an explicit "show full notes (spoilers)" click and are not in the initial HTML.
+- **Secondary surfaces** derived from the same vault data: a reading log grouped by month, annual stats per year, a series browser, a tag taxonomy, a discovery view of connected books, an outbound link row (Goodreads / Hardcover / Storygraph / Bookwyrm) when frontmatter IDs are populated, subscribable feeds (Atom + JSON Feed) of finished books, and per-route Open Graph share images. The SPEC stays at "what the project does at a glance"; route-level enumeration lives in `ARCHITECTURE.md`.
 - **Vault as source of truth.** All data is read from the vault (Markdown + YAML frontmatter). No database, no duplicate state. The vault is maintained by the reader and an in-vault Claude agent governed by `books/CLAUDE.md`.
 - **Spoiler hygiene by tier.** Catalog facts are always public. Synopses are one click away (server-rendered, indexable). Deep notes are explicit-opt-in only and never reach search engines.
 
