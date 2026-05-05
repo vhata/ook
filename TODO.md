@@ -9,7 +9,6 @@ Flat backlog. Each entry tagged with `#area`. Done items deleted, not struck thr
 ### Site / render
 
 - TBR file currently includes long instructional prose meant for the agent ("When one moves into 'currently reading', promote it…"). The pile parser correctly extracts `## Wanted` / `## Re-Read Aspirations`, but those piles are empty (no entries yet), so the home page falls back to rendering the raw markdown body. Either fill the piles with real entries or strip the instructional prose from `tbr.md`. `#polish #render`
-- Document the new optional external-ID frontmatter fields (`goodreads_id`, `hardcover_slug`, `storygraph_slug`, `bookwyrm_url`) in vault-side `books/CLAUDE.md`. The renderer already surfaces a "View on …" link row for any of these that are populated; the in-vault agent should know to populate them during capture. `#vault #docs`
 - Per-book page React-component tests (would catch render regressions; needs `@testing-library/react` + `happy-dom`). `#testing`
 - Flesh out `ook-review` Layer 2 categories as project-specific rules emerge in `ARCHITECTURE.md`. `#review #setup`
 - Cover-picker improvements. `book covers` already opens an HTML grid of Open Library editions and `book cover <slug> <url>` sets any URL by hand — those are done. Still wanted: ISBN13 fallback when title-search returns no editions; surface non-Open-Library candidates (Google Books) when OL has thin coverage; per-cover language / region preference. `#feature #covers #polish`
