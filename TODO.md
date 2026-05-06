@@ -168,7 +168,7 @@ Vault-write work, but ook will render whatever lands. Listed here so the rendere
 
 The unfiltered drawer. Strike most. Keep one.
 
-- **Time-machine view**: `?at=2026-01-15` shows the site as it would have rendered on that date, vault-history-aware. Pulls past commits of the books repo. `#wild #time-machine`
+- Time-machine view: vault-history-aware extension. The current `?at=` lens filters the live frontmatter against a past date — covers most of the value. Pulling past commits of the books repo (the original "vault-history-aware" framing) is a heavier follow-up: lets the lens see frontmatter as it actually was on that day, not just `started`/`finished` re-projected. `#wild #time-machine`
 - **`ook quiz` CLI**: flashcards on quotes from finished books. Lives in the vault repo's `bin/`. `#wild #cli #quotes`
 - **Library-card aesthetic mode**: every book gets a stamped checkout-history card view. Theme. `#wild #visual #theme`
 - **Reverse bingo archaeology**: every past book retroactively tagged with which prior bingo squares it could have filled. A guilt trip. `#wild #bingo`

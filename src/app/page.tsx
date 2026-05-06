@@ -3,6 +3,7 @@ import { Cover } from "@/components/Cover";
 import { foxingFor } from "@/lib/foxing";
 import {
   bookStuck,
+  getAllBooks,
   getBingo,
   getCurrentBingoYear,
   getCurrentlyReading,
@@ -12,33 +13,62 @@ import {
   getSerendipity,
   getTbr,
 } from "@/lib/books";
+import { bingoAt, finishedAt, makeTimeMachine, readingAt } from "@/lib/time-machine";
 import type { BingoCard, BingoSquare, Book, LogEntry, Tbr } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = Promise<{ pile?: string }>;
+type SearchParams = Promise<{ pile?: string; at?: string }>;
 
 export default async function Home({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const selectedPile = typeof sp.pile === "string" ? sp.pile : "All";
+  const lens = typeof sp.at === "string" ? makeTimeMachine(sp.at) : null;
 
   const today = new Date();
-  const journalYear = today.getFullYear();
-  const bingoYear = await getCurrentBingoYear();
+  const journalYear = lens ? Number(lens.at.slice(0, 4)) : today.getFullYear();
+  const bingoYear = lens ? Number(lens.at.slice(0, 4)) : await getCurrentBingoYear();
 
-  const [reading, finished, bingo, tbr, onThisDay, rotatingQuote, serendipity] = await Promise.all([
-    getCurrentlyReading(),
-    getRecentlyFinished(6),
-    bingoYear !== null ? getBingo(bingoYear) : Promise.resolve(null),
-    getTbr(),
-    getOnThisDay(),
-    getRandomPullquote(),
-    getSerendipity(),
-  ]);
+  // When the lens is active, derive everything from the full book
+  // index against the lens date; otherwise use the live helpers.
+  let reading: Book[];
+  let finished: Book[];
+  let bingo: BingoCard | null;
+  let tbr: Tbr | null;
+  let onThisDay: LogEntry[];
+  let rotatingQuote: { book: Book; pullquote: NonNullable<Book["pullquote"]> } | null;
+  let serendipity: { book: Book; yearsAgo: number } | null;
+
+  if (lens) {
+    const all = await getAllBooks();
+    reading = readingAt(all, lens.at);
+    finished = finishedAt(all, lens.at, 6);
+    const liveBingo = bingoYear !== null ? await getBingo(bingoYear) : null;
+    const bySlug = new Map(all.map((b) => [b.slug, b]));
+    bingo = liveBingo ? bingoAt(liveBingo, lens.at, bySlug) : null;
+    // Quieter sub-surfaces don't time-travel — leave the lens to the
+    // primary three sections so the page stays readable.
+    tbr = null;
+    onThisDay = [];
+    rotatingQuote = null;
+    serendipity = null;
+  } else {
+    [reading, finished, bingo, tbr, onThisDay, rotatingQuote, serendipity] = await Promise.all([
+      getCurrentlyReading(),
+      getRecentlyFinished(6),
+      bingoYear !== null ? getBingo(bingoYear) : Promise.resolve(null),
+      getTbr(),
+      getOnThisDay(),
+      getRandomPullquote(),
+      getSerendipity(),
+    ]);
+  }
   const todayMs = today.getTime();
 
   return (
     <main className="mx-auto box-border w-full max-w-[1140px] px-6 py-12 sm:px-14 sm:pt-14 sm:pb-20">
+      {lens && <TimeMachineBanner at={lens.at} />}
+
       <Header year={journalYear} />
 
       <StatsStrip reading={reading.length} finished={finished.length} bingo={bingo} />
@@ -227,6 +257,23 @@ function RotatingQuote({
         {pullquote.source && <span>· {pullquote.source}</span>}
       </figcaption>
     </figure>
+  );
+}
+
+function TimeMachineBanner({ at }: { at: string }) {
+  return (
+    <div className="border-accent bg-accent-soft mb-8 flex items-baseline justify-between gap-3 rounded border-l-2 px-5 py-3">
+      <div className="font-serif text-ink text-[15px] italic">
+        Viewing as of <span className="font-mono text-[14px]">{at}</span> — the home page as it
+        would have looked then.
+      </div>
+      <Link
+        href="/"
+        className="text-accent hover:text-ink shrink-0 text-[11px] tracking-[0.14em] uppercase whitespace-nowrap"
+      >
+        ← back to today
+      </Link>
+    </div>
   );
 }
 
