@@ -46,7 +46,7 @@ Corpus size as of May 2026 is ~230 books after a Goodreads bulk-import. To keep 
 
 ## Disciplines
 
-- **Vault is read-only from this project.** `ook` reads frontmatter and body markdown; it never writes. Mutations to the vault happen via Obsidian or the in-vault `bin/book` CLI. Encoded in `eslint.config.mjs` as a `no-restricted-syntax`/`no-restricted-imports` rule scoped to `src/**` that bans `fs.writeFile`, `fs.appendFile`, and friends — the prebuild SSH-key writer in `scripts/` is out of scope by design.
+- **Vault is read-only via filesystem.** Public render code under `src/**` never writes to disk. Encoded in `eslint.config.mjs` as a `no-restricted-syntax`/`no-restricted-imports` rule scoped to `src/**` banning `fs.writeFile`, `fs.appendFile`, and friends. The MCP write surface (deferred, on branch `feral/mcp`) writes to the vault via the GitHub Contents API (Octokit), not via filesystem, so the lint rule still holds at the production boundary. The local-fs adapter in `src/lib/github.ts` (used in dev when no PAT is set) is the sole intentional exception, scoped via `eslint-disable` comments at the call sites. The prebuild SSH-key writer in `scripts/` is out of the lint scope by design.
 - **Data layer separated from rendering.** Anything that touches the filesystem lives in `src/lib/` (or in the API route under `src/app/api/`). Components import typed values from there; no component reads the vault directly. Reason: keeps the boundary mockable for tests and isolates the "only place we know the on-disk shape" to one module.
 - **Tiered spoiler rendering.** Tier 0 fields (catalog) render in HTML. Tier 1 (synopsis, review, quotes) render in HTML but are visually gated by client-side reveal components. Tier 2 (deep notes) is fetched from `/api/books/[slug]/notes` only after a user click — must NEVER be in the initial server-rendered HTML. The `progress` field is never rendered publicly under any tier.
 - **Single source of truth per book.** Cover URL, status, rating, etc. live in the book's own frontmatter. The bingo file's `cover:` field is the fallback for unbound squares (no vault directory yet); the renderer prefers the linked book's frontmatter when available. Bingo `done`-ness is derived from the bound book's `status` (finished → done) — the per-square `done:` field in the YAML is read but not trusted, and is a vault-side cleanup candidate.
@@ -63,31 +63,42 @@ Corpus size as of May 2026 is ~230 books after a Goodreads bulk-import. To keep 
 | `OOK_SITE_URL`     | `.env.local` / Vercel env | Public canonical URL used for absolute links in feeds and metadata. Falls back to the prod URL.    | No        |
 | `BOOKS_DEPLOY_KEY` | Vercel env (production)   | SSH private key used by `scripts/fetch-vault.mjs` to clone `vhata/books` at build time. Prod only. | Prod only |
 
+Write surface (only relevant on `feral/mcp`):
+
+| Var                                                                                                                         | Purpose                                                                         | Required for the write surface?             |
+| --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------- |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                        | Provisioned via Vercel Marketplace; auto-injected. Falls back to in-memory.     | Yes in prod (or `OOK_ALLOW_MEMORY_STORE=1`) |
+| `OOK_AUTH_SESSION_SECRET`                                                                                                   | 32+ byte secret for cookie signing. `openssl rand -hex 32`.                     | Yes                                         |
+| `OOK_AUTH_RP_ID`, `OOK_AUTH_RP_NAME`, `OOK_AUTH_EXPECTED_ORIGIN`, `OOK_AUTH_OWNER_USERNAME`, `OOK_AUTH_SESSION_TTL_SECONDS` | WebAuthn config; sensible defaults from `OOK_SITE_URL`.                         | No                                          |
+| `GITHUB_BOOKS_PAT`, `GITHUB_BOOKS_REPO`, `GITHUB_BOOKS_BRANCH`                                                              | Fine-grained PAT for `commit_patch` writes. Falls back to local-fs in dev.      | Yes in prod                                 |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                                                                      | Claude API for the `/admin` orchestration. Set a monthly cap before going live. | Yes for `/admin`                            |
+
 `.env.example` documents the same set with safe defaults.
 
-## Branched work
+## Write surface — `/admin` + MCP
 
-### `feral/mcp` — write surface (built, deferred from merge)
+The user-facing surfaces:
 
-The deferred MCP write surface from `docs/proposals/mcp-write-surface.md` is fully built on the `feral/mcp` branch (currently nine commits ahead of main, rebased onto main twice). It's parked rather than abandoned: the user wanted to land it after sleeping on it, and the public render side keeps shipping in the meantime. A fresh session should treat it as **available infrastructure that can be merged when the user signals**, not as work to redo.
+- **`/admin`** — passkey-gated owner-only console. Renders one of three states (claim, sign-in, authed) based on session + credential count. The authed state is a single textarea: free-text input → server-side Claude API loop with MCP tools attached → diff preview → confirm → commit. Built from `src/components/admin/{RegisterForm,SignInForm,AdminConsole}.tsx`.
+- **`/api/mcp/[transport]`** — MCP HTTP transport for external agents (Claude Code, Claude Desktop). Same auth gate; same tools. Stateless, JSON-mode `WebStandardStreamableHTTPServerTransport`.
+- **`/api/auth/{register,login,logout}/*`** — WebAuthn registration and sign-in via `@simplewebauthn/server`. Single-user; first registration is open (the owner claims the site), subsequent registrations require either an active session or a one-shot backup code generated at first registration.
+- **`/api/admin/agent`, `/api/admin/agent/commit`** — the orchestration pair that backs the `/admin` console: the first calls Claude with read-only tools + a special `propose_patch` tool that stages a `CommitPatchInput` without committing; the second runs the staged patch through `commitPatch` after re-validating the schema.
+- **`/api/admin/reindex`** — webhook target / admin button for rebuilding the materialised view.
 
-What's on the branch:
+Storage: `src/lib/store/` exports a `Store` interface with two adapters — `MemoryStore` (default; tests + local dev) and `UpstashStore` (production, via Vercel Marketplace). `src/lib/store/index-vault.ts` is the indexer; `src/lib/store/index.ts` exports the `keys` namespace centralising every key shape.
 
-- **Storage:** `src/lib/store/` — `Store` interface with `MemoryStore` (tests + dev) and `UpstashStore` (production via Vercel Marketplace) adapters. Vault indexer materialises a fast read view; `/api/admin/reindex` rebuilds it on demand.
-- **Auth:** `src/lib/auth/` + `/api/auth/{register,login,logout}/*` — single-user WebAuthn passkey flow via `@simplewebauthn/server`. First registration is open; subsequent ones need an active session or a one-shot backup code minted at first registration.
-- **MCP server:** `src/lib/mcp/` plus `/api/mcp/[transport]`. In-process tool functions (`listBooks`, `getBook`, `commitPatch`, `listBingo`, `bindBookToBingoSquare`, `createBook`, `appendLogEntry`); the route is thin SDK glue over them.
-- **Vault client:** `src/lib/github.ts` — `VaultClient` interface with a `GitHubVaultClient` (Octokit + `GITHUB_BOOKS_PAT`) and a `LocalFsVaultClient` (BOOKS_DIR + `node:fs`) adapter. The local-fs adapter is the only intentional `fs.writeFile` in `src/`, scoped via `eslint-disable` comments and only active when no PAT is set.
-- **Owner console:** `/admin` — passkey-gated. Free-text textarea → server-side Claude API loop with read-only MCP tools + a `propose_patch` tool that _stages_ a `CommitPatchInput` rather than writing → diff preview → confirm → commit. Backed by `/api/admin/agent` and `/api/admin/agent/commit`.
-- **Living docs on the branch.** The branch's own `SPEC.md` and `ARCHITECTURE.md` describe its surfaces in more detail (commit `a063041`). When merging, prefer those versions; this main-side note is a pointer, not a substitute.
+Tools: `src/lib/mcp/` holds the in-process tool functions (`listBooks`, `getBook`, `commitPatch`, `listBingo`, `bindBookToBingoSquare`, `createBook`, `appendLogEntry`). The MCP route is thin SDK glue over these.
 
-Disciplines specific to the branch (load-bearing for any future revival):
+Vault client: `src/lib/github.ts` exports a `VaultClient` interface with two adapters — `GitHubVaultClient` (Octokit + `GITHUB_BOOKS_PAT`) and `LocalFsVaultClient` (BOOKS_DIR + `node:fs`). Picks based on env. The local-fs adapter contains the only intentional `fs.writeFile` calls in `src/`, scoped via `eslint-disable` comments and only active when no PAT is configured.
 
-- **The agent never commits.** `propose_patch` is the only write-shaped tool exposed to Claude in `/admin`; it physically returns the staged patch to the client rather than mutating anything. The diff preview is the structural safety net.
-- **Sections are opt-in on `get_book`.** Reduces prompt-injection surface — if the patch only touches `progress`, the agent has no excuse to fetch `quotes`.
+Disciplines specific to the write surface:
+
+- **The agent never commits.** The diff preview is the structural safety net — `propose_patch` is the only write-shaped tool exposed to Claude in `/admin`, and it physically returns the staged patch to the client rather than mutating anything.
+- **Sections are opt-in on `get_book`.** Reduces prompt-injection surface — if the patch is to `progress`, the agent has no excuse to fetch `quotes`.
 - **Commit-patch validates after applying.** Title must remain non-empty; status must remain a valid `BookStatus`; authors must remain a string array if present.
-- **Optimistic store updates.** Every write committed via the vault client also updates the corresponding store key in-process so subsequent reads don't wait for the webhook reindex.
+- **Optimistic store updates.** Every write committed via the vault client also updates the corresponding store key in-process so subsequent reads don't need to wait for the webhook reindex.
 
-Env vars required only when the branch is in play (kept here as a note so a future merge knows what to provision in Vercel):
+Env vars required for the write surface to operate in production:
 
 | Var                                                                                                                         | Purpose                                                                     |
 | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
