@@ -2,6 +2,12 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { bindBookToBingoSquare, bindBookToBingoSquareInputSchema } from "@/lib/mcp/bingo-tools";
 import { commitPatch, getBook, getBookInputSchema } from "@/lib/mcp/book-tools";
+import {
+  appendLogEntry,
+  appendLogEntryInputSchema,
+  createBook,
+  createBookInputSchema,
+} from "@/lib/mcp/extra-tools";
 import { commitPatchInputSchema } from "@/lib/mcp/patch";
 import { listBingo, listBingoInputSchema, listBooks, listBooksInputSchema } from "@/lib/mcp/tools";
 
@@ -113,6 +119,43 @@ function buildServer(): McpServer {
     },
     async (args) => {
       const result = await commitPatch(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "create_book",
+    {
+      title: "Create a new book",
+      description:
+        "Create a new vault directory with a minimal frontmatter file. " +
+        "Use when starting a book that wasn't already on the TBR pile. " +
+        "Refuses to overwrite an existing book.",
+      inputSchema: createBookInputSchema,
+    },
+    async (args) => {
+      const result = await createBook(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "append_log_entry",
+    {
+      title: "Append a non-book event to the reading log",
+      description:
+        "Add a bullet under a date heading in _meta/log.md. Use for " +
+        "narrative events the per-book frontmatter doesn't cover (\"committed " +
+        'to bingo", "added to TBR", "made progress note"). Kind must be ' +
+        "Note, Tbr, Reread, Progress, or Committed.",
+      inputSchema: appendLogEntryInputSchema,
+    },
+    async (args) => {
+      const result = await appendLogEntry(args);
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
