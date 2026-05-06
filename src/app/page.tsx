@@ -321,13 +321,9 @@ function CurrentCard({ book, bingoYear }: { book: Book; bingoYear: number | null
           <div className="text-ink-soft mt-1 text-[14px] sm:text-[16px]">
             {book.authors.join(", ")}
           </div>
-          {book.progress && (
-            <div className="border-rule text-ink mt-4 border-t pt-3.5 text-[13px] leading-[1.5] sm:text-[14px]">
-              <div className="text-ink-soft mb-1 text-[10px] tracking-[0.16em] uppercase">
-                Last note
-                {book.lastEdited && ` · ${book.lastEdited}`}
-              </div>
-              {book.progress}
+          {book.lastEdited && (
+            <div className="border-rule text-ink-soft mt-4 border-t pt-3 text-[10px] tracking-[0.16em] uppercase">
+              Last edited · {book.lastEdited}
             </div>
           )}
           {book.bingoSquares.length > 0 && bingoYear !== null && (

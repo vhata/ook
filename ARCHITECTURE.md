@@ -38,6 +38,16 @@ Live in production at https://b-ook.vercel.app. Vault (`vhata/books`) is a priva
 - **Single source of truth per book.** Cover URL, status, rating, etc. live in the book's own frontmatter. The bingo file's `cover:` field is the fallback for unbound squares (no vault directory yet); the renderer prefers the linked book's frontmatter when available.
 - **No secrets in env vars exposed to the client.** Anything in `process.env.NEXT_PUBLIC_*` ships to the browser; everything else stays server-side. The `BOOKS_DEPLOY_KEY` env var on Vercel is consumed only by the prebuild script, never by runtime code.
 
+## Environment
+
+| Var                | Where set                 | Purpose                                                                                            | Required? |
+| ------------------ | ------------------------- | -------------------------------------------------------------------------------------------------- | --------- |
+| `BOOKS_DIR`        | `.env.local`              | Absolute path to the local books vault. Falls back to `<cwd>/.vault` (populated by prebuild).      | No        |
+| `OOK_SITE_URL`     | `.env.local` / Vercel env | Public canonical URL used for absolute links in feeds and metadata. Falls back to the prod URL.    | No        |
+| `BOOKS_DEPLOY_KEY` | Vercel env (production)   | SSH private key used by `scripts/fetch-vault.mjs` to clone `vhata/books` at build time. Prod only. | Prod only |
+
+`.env.example` documents the same set with safe defaults.
+
 ## Open questions
 
 - **`summary.md` content.** The convention says it's a "full-spoiler plot summary," but tier 1 puts it one click away. For books where the summary really is full-spoiler (Ra), one option is moving that content into the reference notes (tier 2) and reserving `summary.md` for tier-1 synopses. Decide as the user populates more.
