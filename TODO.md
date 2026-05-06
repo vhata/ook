@@ -89,13 +89,11 @@ Vault-only stats; no external API needed. All extend the existing `/stats/[year]
 
 - **Tag overlap Sankey across years**: flows between top tags year-on-year. Reveals genre migrations. `#feature #stats #visual`
 - **Last book before personal milestone**: overlay log on a manually-maintained `_meta/milestones.md` (birthdays, moves, losses). Sentimental. `#feature #stats #personal`
-- **Word frequency across reviews**: what _you_ keep saying. Self-portrait. `#feature #stats #introspection`
 - **"Books I rated 5 but never re-read"**: introspection axis; needs `reread_count` schema. `#feature #stats #introspection`
-- **"You always read X before Y" pattern detection**: consecutive-finishes patterns surfaced on `/stats`. `#feature #stats`
 - **Pages-per-month chart**: contingent on `pages` frontmatter. `#feature #stats #pages`
 - **Series progress bars on `/series`**: total-count denominator from Open Library / Hardcover ("3 of 16 read") rather than the current "N read in vault" — the route already groups by series, just needs the external lookup. `#feature #series #hardcover`
 - **Author depth chart**: per author, books-read / books-written. Denominator from Hardcover or Open Library. `#feature #stats #authors #hardcover`
-- **Reading-velocity projection**: given current `started` date and historical pace, project a finish window for currently-reading. Surface on home or per-book. `#feature #stats #currently-reading`
+- Reading-velocity finish projection (full version): once a `pages` schema field is in the vault, extend the home Currently-Reading "days in" caption with a back-of-envelope ETA from historical pace. The days-in caption ships now without ETA. `#feature #stats #currently-reading`
 
 ### Discovery & wandering (brainstormed 2026-05-03)
 

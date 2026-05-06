@@ -53,7 +53,14 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
         {reading.length === 0 ? (
           <EmptyNote>Nothing on the desk right now.</EmptyNote>
         ) : (
-          reading.map((b) => <CurrentCard key={b.slug} book={b} bingoYear={bingo?.year ?? null} />)
+          reading.map((b) => (
+            <CurrentCard
+              key={b.slug}
+              book={b}
+              bingoYear={bingo?.year ?? null}
+              daysIn={daysInForBook(b.started, todayMs)}
+            />
+          ))
         )}
       </Section>
 
@@ -334,7 +341,22 @@ function EmptyNote({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CurrentCard({ book, bingoYear }: { book: Book; bingoYear: number | null }) {
+function daysInForBook(started: string | null, todayMs: number): number | null {
+  if (!started) return null;
+  const startedMs = Date.parse(`${started}T12:00:00Z`);
+  if (!Number.isFinite(startedMs)) return null;
+  return Math.max(0, Math.floor((todayMs - startedMs) / 86400000));
+}
+
+function CurrentCard({
+  book,
+  bingoYear,
+  daysIn,
+}: {
+  book: Book;
+  bingoYear: number | null;
+  daysIn: number | null;
+}) {
   return (
     <Link
       href={`/books/${encodeURIComponent(book.slug)}`}
@@ -358,6 +380,14 @@ function CurrentCard({ book, bingoYear }: { book: Book; bingoYear: number | null
           <div className="text-ink-soft mt-1 text-[14px] sm:text-[16px]">
             {book.authors.join(", ")}
           </div>
+          {daysIn !== null && (
+            <div className="text-ink-dim mt-3 text-[11px] tracking-[0.14em] uppercase">
+              {daysIn === 0 ? "Started today" : `${daysIn} day${daysIn === 1 ? "" : "s"} in`}
+              {book.started && (
+                <span className="text-ink-dim ml-2 normal-case">· since {book.started}</span>
+              )}
+            </div>
+          )}
           {book.lastEdited && (
             <div className="border-rule text-ink-soft mt-4 border-t pt-3 text-[10px] tracking-[0.16em] uppercase">
               Last edited · {book.lastEdited}

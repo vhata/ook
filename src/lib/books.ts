@@ -693,6 +693,303 @@ function scorePair(a: Book, b: Book): { score: number; reasons: ConnectionReason
 // renders this as a quiet "from the shelf" line — feels different on
 // each page-load (the route is force-dynamic), without any UI controls.
 // Returns the picked book alongside so the home page can link to it.
+// Top-N words across every review.md the reader has written. The
+// "self-portrait" view from `/stats`. Pure introspection — what do you
+// keep saying. Stop-words and very short tokens are filtered; the
+// remaining counts are returned in descending order.
+
+const WORD_STOP_WORDS = new Set([
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "but",
+  "of",
+  "to",
+  "in",
+  "on",
+  "at",
+  "by",
+  "for",
+  "with",
+  "from",
+  "as",
+  "is",
+  "was",
+  "are",
+  "were",
+  "be",
+  "been",
+  "being",
+  "have",
+  "has",
+  "had",
+  "do",
+  "does",
+  "did",
+  "will",
+  "would",
+  "should",
+  "could",
+  "may",
+  "might",
+  "can",
+  "this",
+  "that",
+  "these",
+  "those",
+  "it",
+  "its",
+  "i",
+  "me",
+  "my",
+  "mine",
+  "you",
+  "your",
+  "yours",
+  "he",
+  "she",
+  "him",
+  "her",
+  "his",
+  "hers",
+  "they",
+  "them",
+  "their",
+  "theirs",
+  "we",
+  "us",
+  "our",
+  "ours",
+  "what",
+  "which",
+  "who",
+  "whom",
+  "whose",
+  "when",
+  "where",
+  "why",
+  "how",
+  "not",
+  "no",
+  "nor",
+  "so",
+  "if",
+  "then",
+  "than",
+  "also",
+  "very",
+  "much",
+  "more",
+  "most",
+  "some",
+  "any",
+  "all",
+  "each",
+  "every",
+  "one",
+  "two",
+  "three",
+  "four",
+  "five",
+  "first",
+  "last",
+  "now",
+  "still",
+  "just",
+  "even",
+  "only",
+  "really",
+  "quite",
+  "such",
+  "into",
+  "over",
+  "under",
+  "through",
+  "between",
+  "again",
+  "there",
+  "here",
+  "because",
+  "while",
+  "both",
+  "either",
+  "neither",
+  "either",
+  "about",
+  "against",
+  "up",
+  "down",
+  "out",
+  "off",
+  "across",
+  "before",
+  "after",
+  "during",
+  "without",
+  "within",
+  "upon",
+  "like",
+  "unlike",
+  "yet",
+  "though",
+  "although",
+  "since",
+  "ever",
+  "never",
+  "always",
+  "often",
+  "sometimes",
+  "usually",
+  "rarely",
+  "seemed",
+  "seems",
+  "feel",
+  "felt",
+  "felt",
+  "made",
+  "make",
+  "makes",
+  "made",
+  "get",
+  "gets",
+  "got",
+  "go",
+  "goes",
+  "went",
+  "gone",
+  "come",
+  "came",
+  "comes",
+  "take",
+  "took",
+  "taken",
+  "takes",
+  "want",
+  "wanted",
+  "wants",
+  "said",
+  "says",
+  "saying",
+  "told",
+  "tell",
+  "tells",
+  "read",
+  "reading",
+  "reads",
+  "book",
+  "books",
+  "story",
+  "stories",
+  "novel",
+  "novels",
+  "author",
+  "character",
+  "characters",
+  "page",
+  "pages",
+  "chapter",
+  "chapters",
+  "plot",
+  "narrative",
+  "prose",
+  "writer",
+  "writing",
+  "rather",
+  "being",
+  "been",
+  "done",
+  "seem",
+  "seemed",
+  "quite",
+  "perhaps",
+  "maybe",
+  "mostly",
+]);
+
+export type WordCount = { word: string; count: number };
+
+export async function getReviewWordFrequency(limit = 40): Promise<WordCount[]> {
+  const books = await getAllBooks();
+  const counts = new Map<string, number>();
+
+  for (const book of books) {
+    if (!book.hasReview) continue;
+    const reviewPath = path.join(booksDir(), book.slug, "review.md");
+    const text = await readOptionalFile(reviewPath);
+    if (!text) continue;
+    // Strip frontmatter delimiters defensively (review.md doesn't carry
+    // them, but if a stray review starts with --- we don't want to count
+    // YAML keys as words).
+    const stripped = text.replace(/^---[\s\S]*?---/m, "");
+    // Also strip code fences and links.
+    const cleaned = stripped
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/`[^`]*`/g, " ")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/[*_~>#]/g, " ");
+    const tokens = cleaned.toLowerCase().match(/[a-z][a-z'’]{2,}/g) ?? [];
+    for (const raw of tokens) {
+      const word = raw.replace(/[’']s$/i, "").replace(/[’']/g, "");
+      if (word.length < 4) continue;
+      if (WORD_STOP_WORDS.has(word)) continue;
+      counts.set(word, (counts.get(word) ?? 0) + 1);
+    }
+  }
+
+  return [...counts.entries()]
+    .map(([word, count]) => ({ word, count }))
+    .filter((w) => w.count >= 2) // singletons are noise
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word))
+    .slice(0, limit);
+}
+
+// Consecutive-finish "X before Y" patterns. Walks finished books in
+// chronological finish order and tallies ordered adjacent pairs.
+// Returns pairs that occur at least `minOccurrences` times. Useful
+// when the reader has a habit (say, reading the next book in a series
+// immediately after the previous one — surface that as a pattern).
+
+export type FinishPair = {
+  beforeSlug: string;
+  beforeTitle: string;
+  afterSlug: string;
+  afterTitle: string;
+  count: number;
+};
+
+export async function getFinishPairs(minOccurrences = 2): Promise<FinishPair[]> {
+  const books = await getAllBooks();
+  const finished = books
+    .filter((b) => b.status === "finished" && b.finished)
+    .sort((a, b) => (a.finished as string).localeCompare(b.finished as string));
+
+  const tallies = new Map<string, FinishPair>();
+  for (let i = 0; i < finished.length - 1; i++) {
+    const a = finished[i];
+    const b = finished[i + 1];
+    if (a.slug === b.slug) continue; // same book listed twice (edge)
+    const key = `${a.slug} ${b.slug}`;
+    const existing = tallies.get(key);
+    if (existing) {
+      existing.count++;
+    } else {
+      tallies.set(key, {
+        beforeSlug: a.slug,
+        beforeTitle: a.title,
+        afterSlug: b.slug,
+        afterTitle: b.title,
+        count: 1,
+      });
+    }
+  }
+
+  return [...tallies.values()]
+    .filter((p) => p.count >= minOccurrences)
+    .sort((a, b) => b.count - a.count || a.beforeTitle.localeCompare(b.beforeTitle));
+}
+
 export async function getRandomPullquote(): Promise<{
   book: Book;
   pullquote: NonNullable<Book["pullquote"]>;

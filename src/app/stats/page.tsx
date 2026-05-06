@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getAllBooks, getStatsYears } from "@/lib/books";
+import { getAllBooks, getFinishPairs, getReviewWordFrequency, getStatsYears } from "@/lib/books";
 import type { Book } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,12 @@ export const metadata = {
 // year has any reading activity yet, falls through to the current-year
 // stats page so the route still does something useful for a fresh vault.
 export default async function StatsIndex() {
-  const [years, books] = await Promise.all([getStatsYears(), getAllBooks()]);
+  const [years, books, words, pairs] = await Promise.all([
+    getStatsYears(),
+    getAllBooks(),
+    getReviewWordFrequency(40),
+    getFinishPairs(2),
+  ]);
   if (years.length === 0) redirect(`/stats/${new Date().getFullYear()}`);
 
   const yearly = years.map((year) => {
@@ -64,6 +69,9 @@ export default async function StatsIndex() {
       </header>
 
       {ratedDots.length >= 4 && <RatingOverTime dots={ratedDots} />}
+
+      {words.length >= 6 && <WordCloud words={words} />}
+      {pairs.length > 0 && <FinishPatterns pairs={pairs} />}
 
       <ol className="m-0 list-none space-y-6 p-0">
         {yearly.map((y) => (
@@ -245,6 +253,86 @@ function RatingOverTime({ dots }: { dots: RatedDot[] }) {
           </span>
         </div>
       </div>
+    </section>
+  );
+}
+
+function WordCloud({ words }: { words: Array<{ word: string; count: number }> }) {
+  // Sized cloud — bigger for more frequent. Min/max scaled around the
+  // top word so a runaway-frequent word doesn't crush the rest.
+  const maxCount = words[0]?.count ?? 1;
+  const sizeFor = (count: number) => {
+    const base = 13;
+    const range = 17; // 13..30 px
+    return Math.round(base + (count / maxCount) * range);
+  };
+  return (
+    <section className="mb-12">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
+        <h2 className="font-serif text-ink m-0 text-[22px] leading-tight font-medium tracking-[-0.012em]">
+          What you keep saying
+        </h2>
+        <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
+          top {words.length} across reviews
+        </span>
+      </div>
+      <div className="bg-surface border-rule flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded border p-5">
+        {words.map((w) => (
+          <span
+            key={w.word}
+            className="font-serif text-ink"
+            style={{ fontSize: sizeFor(w.count), opacity: 0.65 + (w.count / maxCount) * 0.35 }}
+            title={`${w.word}: ${w.count}×`}
+          >
+            {w.word}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FinishPatterns({
+  pairs,
+}: {
+  pairs: Array<{
+    beforeSlug: string;
+    beforeTitle: string;
+    afterSlug: string;
+    afterTitle: string;
+    count: number;
+  }>;
+}) {
+  return (
+    <section className="mb-12">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
+        <h2 className="font-serif text-ink m-0 text-[22px] leading-tight font-medium tracking-[-0.012em]">
+          Finishing patterns
+        </h2>
+        <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
+          consecutive-finish pairs
+        </span>
+      </div>
+      <ul className="bg-surface border-rule m-0 list-none space-y-2 rounded border p-5 text-[14px]">
+        {pairs.map((p, i) => (
+          <li key={i} className="flex items-baseline gap-2">
+            <Link
+              href={`/books/${encodeURIComponent(p.beforeSlug)}`}
+              className="font-serif text-ink decoration-accent-soft hover:decoration-accent underline underline-offset-[3px]"
+            >
+              {p.beforeTitle}
+            </Link>
+            <span className="text-ink-dim text-[12px]">→</span>
+            <Link
+              href={`/books/${encodeURIComponent(p.afterSlug)}`}
+              className="font-serif text-ink decoration-accent-soft hover:decoration-accent underline underline-offset-[3px]"
+            >
+              {p.afterTitle}
+            </Link>
+            <span className="text-ink-soft ml-auto font-mono text-[11px]">×{p.count}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
