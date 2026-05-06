@@ -16,6 +16,7 @@
     "*.{ts,tsx,js,mjs,cjs}": "eslint --fix"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.94.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@octokit/rest": "^22.0.1",
     "@simplewebauthn/browser": "^13.3.0",
