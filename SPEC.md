@@ -10,7 +10,7 @@ What I'm reading, what I've read, and the bingo card I'm chasing.
 
 ## Glossary
 
-- **Vault** — the Obsidian directory at `~/Google Drive/My Drive/Obsidian/books`, tracked in the `vhata/obsidian` git repo. Holds per-book directories and the `_meta/` infrastructure.
+- **Vault** — the books directory at `~/Google Drive/My Drive/Obsidian/books`, tracked in its own `vhata/books` git repo. Sits nested inside a larger Obsidian-vault directory whose own repo (`vhata/obsidian`) gitignores this folder, so the two never double-track. Holds per-book directories and the `_meta/` infrastructure.
 - **Reference notes** — the per-book Markdown file (`<Title>/<Title>.md`) with YAML frontmatter and a body of structured prose. The primary lookup tool while reading.
 - **Frontmatter schema** — the YAML block at the top of each reference-notes file. Source of structured metadata (status, rating, bingo squares, cover, pullquote, see_also, etc.). Defined in `books/CLAUDE.md`.
 - **Capture flow** — the low-friction agent prompts triggered by reading milestones (finishing a book, starting a book, abandoning or pausing one, claiming a bingo square, adding a TBR, logging a non-book event), plus an on-demand or weekly check-in that surfaces stale fields. Two or three small questions, never a wall of fields. Every prompt offers `(skip)` and the agent stops after three skips in a flow.
