@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getStatsYears, getYearActivity, getYearStats } from "@/lib/books";
-import type { DayActivity, RatingBucket, YearStats } from "@/lib/types";
+import { Cover } from "@/components/Cover";
+import { getAllBooks, getStatsYears, getYearActivity, getYearStats } from "@/lib/books";
+import type { Book, DayActivity, RatingBucket, YearStats } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +18,16 @@ export default async function StatsYearPage({ params }: { params: Params }) {
   const year = Number(yearParam);
   if (!Number.isInteger(year) || year < 1900 || year > 2999) notFound();
 
-  const [stats, allYears, activity] = await Promise.all([
+  const [stats, allYears, activity, allBooks] = await Promise.all([
     getYearStats(year),
     getStatsYears(),
     getYearActivity(year),
+    getAllBooks(),
   ]);
   const totalEvents = activity.reduce((sum, d) => sum + d.count, 0);
+  const finishedThisYear = allBooks
+    .filter((b) => b.status === "finished" && b.finished?.startsWith(`${year}-`))
+    .sort((a, b) => (a.finished ?? "").localeCompare(b.finished ?? ""));
 
   return (
     <main className="mx-auto box-border w-full max-w-[900px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
@@ -59,6 +64,7 @@ export default async function StatsYearPage({ params }: { params: Params }) {
               }))}
             />
           </div>
+          {finishedThisYear.length > 0 && <CoverMosaic year={year} books={finishedThisYear} />}
         </>
       )}
     </main>
@@ -341,6 +347,43 @@ function RatingBar({ bucket, max }: { bucket: RatingBucket; max: number }) {
       </div>
       <div className="text-ink-soft text-right font-mono text-[12px]">{bucket.count}</div>
     </div>
+  );
+}
+
+function CoverMosaic({ year, books }: { year: number; books: Book[] }) {
+  // Wall of every finished cover from the year, ordered by finish date.
+  // Books without a cover get a stylised placeholder card so the wall
+  // stays even — the goal is the visual mass, not just the lucky ones.
+  // Each tile is a link to the per-book page; hover scales gently.
+  return (
+    <section className="mt-14">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
+        <h2 className="font-serif text-ink m-0 text-[22px] leading-tight font-medium tracking-[-0.012em]">
+          The wall — {year}
+        </h2>
+        <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
+          {books.length} finished, in order
+        </span>
+      </div>
+      <div
+        className="grid gap-2 sm:gap-3"
+        style={{
+          gridTemplateColumns: "repeat(auto-fill, minmax(64px, 1fr))",
+        }}
+      >
+        {books.map((b) => (
+          <Link
+            key={b.slug}
+            href={`/books/${encodeURIComponent(b.slug)}`}
+            title={`${b.title}${b.authors.length > 0 ? ` — ${b.authors.join(", ")}` : ""}${b.finished ? ` · ${b.finished}` : ""}`}
+            className="bg-surface-mute border-rule block overflow-hidden rounded-sm border transition-transform hover:-translate-y-0.5"
+            style={{ aspectRatio: "0.66 / 1" }}
+          >
+            <Cover src={b.cover} title={b.title} width="100%" height="100%" rounded={0} />
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }
 

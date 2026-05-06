@@ -76,7 +76,6 @@ Source notes:
 
 Cosmetic and atmospheric ideas. Mostly low-stakes; pick whichever delights.
 
-- **Year-end cover mosaic**: every cover of every finished book tiled into one wall, sharable as a single image. Builds on existing `/stats/[year]`. `#feature #visual #stats`
 - **Bookspine shelf view**: SVG strip of vertical spines, scaled to actual page counts when known, sortable by colour. Aesthetic-shelf delight. Needs `pages` schema. `#feature #visual #shelf`
 - **Procedural cover for the coverless**: hand-drawn-looking abstract jacket generated from title letterforms when no real cover exists. Beats the current "no cover" placeholder. `#feature #visual #covers`
 - **Foxing & yellowing by age**: subtle CSS filter on book cards that ages by how long ago you finished. Cosmetic, optional theme. `#polish #visual`
