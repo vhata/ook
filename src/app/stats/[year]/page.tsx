@@ -41,6 +41,7 @@ export default async function StatsYearPage({ params }: { params: Params }) {
         <>
           <Topline stats={stats} />
           {totalEvents > 0 && <Heatmap activity={activity} totalEvents={totalEvents} />}
+          {totalEvents > 0 && <WeekendSplit activity={activity} />}
           {stats.rated > 0 && <RatingHistogram stats={stats} />}
           <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-2">
             <TopList
@@ -229,6 +230,80 @@ function Heatmap({ activity, totalEvents }: { activity: DayActivity[]; totalEven
             {monthLabels.map((m) => m.label).join(" · ")}
           </span>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function WeekendSplit({ activity }: { activity: DayActivity[] }) {
+  // Weekend: Sat (6) + Sun (0). Weekday: Mon-Fri (1-5). Render the
+  // per-day rate, not just the totals — there are ~5x as many weekdays
+  // as weekend days, so raw totals are misleading. The "skew" callout
+  // says which slot punches above its weight.
+  let weekdayCount = 0;
+  let weekendCount = 0;
+  let weekdayDays = 0;
+  let weekendDays = 0;
+  for (const d of activity) {
+    if (d.weekday === 0 || d.weekday === 6) {
+      weekendDays++;
+      weekendCount += d.count;
+    } else {
+      weekdayDays++;
+      weekdayCount += d.count;
+    }
+  }
+  const weekdayRate = weekdayDays > 0 ? weekdayCount / weekdayDays : 0;
+  const weekendRate = weekendDays > 0 ? weekendCount / weekendDays : 0;
+  const maxRate = Math.max(weekdayRate, weekendRate, 0.001);
+  const skew =
+    weekdayRate === 0 && weekendRate === 0
+      ? null
+      : weekendRate > weekdayRate * 1.15
+        ? `weekends run ${(weekendRate / Math.max(weekdayRate, 0.001)).toFixed(1)}× hotter`
+        : weekdayRate > weekendRate * 1.15
+          ? `weekdays run ${(weekdayRate / Math.max(weekendRate, 0.001)).toFixed(1)}× hotter`
+          : "even split, day for day";
+
+  type Row = {
+    label: string;
+    total: number;
+    days: number;
+    rate: number;
+  };
+  const rows: Row[] = [
+    { label: "Weekday", total: weekdayCount, days: weekdayDays, rate: weekdayRate },
+    { label: "Weekend", total: weekendCount, days: weekendDays, rate: weekendRate },
+  ];
+  return (
+    <section className="mt-12">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
+        <h2 className="font-serif text-ink m-0 text-[22px] leading-tight font-medium tracking-[-0.012em]">
+          Weekday vs weekend
+        </h2>
+        {skew && (
+          <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">{skew}</span>
+        )}
+      </div>
+      <div className="bg-surface border-rule space-y-3 rounded border p-5">
+        {rows.map((r) => (
+          <div key={r.label} className="flex items-center gap-4">
+            <span className="text-ink-soft w-20 shrink-0 text-[11px] tracking-[0.14em] uppercase">
+              {r.label}
+            </span>
+            <div className="bg-surface-mute relative h-6 flex-1 overflow-hidden rounded">
+              <div
+                className="bg-accent absolute top-0 left-0 h-full"
+                style={{ width: `${(r.rate / maxRate) * 100}%` }}
+              />
+            </div>
+            <span className="font-mono text-ink w-32 shrink-0 text-right text-[12px]">
+              {r.rate.toFixed(2)}
+              <span className="text-ink-soft">/day</span>
+              <span className="text-ink-dim ml-1.5 text-[11px]">({r.total})</span>
+            </span>
+          </div>
+        ))}
       </div>
     </section>
   );
