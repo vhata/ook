@@ -108,7 +108,6 @@ Vault-only stats; no external API needed. All extend the existing `/stats/[year]
 
 Surface your own past back to you. All vault-only.
 
-- **Serendipity engine on home page**: surfaces a finished book you haven't touched in over a year, in a quiet sidebar. `#feature #discovery #home`
 - **"Books I read while the world did X" overlay**: major news events from Wikipedia overlaid on `/log`. Provenance-marked, never asserted as causation. `#feature #discovery #log #wikipedia`
 
 ### Sharing & outbound (brainstormed 2026-05-03)

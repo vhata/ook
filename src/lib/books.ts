@@ -695,6 +695,31 @@ export async function getRandomPullquote(): Promise<{
   return { book: pick, pullquote: pick.pullquote };
 }
 
+// One finished book the reader hasn't touched in a while, surfaced as a
+// "remember this?" card on the home page. Pool: status=finished and
+// finished date older than the threshold. Re-rolled per page-load, so
+// the home feels alive across refreshes. `yearsAgo` is computed against
+// the same `today` as the cutoff, kept here so the renderer doesn't
+// have to call `Date.now()` itself (server-component purity rule).
+export async function getSerendipity(
+  thresholdDays = 365,
+  today: Date = new Date(),
+): Promise<{ book: Book; yearsAgo: number } | null> {
+  const books = await getAllBooks();
+  const todayMs = today.getTime();
+  const cutoffMs = todayMs - thresholdDays * 86400000;
+  const candidates = books.filter((b) => {
+    if (b.status !== "finished" || !b.finished) return false;
+    const finishedMs = Date.parse(`${b.finished}T12:00:00Z`);
+    return Number.isFinite(finishedMs) && finishedMs < cutoffMs;
+  });
+  if (candidates.length === 0) return null;
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  const finishedMs = Date.parse(`${pick.finished}T12:00:00Z`);
+  const yearsAgo = Math.max(1, Math.floor((todayMs - finishedMs) / (365.25 * 86400000)));
+  return { book: pick, yearsAgo };
+}
+
 // Top-N books most similar to the given slug, by the same scoring used
 // for /discover. Excludes the book itself; null score (no signal) drops
 // out. Returns lite summaries — the per-book sidebar only renders

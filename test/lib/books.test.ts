@@ -18,6 +18,7 @@ import {
   getOnThisDay,
   getReadingLog,
   getRecentlyFinished,
+  getSerendipity,
   getStatsYears,
   getTbr,
   getYearActivity,
@@ -471,6 +472,37 @@ describe("getOnThisDay", () => {
     const today = new Date("2027-07-04T12:00:00Z");
     const entries = await getOnThisDay(today);
     expect(entries).toEqual([]);
+  });
+});
+
+describe("getSerendipity", () => {
+  it("returns null when no finished book is older than the threshold", async () => {
+    // TestBook finished 2026-02-20. With "today" pinned to 2026-06-01,
+    // nothing in the fixture is more than 365 days old.
+    const today = new Date("2026-06-01T12:00:00Z");
+    expect(await getSerendipity(365, today)).toBeNull();
+  });
+
+  it("returns a finished book once it crosses the threshold", async () => {
+    // TestBook finished 2026-02-20. By 2027-02-21 it's >365 days old.
+    const today = new Date("2027-02-21T12:00:00Z");
+    const pick = await getSerendipity(365, today);
+    expect(pick?.book.slug).toBe("TestBook");
+    expect(pick?.yearsAgo).toBe(1);
+  });
+
+  it("computes yearsAgo as floor of years since finish, with a one-year minimum", async () => {
+    // TestBook finished 2026-02-20. By 2030-08-01, ~4.4 years → 4.
+    const today = new Date("2030-08-01T12:00:00Z");
+    const pick = await getSerendipity(365, today);
+    expect(pick?.yearsAgo).toBe(4);
+  });
+
+  it("ignores currently-reading books even with a started date", async () => {
+    // PrivateBook is reading, not finished — must not be returned.
+    const today = new Date("2030-01-01T12:00:00Z");
+    const pick = await getSerendipity(365, today);
+    expect(pick?.book.slug).not.toBe("PrivateBook");
   });
 });
 

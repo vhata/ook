@@ -7,6 +7,7 @@ import {
   getOnThisDay,
   getRandomPullquote,
   getRecentlyFinished,
+  getSerendipity,
   getTbr,
 } from "@/lib/books";
 import type { BingoCard, BingoSquare, Book, LogEntry, Tbr } from "@/lib/types";
@@ -22,13 +23,14 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const journalYear = new Date().getFullYear();
   const bingoYear = await getCurrentBingoYear();
 
-  const [reading, finished, bingo, tbr, onThisDay, rotatingQuote] = await Promise.all([
+  const [reading, finished, bingo, tbr, onThisDay, rotatingQuote, serendipity] = await Promise.all([
     getCurrentlyReading(),
     getRecentlyFinished(6),
     bingoYear !== null ? getBingo(bingoYear) : Promise.resolve(null),
     getTbr(),
     getOnThisDay(),
     getRandomPullquote(),
+    getSerendipity(),
   ]);
 
   return (
@@ -38,6 +40,8 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       <StatsStrip reading={reading.length} finished={finished.length} bingo={bingo} />
 
       {rotatingQuote && <RotatingQuote quote={rotatingQuote} />}
+
+      {serendipity && <Serendipity book={serendipity.book} yearsAgo={serendipity.yearsAgo} />}
 
       {onThisDay.length > 0 && <OnThisDay entries={onThisDay} />}
 
@@ -212,6 +216,37 @@ function RotatingQuote({
         {pullquote.source && <span>· {pullquote.source}</span>}
       </figcaption>
     </figure>
+  );
+}
+
+function Serendipity({ book, yearsAgo }: { book: Book; yearsAgo: number }) {
+  return (
+    <aside className="border-rule mb-12 flex items-center gap-4 rounded border border-dashed p-4 md:p-5">
+      {book.cover && (
+        <div className="hidden shrink-0 sm:block">
+          <Cover src={book.cover} title={book.title} width={48} height={72} />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="text-ink-soft mb-1 text-[10px] tracking-[0.18em] uppercase">
+          Remember this?
+          <span className="text-ink-dim ml-2 normal-case tracking-normal">
+            · {yearsAgo} {yearsAgo === 1 ? "year" : "years"} ago
+          </span>
+        </div>
+        <Link
+          href={`/books/${encodeURIComponent(book.slug)}`}
+          className="font-serif text-ink decoration-accent-soft hover:decoration-accent block truncate text-[18px] underline underline-offset-[3px]"
+        >
+          {book.title}
+        </Link>
+        {book.authors.length > 0 && (
+          <div className="text-ink-soft mt-0.5 truncate text-[13px] italic">
+            {book.authors.join(", ")}
+          </div>
+        )}
+      </div>
+    </aside>
   );
 }
 
