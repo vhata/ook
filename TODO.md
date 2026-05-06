@@ -112,7 +112,7 @@ Let the site reach beyond the page-view.
 
 - **WebSub push notification on book status flips**: niche but real, pingable subscribers. `#feature #feed #websub`
 - **Email digest, monthly self-mail**: cron + Resend, summary of "what you read, what you said." `#feature #email #digest`
-- **Per-book QR code endpoint**: at `/books/[slug]/qr.png`, usable as printable bookmark slip. `#feature #qr #per-book`
+- Surface the per-book QR endpoint somewhere on `/books/[slug]` if discoverability matters. Endpoint exists at `/books/[slug]/qr`; no UI link yet, so right now it's URL-guess only. Decide whether a small "↓ QR" link in the metadata strip is wanted. `#polish #qr #per-book`
 - **Postcard generator at `/books/[slug]/postcard.png`**: printable "I just finished X" card with a quote. `#feature #postcard #per-book`
 - **Reply-by-email comments**: `mailto:` link on per-book pages with subject pre-filled, lands in vault inbox. `#feature #per-book #comments`
 - **ActivityPub federation of finishes to Bookwyrm/Mastodon**: heavy lift; if you join a Bookwyrm instance, ook becomes the front-end of your entry. `#feature #activitypub #bookwyrm`
