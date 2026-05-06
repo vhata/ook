@@ -78,12 +78,9 @@ Cosmetic and atmospheric ideas. Mostly low-stakes; pick whichever delights.
 
 - **Bookspine shelf view**: SVG strip of vertical spines, scaled to actual page counts when known, sortable by colour. Aesthetic-shelf delight. Needs `pages` schema. `#feature #visual #shelf`
 - **Procedural cover for the coverless**: hand-drawn-looking abstract jacket generated from title letterforms when no real cover exists. Beats the current "no cover" placeholder. `#feature #visual #covers`
-- **Foxing & yellowing by age**: subtle CSS filter on book cards that ages by how long ago you finished. Cosmetic, optional theme. `#polish #visual`
 - **Bookmark-ribbon progress strip**: silk-ribbon-style indicator on currently-reading cards showing chapter or % progress. Needs structured progress data. `#feature #visual #currently-reading`
-- **Marginalia mode for quotes**: render quotes in the margin with hand-drawn pencil-bracket SVG instead of indented blockquotes. `#feature #visual #per-book`
 - **Page-turn micro-interaction**: animate the switch between review/quotes/synopsis tabs as a page-curl. `#polish #visual #per-book`
 - **Embossed/letterpress alternative theme**: a third theme beyond light/dark, vintage printer's aesthetic. `#feature #visual #theme`
-- **Seasonal accent palette drift**: rust → forest → slate → ochre quarterly; paper-and-ink stays constant. `#polish #visual #theme`
 - **Rating-as-wear-marks**: instead of stars, render condition (pristine for 5, dog-eared for 3, water-damaged for 1). May offend the rated. `#feature #visual #ratings`
 
 ### Stats & introspection (brainstormed 2026-05-03)
@@ -184,7 +181,6 @@ The unfiltered drawer. Strike most. Keep one.
 - **`/print/[year]` print mode**: formats year as a real-paper bibliography, mailable. `#wild #print #year`
 - **Static-export branch**: generate a fully-static archive that needs no Vercel. Posterity hedge. `#wild #posterity #static`
 - **ePub export of your reviews**: your own book, of you, by you, about you reading. `#wild #epub #archive`
-- **Postal-stamp art per book**: tiny illustrated stamp for each finished volume. `#wild #visual`
 - **Bookcrossing log**: track physical lending — "this copy is currently with Sarah." `#wild #lending`
 
 ### Tooling & vault hygiene (brainstormed 2026-05-03)

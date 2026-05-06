@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Cover } from "@/components/Cover";
+import { foxingFor } from "@/lib/foxing";
 import {
   bookStuck,
   getBingo,
@@ -21,7 +22,8 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const sp = await searchParams;
   const selectedPile = typeof sp.pile === "string" ? sp.pile : "All";
 
-  const journalYear = new Date().getFullYear();
+  const today = new Date();
+  const journalYear = today.getFullYear();
   const bingoYear = await getCurrentBingoYear();
 
   const [reading, finished, bingo, tbr, onThisDay, rotatingQuote, serendipity] = await Promise.all([
@@ -33,6 +35,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
     getRandomPullquote(),
     getSerendipity(),
   ]);
+  const todayMs = today.getTime();
 
   return (
     <main className="mx-auto box-border w-full max-w-[1140px] px-6 py-12 sm:px-14 sm:pt-14 sm:pb-20">
@@ -69,7 +72,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
             {finished.map((b) => (
-              <FinishedCard key={b.slug} book={b} />
+              <FinishedCard key={b.slug} book={b} foxing={foxingFor(b.finished, todayMs)} />
             ))}
           </div>
         )}
@@ -372,7 +375,7 @@ function CurrentCard({ book, bingoYear }: { book: Book; bingoYear: number | null
   );
 }
 
-function FinishedCard({ book }: { book: Book }) {
+function FinishedCard({ book, foxing }: { book: Book; foxing: string | null }) {
   const stuck = bookStuck(book);
   return (
     <Link
@@ -391,7 +394,7 @@ function FinishedCard({ book }: { book: Book }) {
       <div className="flex gap-4 sm:block">
         <div
           className="relative w-20 shrink-0 sm:mb-3 sm:w-full"
-          style={{ aspectRatio: "0.78 / 1" }}
+          style={{ aspectRatio: "0.78 / 1", filter: foxing ?? undefined }}
         >
           <Cover src={book.cover} title={book.title} width="100%" height="100%" />
         </div>

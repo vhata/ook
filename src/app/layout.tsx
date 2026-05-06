@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Source_Serif_4, Inter_Tight, IBM_Plex_Mono } from "next/font/google";
 import { Suspense } from "react";
 import Controls from "@/components/Controls";
+import { seasonalCss, seasonalPalette } from "@/lib/seasonal";
 import "./globals.css";
 
 const serif = Source_Serif_4({
@@ -50,11 +51,20 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Seasonal accent drift — pure CSS variable override based on the
+  // server's current month. Computed at request time (this layout is
+  // rendered per request via Next 16's default), so the palette
+  // shifts on its own as the year passes.
+  const palette = seasonalPalette();
   return (
     <html
       lang="en"
       className={`${serif.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
+      data-season={palette.name}
     >
+      <head>
+        <style dangerouslySetInnerHTML={{ __html: seasonalCss(palette) }} />
+      </head>
       <body className="bg-bg text-ink font-sans flex min-h-full flex-col">
         <Suspense fallback={null}>
           <Controls />

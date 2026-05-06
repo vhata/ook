@@ -8,6 +8,7 @@ import { Cover } from "@/components/Cover";
 import DeepNotes from "@/components/DeepNotes";
 import RevealSection from "@/components/RevealSection";
 import Spoiler from "@/components/Spoiler";
+import { Stamp } from "@/components/Stamp";
 import {
   bookStuck,
   externalLinks,
@@ -87,7 +88,7 @@ export default async function BookPage({ params }: { params: Params }) {
               buttonLabel="Show quotes"
               expandedTitle="Quotes"
             >
-              <Markdown source={quotes} />
+              <Markdown source={quotes} marginalia />
             </RevealSection>
           )}
 
@@ -111,7 +112,14 @@ export default async function BookPage({ params }: { params: Params }) {
 function BookHeader({ book, bingoYear }: { book: Book; bingoYear: number | null }) {
   return (
     <header className="border-rule mb-12 grid grid-cols-1 gap-8 border-b pb-8 sm:grid-cols-[180px_1fr]">
-      <Cover src={book.cover} title={book.title} width={180} height={270} />
+      <div className="relative">
+        <Cover src={book.cover} title={book.title} width={180} height={270} />
+        {book.status === "finished" && (
+          <div className="absolute -top-3 -right-3 rotate-[8deg] sm:rotate-[-6deg]">
+            <Stamp book={book} />
+          </div>
+        )}
+      </div>
       <div className="min-w-0">
         <div className="text-ink-soft mb-4 flex flex-wrap items-center gap-2 text-[10px] tracking-[0.16em] uppercase">
           {book.bingoSquares.length > 0 && bingoYear !== null && (
@@ -299,7 +307,7 @@ function SummaryPlaceholder() {
   );
 }
 
-function Markdown({ source }: { source: string }) {
+function Markdown({ source, marginalia = false }: { source: string; marginalia?: boolean }) {
   return (
     <div className="font-serif text-ink prose-narrow max-w-[680px] text-[16px] leading-[1.65]">
       <ReactMarkdown
@@ -332,11 +340,14 @@ function Markdown({ source }: { source: string }) {
               {children}
             </code>
           ),
-          blockquote: ({ children }) => (
-            <blockquote className="border-rule text-ink-soft my-4 border-l-2 pl-4 italic">
-              {children}
-            </blockquote>
-          ),
+          blockquote: ({ children }) =>
+            marginalia ? (
+              <MarginaliaQuote>{children}</MarginaliaQuote>
+            ) : (
+              <blockquote className="border-rule text-ink-soft my-4 border-l-2 pl-4 italic">
+                {children}
+              </blockquote>
+            ),
           div: (props) => {
             if ((props as Record<string, unknown>)["data-spoiler"]) {
               return <Spoiler>{props.children}</Spoiler>;
@@ -354,5 +365,45 @@ function Markdown({ source }: { source: string }) {
         {source}
       </ReactMarkdown>
     </div>
+  );
+}
+
+// Pencil-bracket SVG marginalia for the quotes section. Replaces the
+// stock left-border blockquote with a hand-drawn-feeling bracket on
+// each side, drawn with rough stroke-dasharray for the pencil look.
+function MarginaliaQuote({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="my-6 flex items-stretch gap-3 sm:gap-4">
+      <Bracket side="left" />
+      <div className="font-serif text-ink min-w-0 flex-1 px-1 text-[16px] leading-[1.6] italic">
+        {children}
+      </div>
+      <Bracket side="right" />
+    </div>
+  );
+}
+
+function Bracket({ side }: { side: "left" | "right" }) {
+  // The bracket is drawn as three short strokes: a top arm, a long
+  // vertical, and a bottom arm. A subtle stroke-dasharray gives it the
+  // pencil-and-paper feel without going full hand-drawn pastiche.
+  const path = side === "left" ? "M 11 4 L 5 4 L 5 56 L 11 56" : "M 1 4 L 7 4 L 7 56 L 1 56";
+  return (
+    <svg
+      width="12"
+      height="60"
+      viewBox="0 0 12 60"
+      fill="none"
+      stroke="var(--accent)"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeDasharray="0.6 0.9"
+      className="shrink-0 self-stretch opacity-80"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path d={path} />
+    </svg>
   );
 }
