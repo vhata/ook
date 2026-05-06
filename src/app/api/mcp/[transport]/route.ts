@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { bindBookToBingoSquare, bindBookToBingoSquareInputSchema } from "@/lib/mcp/bingo-tools";
 import { commitPatch, getBook, getBookInputSchema } from "@/lib/mcp/book-tools";
 import { commitPatchInputSchema } from "@/lib/mcp/patch";
 import { listBingo, listBingoInputSchema, listBooks, listBooksInputSchema } from "@/lib/mcp/tools";
@@ -76,6 +77,24 @@ function buildServer(): McpServer {
       }
       return {
         content: [{ type: "text", text: JSON.stringify(out, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "bind_book_to_bingo_square",
+    {
+      title: "Bind a book to a bingo square",
+      description:
+        "Set or clear the `book:` field for a named square on the year's " +
+        "bingo card. Pass null book_slug to unbind. Done-ness is derived " +
+        "from the linked book's status — there is no separate claim action.",
+      inputSchema: bindBookToBingoSquareInputSchema,
+    },
+    async (args) => {
+      const result = await bindBookToBingoSquare(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
     },
   );
