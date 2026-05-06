@@ -16,6 +16,7 @@
     "*.{ts,tsx,js,mjs,cjs}": "eslint --fix"
   },
   "dependencies": {
+    "@upstash/redis": "^1.38.0",
     "gray-matter": "^4.0.3",
     "next": "16.2.4",
     "qrcode": "^1.5.4",
