@@ -16,6 +16,8 @@
     "*.{ts,tsx,js,mjs,cjs}": "eslint --fix"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.0",
     "@upstash/redis": "^1.38.0",
     "gray-matter": "^4.0.3",
     "next": "16.2.4",
