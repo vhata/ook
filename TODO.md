@@ -91,7 +91,6 @@ Cosmetic and atmospheric ideas. Mostly low-stakes; pick whichever delights.
 
 Vault-only stats; no external API needed. All extend the existing `/stats/[year]` route.
 
-- **Rating-over-time line chart**: across all finished books, plot rating; reveals taste drift, harshening, kindening. `#feature #stats`
 - **Tag overlap Sankey across years**: flows between top tags year-on-year. Reveals genre migrations. `#feature #stats #visual`
 - **Last book before personal milestone**: overlay log on a manually-maintained `_meta/milestones.md` (birthdays, moves, losses). Sentimental. `#feature #stats #personal`
 - **Word frequency across reviews**: what _you_ keep saying. Self-portrait. `#feature #stats #introspection`

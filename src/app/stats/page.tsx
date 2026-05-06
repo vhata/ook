@@ -30,6 +30,18 @@ export default async function StatsIndex() {
     };
   });
 
+  const ratedDots: RatedDot[] = books
+    .filter((b): b is Book & { finished: string; rating: number } =>
+      Boolean(b.status === "finished" && b.finished && b.rating !== null),
+    )
+    .map((b) => ({
+      slug: b.slug,
+      title: b.title,
+      finished: b.finished,
+      rating: b.rating,
+    }))
+    .sort((a, b) => a.finished.localeCompare(b.finished));
+
   return (
     <main className="mx-auto box-border w-full max-w-[900px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
       <Link
@@ -50,6 +62,8 @@ export default async function StatsIndex() {
           Each year&rsquo;s first finish and last finish, with the count between.
         </p>
       </header>
+
+      {ratedDots.length >= 4 && <RatingOverTime dots={ratedDots} />}
 
       <ol className="m-0 list-none space-y-6 p-0">
         {yearly.map((y) => (
@@ -75,6 +89,163 @@ export default async function StatsIndex() {
         ))}
       </ol>
     </main>
+  );
+}
+
+type RatedDot = {
+  slug: string;
+  title: string;
+  finished: string;
+  rating: number;
+};
+
+function RatingOverTime({ dots }: { dots: RatedDot[] }) {
+  // SVG viewbox-only chart: 800×220 with 32px right pad for the y-axis
+  // labels and 28px bottom for x-axis ticks. Dots are drawn against the
+  // span of finish dates and the 0..5 rating range. Includes a simple
+  // running average (window = ceil(N/8), min 3) to make the trend
+  // legible without a heavy smoother.
+  const W = 800;
+  const H = 220;
+  const padL = 32;
+  const padR = 12;
+  const padT = 12;
+  const padB = 28;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+
+  const tMin = Date.parse(`${dots[0].finished}T12:00:00Z`);
+  const tMax = Date.parse(`${dots[dots.length - 1].finished}T12:00:00Z`);
+  const span = Math.max(tMax - tMin, 86400000);
+
+  const x = (iso: string) => {
+    const t = Date.parse(`${iso}T12:00:00Z`);
+    return padL + ((t - tMin) / span) * innerW;
+  };
+  const y = (rating: number) => padT + ((5 - rating) / 5) * innerH;
+
+  const window = Math.max(3, Math.ceil(dots.length / 8));
+  const rolling = dots.map((_, i) => {
+    const slice = dots.slice(Math.max(0, i - window + 1), i + 1);
+    const sum = slice.reduce((s, d) => s + d.rating, 0);
+    return sum / slice.length;
+  });
+  const linePath = dots
+    .map((d, i) => `${i === 0 ? "M" : "L"} ${x(d.finished).toFixed(2)} ${y(rolling[i]).toFixed(2)}`)
+    .join(" ");
+
+  // Year ticks at January 1 of each year that falls in span.
+  const yearStart = new Date(tMin).getUTCFullYear();
+  const yearEnd = new Date(tMax).getUTCFullYear();
+  const yearTicks: Array<{ year: number; xPos: number }> = [];
+  for (let yr = yearStart; yr <= yearEnd; yr++) {
+    const t = Date.UTC(yr, 0, 1);
+    if (t >= tMin && t <= tMax) {
+      yearTicks.push({ year: yr, xPos: padL + ((t - tMin) / span) * innerW });
+    }
+  }
+
+  const bestRating = Math.max(...dots.map((d) => d.rating));
+  const worstRating = Math.min(...dots.map((d) => d.rating));
+  const avgRating = dots.reduce((s, d) => s + d.rating, 0) / dots.length;
+
+  return (
+    <section className="mb-12">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
+        <h2 className="font-serif text-ink m-0 text-[22px] leading-tight font-medium tracking-[-0.012em]">
+          Ratings, over time
+        </h2>
+        <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
+          {dots.length} rated · avg {avgRating.toFixed(2)} · {worstRating.toFixed(1)}–
+          {bestRating.toFixed(1)}
+        </span>
+      </div>
+      <div className="bg-surface border-rule rounded border p-4 sm:p-5">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+          className="block h-auto w-full"
+          aria-label="Each finished and rated book plotted by finish date"
+        >
+          {/* Horizontal rating gridlines at 1, 2, 3, 4, 5 */}
+          {[1, 2, 3, 4, 5].map((r) => (
+            <g key={r}>
+              <line
+                x1={padL}
+                x2={W - padR}
+                y1={y(r)}
+                y2={y(r)}
+                stroke="var(--rule)"
+                strokeDasharray={r === 5 ? "0" : "2 4"}
+                strokeWidth={r === 5 ? 0.7 : 0.5}
+              />
+              <text
+                x={padL - 6}
+                y={y(r) + 3}
+                fontSize="9"
+                fill="var(--ink-soft)"
+                textAnchor="end"
+                fontFamily="ui-monospace, monospace"
+              >
+                {r}
+              </text>
+            </g>
+          ))}
+
+          {/* Year ticks */}
+          {yearTicks.map((t) => (
+            <g key={t.year}>
+              <line
+                x1={t.xPos}
+                x2={t.xPos}
+                y1={padT}
+                y2={H - padB}
+                stroke="var(--rule)"
+                strokeDasharray="2 6"
+                strokeWidth={0.5}
+              />
+              <text
+                x={t.xPos}
+                y={H - padB + 14}
+                fontSize="10"
+                fill="var(--ink-soft)"
+                textAnchor="middle"
+                fontFamily="ui-monospace, monospace"
+              >
+                {t.year}
+              </text>
+            </g>
+          ))}
+
+          {/* Rolling average line */}
+          <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth={1.5} opacity={0.55} />
+
+          {/* Dots */}
+          {dots.map((d) => (
+            <circle
+              key={d.slug}
+              cx={x(d.finished)}
+              cy={y(d.rating)}
+              r={3}
+              fill="var(--ink)"
+              opacity={0.78}
+            >
+              <title>{`${d.title} — ${d.rating.toFixed(1)} ★ — ${d.finished}`}</title>
+            </circle>
+          ))}
+        </svg>
+        <div className="text-ink-dim mt-2 flex items-center gap-3 text-[10px] tracking-[0.14em] uppercase">
+          <span className="flex items-center gap-1.5">
+            <span className="bg-ink inline-block h-1.5 w-1.5 rounded-full opacity-78" />
+            <span className="text-ink-soft">each finished book</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="bg-accent inline-block h-px w-3 opacity-55" />
+            <span className="text-ink-soft">rolling avg ({window}-book window)</span>
+          </span>
+        </div>
+      </div>
+    </section>
   );
 }
 
