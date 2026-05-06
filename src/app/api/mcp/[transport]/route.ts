@@ -1,5 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { commitPatch, getBook, getBookInputSchema } from "@/lib/mcp/book-tools";
+import { commitPatchInputSchema } from "@/lib/mcp/patch";
 import { listBingo, listBingoInputSchema, listBooks, listBooksInputSchema } from "@/lib/mcp/tools";
 
 // MCP HTTP transport at /api/mcp/[transport]. The `[transport]`
@@ -48,6 +50,52 @@ function buildServer(): McpServer {
       const card = await listBingo(args);
       return {
         content: [{ type: "text", text: JSON.stringify(card, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "get_book",
+    {
+      title: "Get book",
+      description:
+        "Fetch a single book's frontmatter plus optionally a list of named " +
+        "sections. Sections must be opt-in to keep prompt-injection surface " +
+        "small. Special section names: summary, review, quotes (top-level " +
+        "files in the book directory). Other names map to H2 blocks in the " +
+        "reference notes file.",
+      inputSchema: getBookInputSchema,
+    },
+    async (args) => {
+      const out = await getBook(args);
+      if (!out) {
+        return {
+          content: [{ type: "text", text: JSON.stringify({ error: "not-found" }) }],
+          isError: true,
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(out, null, 2) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "commit_patch",
+    {
+      title: "Commit a patch to a book",
+      description:
+        "Apply frontmatter and section changes to a book and commit the " +
+        "result to the vault. Frontmatter changes are key→value where null " +
+        "deletes the key. Section changes are name→{action, content} where " +
+        "action is replace, append, or prepend. The original commit message " +
+        "is preserved verbatim.",
+      inputSchema: commitPatchInputSchema.shape,
+    },
+    async (args) => {
+      const result = await commitPatch(args);
+      return {
+        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
       };
     },
   );
