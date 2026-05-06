@@ -32,10 +32,10 @@ Live in production at https://b-ook.vercel.app. Vault (`vhata/books`) is a priva
 
 ## Disciplines
 
-- **Vault is read-only from this project.** `ook` reads frontmatter and body markdown; it never writes. Mutations to the vault happen via Obsidian or the in-vault `bin/book` CLI. Lint/review should flag any `fs.writeFile`, `fs.appendFile`, or similar against `BOOKS_DIR`.
+- **Vault is read-only from this project.** `ook` reads frontmatter and body markdown; it never writes. Mutations to the vault happen via Obsidian or the in-vault `bin/book` CLI. Encoded in `eslint.config.mjs` as a `no-restricted-syntax`/`no-restricted-imports` rule scoped to `src/**` that bans `fs.writeFile`, `fs.appendFile`, and friends — the prebuild SSH-key writer in `scripts/` is out of scope by design.
 - **Data layer separated from rendering.** Anything that touches the filesystem lives in `src/lib/` (or in the API route under `src/app/api/`). Components import typed values from there; no component reads the vault directly. Reason: keeps the boundary mockable for tests and isolates the "only place we know the on-disk shape" to one module.
 - **Tiered spoiler rendering.** Tier 0 fields (catalog) render in HTML. Tier 1 (synopsis, review, quotes) render in HTML but are visually gated by client-side reveal components. Tier 2 (deep notes) is fetched from `/api/books/[slug]/notes` only after a user click — must NEVER be in the initial server-rendered HTML. The `progress` field is never rendered publicly under any tier.
-- **Single source of truth per book.** Cover URL, status, rating, etc. live in the book's own frontmatter. The bingo file's `cover:` field is the fallback for unbound squares (no vault directory yet); the renderer prefers the linked book's frontmatter when available.
+- **Single source of truth per book.** Cover URL, status, rating, etc. live in the book's own frontmatter. The bingo file's `cover:` field is the fallback for unbound squares (no vault directory yet); the renderer prefers the linked book's frontmatter when available. Bingo `done`-ness is derived from the bound book's `status` (finished → done) — the per-square `done:` field in the YAML is read but not trusted, and is a vault-side cleanup candidate.
 - **No secrets in env vars exposed to the client.** Anything in `process.env.NEXT_PUBLIC_*` ships to the browser; everything else stays server-side. The `BOOKS_DEPLOY_KEY` env var on Vercel is consumed only by the prebuild script, never by runtime code.
 
 ## Environment

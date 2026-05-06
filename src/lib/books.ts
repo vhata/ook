@@ -268,8 +268,9 @@ export async function getBingo(year: number): Promise<BingoCard | null> {
 
   // Look up linked books so we can: (a) render a "now" pill on currently-
   // reading squares; (b) prefer the book's own frontmatter cover over the
-  // stale copy embedded in the bingo file. The bingo's cover field is the
-  // fallback for squares without a vault directory.
+  // stale copy embedded in the bingo file; (c) derive done-ness from the
+  // bound book's status. The bingo's cover field is the fallback for squares
+  // without a vault directory.
   const allBooks = await getAllBooks();
   const bySlug = new Map(allBooks.map((b) => [b.slug, b]));
 
@@ -284,7 +285,10 @@ export async function getBingo(year: number): Promise<BingoCard | null> {
           authors: parseStringList(s.authors),
           book: bookSlug,
           cover,
-          done: s.done === true,
+          // Done-ness is derived from the linked book's status — single
+          // source of truth per book. The square's stored `done` field is
+          // ignored (and is a candidate for vault-side cleanup).
+          done: linked?.status === "finished",
           reading: linked?.status === "reading",
           free: s.free === true,
         };

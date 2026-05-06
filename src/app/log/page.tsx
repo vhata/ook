@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { getReadingLog } from "@/lib/books";
 import type { LogEntry } from "@/lib/types";
@@ -48,16 +49,30 @@ function daysBetween(later: string, earlier: string): number {
   return Math.round((a - b) / 86400000);
 }
 
+type IndexedEntry = LogEntry & { _i: number };
+
 export default async function LogPage() {
   const log = await getReadingLog();
 
-  const byMonth = new Map<string, LogEntry[]>();
-  for (const e of log) {
+  // Walk adjacent pairs (newest first) and flag each gap that exceeds the
+  // drought threshold. The marker is keyed by the older entry's index — it
+  // renders directly above that entry, so cross-month gaps land at the top
+  // of the older month and in-month gaps land between two entries.
+  const gaps = new Map<number, number>();
+  for (let i = 0; i < log.length - 1; i++) {
+    const newer = log[i].date;
+    const older = log[i + 1].date;
+    const gap = daysBetween(newer, older);
+    if (gap > DROUGHT_DAYS) gaps.set(i + 1, gap);
+  }
+
+  const byMonth = new Map<string, IndexedEntry[]>();
+  log.forEach((e, i) => {
     const m = e.date.slice(0, 7);
     const arr = byMonth.get(m) ?? [];
-    arr.push(e);
+    arr.push({ ...e, _i: i });
     byMonth.set(m, arr);
-  }
+  });
   const months = [...byMonth.keys()].sort().reverse();
 
   // Most-recent event in the log. If today is > DROUGHT_DAYS past it, we
@@ -100,13 +115,23 @@ export default async function LogPage() {
           No log entries yet.
         </div>
       ) : (
-        months.map((m) => <MonthSection key={m} month={m} entries={byMonth.get(m) ?? []} />)
+        months.map((m) => (
+          <MonthSection key={m} month={m} entries={byMonth.get(m) ?? []} gaps={gaps} />
+        ))
       )}
     </main>
   );
 }
 
-function MonthSection({ month, entries }: { month: string; entries: LogEntry[] }) {
+function MonthSection({
+  month,
+  entries,
+  gaps,
+}: {
+  month: string;
+  entries: IndexedEntry[];
+  gaps: Map<number, number>;
+}) {
   const [year, mm] = month.split("-");
   const label = `${MONTH_NAMES[+mm - 1]} ${year}`;
   return (
@@ -119,11 +144,29 @@ function MonthSection({ month, entries }: { month: string; entries: LogEntry[] }
         </span>
       </h2>
       <ol className="m-0 list-none p-0">
-        {entries.map((e, i) => (
-          <Entry key={i} entry={e} />
-        ))}
+        {entries.map((e) => {
+          const gap = gaps.get(e._i);
+          return (
+            <Fragment key={e._i}>
+              {gap !== undefined && <GapMarker days={gap} />}
+              <Entry entry={e} />
+            </Fragment>
+          );
+        })}
       </ol>
     </section>
+  );
+}
+
+function GapMarker({ days }: { days: number }) {
+  return (
+    <li
+      className="border-rule text-ink-soft grid grid-cols-[54px_1fr] items-center gap-5 border-t py-3 font-sans text-[11px] tracking-[0.14em] uppercase"
+      aria-label={`${days} days quiet`}
+    >
+      <span className="font-mono text-[10px]">↕</span>
+      <span className="italic">{days} days quiet</span>
+    </li>
   );
 }
 

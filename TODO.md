@@ -12,11 +12,12 @@ Flat backlog. Each entry tagged with `#area`. Done items deleted, not struck thr
 
 ### Site / render
 
-- TBR file currently includes long instructional prose meant for the agent ("When one moves into 'currently reading', promote it…"). The pile parser correctly extracts `## Wanted` / `## Re-Read Aspirations`, but those piles are empty (no entries yet), so the home page falls back to rendering the raw markdown body. Either fill the piles with real entries or strip the instructional prose from `tbr.md`. `#polish #render`
-- Per-book page React-component tests (would catch render regressions; needs `@testing-library/react` + `happy-dom`). `#testing`
+- Strip instructional agent-prose from `_meta/tbr.md` (vault-side). The home renderer now hides the TBR section entirely when no pile has entries, so the prose isn't user-visible — but the file still reads oddly. Either populate the `## Wanted` / `## Re-Read Aspirations` piles with real entries or move the agent instructions out of the body. `#polish #vault`
+- Expand component-test coverage now that the scaffold exists. Worth adding: `DeepNotes` (mock fetch for `/api/books/[slug]/notes`), `Cover` (image fallback path), the per-book page itself (server component — needs an integration shape). `#testing`
 - Flesh out `ook-review` Layer 2 categories as project-specific rules emerge in `ARCHITECTURE.md`. `#review #setup`
 - Cover-picker improvements. `book covers` already opens an HTML grid of Open Library editions and `book cover <slug> <url>` sets any URL by hand — those are done. Still wanted: ISBN13 fallback when title-search returns no editions; surface non-Open-Library candidates (Google Books) when OL has thin coverage; per-cover language / region preference. `#feature #covers #polish`
 - Bingo cover dedup at promote time. When `bin/book` auto-promotes a bingo entry to a vault directory, the bingo file's `cover:` line for that square becomes redundant (the renderer prefers the new directory's frontmatter). Strip it during promotion to keep the dedup automatic. Currently the duplicate sits there until the user runs the cleanup script by hand. `#polish #vault`
+- Bingo `done:` YAML cleanup (vault-side). Render now derives done-ness from the bound book's status, so the per-square `done:` field is dead weight. Either strip it from `_meta/bingo-YYYY.md` or have `bin/book` keep it stripped going forward. `#polish #vault #bingo`
 - `summary.md` tier reconsideration. Per the existing convention `summary.md` is a "full-spoiler plot summary," but the tiered model puts it at tier 1 (one click). For books like Ra where the summary really is a full plot dump, that's too eager a reveal. Options: move the full-spoiler content into the body (tier 2) and reserve `summary.md` for synopses; OR add a per-section `:::spoiler` wrap; OR allow a frontmatter `summary_tier: 2` override (we said no overrides — revisit). `#design #spoilers`
 
 ### Goodreads / reading-ecosystem (researched 2026-05-03)
@@ -94,7 +95,6 @@ Vault-only stats; no external API needed. All extend the existing `/stats/[year]
 - **Rating-over-time line chart**: across all finished books, plot rating; reveals taste drift, harshening, kindening. `#feature #stats`
 - **Tag overlap Sankey across years**: flows between top tags year-on-year. Reveals genre migrations. `#feature #stats #visual`
 - **Last book before personal milestone**: overlay log on a manually-maintained `_meta/milestones.md` (birthdays, moves, losses). Sentimental. `#feature #stats #personal`
-- **Reading drought detector — inline gap markers**: the top-of-`/log` quiet-stretch banner is shipped; still wanted is inline "X days quiet" markers between adjacent entries when the gap exceeds the threshold, including across month boundaries. `#feature #log #polish`
 - **Word frequency across reviews**: what _you_ keep saying. Self-portrait. `#feature #stats #introspection`
 - **"Books I rated 5 but never re-read"**: introspection axis; needs `reread_count` schema. `#feature #stats #introspection`
 - **"You always read X before Y" pattern detection**: consecutive-finishes patterns surfaced on `/stats`. `#feature #stats`

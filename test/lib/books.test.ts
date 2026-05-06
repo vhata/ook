@@ -129,6 +129,26 @@ describe("getBingo", () => {
     const claimed = card?.squares.find((s) => s.id === "a1");
     expect(claimed?.book).toBe("TestBook");
     expect(claimed?.done).toBe(true);
+    expect(claimed?.reading).toBe(false);
+  });
+
+  it("derives done from the linked book's status, ignoring the YAML field", async () => {
+    // bingo-2025 a2: book=PrivateBook (status: reading), but YAML says
+    // `done: true`. Derived value must win — the linked book is not
+    // finished, so the square is not done.
+    const card = await getBingo(2025);
+    const a2 = card?.squares.find((s) => s.id === "a2");
+    expect(a2?.book).toBe("PrivateBook");
+    expect(a2?.done).toBe(false);
+    expect(a2?.reading).toBe(true);
+  });
+
+  it("treats unbound squares as not-done regardless of YAML", async () => {
+    const card = await getBingo(2026);
+    const unbound = card?.squares.find((s) => s.id === "a3");
+    expect(unbound?.book).toBeNull();
+    expect(unbound?.done).toBe(false);
+    expect(unbound?.reading).toBe(false);
   });
 
   it("returns null for non-existent year", async () => {

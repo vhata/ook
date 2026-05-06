@@ -13,7 +13,9 @@ squares:
     title: Private Book
     authors: [Solo Author]
     book: PrivateBook
-    done: false
+    # Stored value is a lie — PrivateBook is reading, not finished. Used in
+    # tests to prove the derived value wins over the YAML field.
+    done: true
   - id: a3
     title: Another 2025
     authors: [Other Author]

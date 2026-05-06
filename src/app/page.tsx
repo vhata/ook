@@ -1,6 +1,4 @@
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Cover } from "@/components/Cover";
 import {
   getBingo,
@@ -101,7 +99,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
         )}
       </Section>
 
-      {tbr && tbr.piles.length > 0 && (
+      {tbr && tbr.piles.some((p) => p.entries.length > 0) && (
         <Section
           title="To be read"
           right={<PileFilter piles={tbr.piles.map((p) => p.name)} selected={selectedPile} />}
@@ -509,13 +507,6 @@ function TbrPiles({ tbr, selectedPile }: { tbr: Tbr; selectedPile: string }) {
     selectedPile === "All" ? tbr.piles : tbr.piles.filter((p) => p.name === selectedPile);
   const flat = piles.flatMap((p) => p.entries.map((e) => ({ ...e, pile: p.name })));
   if (flat.length === 0) {
-    if (tbr.body) {
-      return (
-        <div className="font-serif prose-narrow space-y-3 text-[15px] leading-[1.6]">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{tbr.body}</ReactMarkdown>
-        </div>
-      );
-    }
     return <EmptyNote>Nothing in this pile yet — add as they come up.</EmptyNote>;
   }
   return (
