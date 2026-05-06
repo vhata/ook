@@ -6,6 +6,10 @@ Flat backlog. Each entry tagged with `#area`. Done items deleted, not struck thr
 
 ## Backlog
 
+### Write surface (MCP, mobile, /admin)
+
+- **Mobile-friendly write surface for the vault.** Full handoff spec lives at `docs/proposals/mcp-write-surface.md`. Solves "updating book data from a phone": gated `/admin` page + `@modelcontextprotocol/sdk` tools mounted at `/api/mcp/*`, free-text input → Claude API call with MCP attached → diff preview → commit-via-Octokit to `vhata/books`. Same repo, separate route group; render code stays read-only. Ship line is step 5 (the `/admin` end-to-end), bingo + create_book + log entries are incremental. Prerequisites flagged in the proposal's "Corrections noted on import": (a) the lint rule the spec assumes exists actually needs to be added scoped to render code; (b) bingo `done` is stored, not derived (`src/lib/books.ts:287`) — must migrate to derived as part of step 6; (c) Vercel KV is retired, storage is Upstash Redis via Marketplace. Open questions: exact frontmatter schema (lives in private `books/CLAUDE.md`), section name enumeration, which `bin/book` ops to wrap vs reimplement, whether `create_book` is v1. `#feature #write-surface #mcp #mobile #auth`
+
 ### Site / render
 
 - TBR file currently includes long instructional prose meant for the agent ("When one moves into 'currently reading', promote it…"). The pile parser correctly extracts `## Wanted` / `## Re-Read Aspirations`, but those piles are empty (no entries yet), so the home page falls back to rendering the raw markdown body. Either fill the piles with real entries or strip the instructional prose from `tbr.md`. `#polish #render`
