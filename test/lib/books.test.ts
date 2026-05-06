@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import path from "node:path";
 import {
+  bookStuck,
   externalLinks,
   findBingoYearForBook,
   getBooksByTag,
@@ -323,6 +324,60 @@ describe("externalLinks", () => {
       }),
     );
     expect(links.map((l) => l.label)).toEqual(["Goodreads", "Hardcover", "Storygraph", "Bookwyrm"]);
+  });
+});
+
+describe("bookStuck", () => {
+  function makeBook(overrides: Partial<Book> = {}): Book {
+    return {
+      slug: "x",
+      title: "x",
+      authors: [],
+      series: null,
+      status: "finished",
+      progress: "",
+      started: null,
+      finished: null,
+      rating: 4.5,
+      wouldReread: null,
+      bingoSquares: [],
+      tags: [],
+      cover: null,
+      pullquote: null,
+      seeAlso: [],
+      lastEdited: null,
+      hasReview: true,
+      hasQuotes: true,
+      hasSummary: false,
+      goodreadsId: null,
+      hardcoverSlug: null,
+      storygraphSlug: null,
+      bookwyrmUrl: null,
+      ...overrides,
+    };
+  }
+
+  it("marks a finished, reviewed, quoted, highly-rated book as stuck", () => {
+    expect(bookStuck(makeBook())).toBe(true);
+  });
+
+  it("ignores books that aren't finished", () => {
+    expect(bookStuck(makeBook({ status: "reading" }))).toBe(false);
+    expect(bookStuck(makeBook({ status: "abandoned" }))).toBe(false);
+  });
+
+  it("requires both review and quotes", () => {
+    expect(bookStuck(makeBook({ hasReview: false }))).toBe(false);
+    expect(bookStuck(makeBook({ hasQuotes: false }))).toBe(false);
+  });
+
+  it("accepts wouldReread=true even with a low rating", () => {
+    expect(bookStuck(makeBook({ rating: 2, wouldReread: true }))).toBe(true);
+  });
+
+  it("rejects when neither rating>=4 nor wouldReread is set", () => {
+    expect(bookStuck(makeBook({ rating: 3, wouldReread: false }))).toBe(false);
+    expect(bookStuck(makeBook({ rating: null, wouldReread: null }))).toBe(false);
   });
 });
 

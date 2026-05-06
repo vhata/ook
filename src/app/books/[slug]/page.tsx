@@ -9,6 +9,7 @@ import DeepNotes from "@/components/DeepNotes";
 import RevealSection from "@/components/RevealSection";
 import Spoiler from "@/components/Spoiler";
 import {
+  bookStuck,
   externalLinks,
   findBingoYearForBook,
   getAllBooks,
@@ -138,6 +139,17 @@ function BookHeader({ book, bingoYear }: { book: Book; bingoYear: number | null 
             <>
               <span>·</span>
               <span>would re-read</span>
+            </>
+          )}
+          {bookStuck(book) && (
+            <>
+              <span>·</span>
+              <span
+                className="border-accent text-accent rounded-full border px-2 py-[1px]"
+                title="Reviewed, quoted, and either rated highly or marked would-reread."
+              >
+                stuck
+              </span>
             </>
           )}
           {book.lastEdited && (

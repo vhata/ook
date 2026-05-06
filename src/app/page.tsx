@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Cover } from "@/components/Cover";
 import {
+  bookStuck,
   getBingo,
   getCurrentBingoYear,
   getCurrentlyReading,
@@ -372,11 +373,20 @@ function CurrentCard({ book, bingoYear }: { book: Book; bingoYear: number | null
 }
 
 function FinishedCard({ book }: { book: Book }) {
+  const stuck = bookStuck(book);
   return (
     <Link
       href={`/books/${encodeURIComponent(book.slug)}`}
       className="bg-surface border-rule hover:border-ink relative block rounded-md border p-4 transition-all hover:-translate-y-0.5"
     >
+      {stuck && (
+        <span
+          className="border-accent text-accent bg-bg absolute top-2 right-2 z-10 rounded-full border px-2 py-[2px] text-[9px] tracking-[0.18em] uppercase"
+          title="Reviewed, quoted, and either rated highly or marked would-reread."
+        >
+          stuck
+        </span>
+      )}
       {/* Mobile: cover left, info right. Desktop: cover top, info below. */}
       <div className="flex gap-4 sm:block">
         <div

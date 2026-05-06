@@ -155,6 +155,18 @@ async function readBookDir(slug: string): Promise<Book | null> {
 // Build the list of outbound links the book actually has IDs for. Order is
 // fixed (Goodreads, Hardcover, Storygraph, Bookwyrm); missing fields drop
 // out, never guessed. Returns [] if no IDs are populated.
+// "This one stuck" — books that earned the reader's full attention.
+// Heuristic: a finished book that the reader both reviewed AND quoted
+// AND either rated highly (≥4) or marked would-reread. Three signals,
+// because any one alone is too easy to clear (a half-star rating, a
+// stub review). The rule is intentionally rule-based, not corpus-
+// quantile, so the badge's meaning is stable as the corpus grows.
+export function bookStuck(book: Book): boolean {
+  if (book.status !== "finished") return false;
+  if (!book.hasReview || !book.hasQuotes) return false;
+  return (book.rating !== null && book.rating >= 4) || book.wouldReread === true;
+}
+
 export function externalLinks(book: Book): ExternalLink[] {
   const links: ExternalLink[] = [];
   if (book.goodreadsId) {
