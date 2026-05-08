@@ -25,6 +25,14 @@
 //
 // Pass --append to merge with an existing triage.md; otherwise the
 // existing file is overwritten on apply.
+//
+// **Read entries become vault directories**, not triage bullets.
+// The "Read" column is the user's "I've read this" mark — those
+// belong in the reading history, not the consider-later pool.
+// Each Read=truthy row mints `<Title>/<Title>.md` with status:
+// finished. Already-existing vault directories are skipped (case-
+// insensitive name match), so it's safe to re-run after a Goodreads
+// import has already covered most of them.
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -69,11 +77,19 @@ async function main() {
   const indexCol = pickFirst(header, ["#", "index", "book", "vol", "volume"]);
   const readCol = pickFirst(header, ["read", "done", "finished"]);
 
-  // Group entries into piles (H2 sections of triage.md).
+  // Existing vault directories — case-insensitive set so "He Who Fights"
+  // doesn't get re-promoted as "He who fights".
+  const existingDirs = await listVaultDirectories(VAULT);
+  const existingLower = new Set([...existingDirs].map((s) => s.toLowerCase()));
+
+  // Group entries into piles (H2 sections of triage.md), and collect
+  // promotion plans for Read=truthy rows (mint vault directories).
   const piles = new Map();
+  const promotions = []; // { slug, frontmatter, csvRow }
   let parsed = 0;
   let skippedNoTitle = 0;
-  let skippedRead = 0;
+  let skippedReadExisting = 0;
+  let skippedSlugCollision = 0;
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     const title = (row[titleCol] ?? "").trim();
@@ -81,17 +97,41 @@ async function main() {
       skippedNoTitle++;
       continue;
     }
-    if (readCol >= 0 && isTruthy((row[readCol] ?? "").trim())) {
-      skippedRead++;
-      continue;
-    }
     const author = authorCol >= 0 ? (row[authorCol] ?? "").trim() : "";
     const why = whyCol >= 0 ? (row[whyCol] ?? "").trim() : "";
     const source = sourceCol >= 0 ? (row[sourceCol] ?? "").trim() : "";
     const indexNum = indexCol >= 0 ? (row[indexCol] ?? "").trim() : "";
     const pileRaw = pileCol >= 0 ? (row[pileCol] ?? "").trim() : "";
-    // Empty pile-column value falls through to the default; for series-
-    // by-pile imports this collects standalones into one bucket.
+    const isRead = readCol >= 0 && isTruthy((row[readCol] ?? "").trim());
+
+    if (isRead) {
+      // Read entries become vault directories with status: finished.
+      const slug = sanitizeSlug(title);
+      if (!slug) continue;
+      if (existingLower.has(slug.toLowerCase())) {
+        skippedReadExisting++;
+        continue;
+      }
+      if (promotions.some((p) => p.slug.toLowerCase() === slug.toLowerCase())) {
+        skippedSlugCollision++;
+        continue;
+      }
+      promotions.push({
+        slug,
+        frontmatter: {
+          title,
+          authors: author ? [author] : [],
+          series: pileRaw && indexNum ? `${pileRaw} #${indexNum}` : pileRaw || null,
+          status: "finished",
+          finished: null,
+          rating: null,
+          tags: [],
+        },
+      });
+      continue;
+    }
+
+    // Unread → triage pile.
     const pileName = pileRaw || (indexNum ? "Other" : DEFAULT_PILE);
     const list = piles.get(pileName) ?? [];
     list.push({ title, author, why, source, indexNum, pileName: pileRaw });
@@ -99,9 +139,10 @@ async function main() {
     parsed++;
   }
   process.stderr.write(
-    `${parsed} entries from ${path.basename(CSV)}` +
-      (skippedRead ? ` (skipped ${skippedRead} already-read)` : "") +
-      (skippedNoTitle ? ` (skipped ${skippedNoTitle} with no title)` : "") +
+    `${parsed} triage entries · ${promotions.length} read → vault` +
+      (skippedReadExisting ? ` (${skippedReadExisting} read already in vault)` : "") +
+      (skippedSlugCollision ? ` (${skippedSlugCollision} slug collisions)` : "") +
+      (skippedNoTitle ? ` (${skippedNoTitle} skipped: no title)` : "") +
       "\n",
   );
 
@@ -148,13 +189,112 @@ async function main() {
 
   if (!APPLY) {
     process.stdout.write(final);
-    process.stderr.write(`\n(dry-run; rerun with --apply to write to ${triagePath})\n`);
+    process.stderr.write(`\n(dry-run; rerun with --apply to write to ${triagePath}`);
+    if (promotions.length > 0) {
+      process.stderr.write(` and ${promotions.length} new vault dirs`);
+    }
+    process.stderr.write(")\n");
+    if (promotions.length > 0) {
+      process.stderr.write("\nWould-promote (Read=truthy → vault dir, status: finished):\n");
+      for (const p of promotions) {
+        process.stderr.write(`  ${p.slug}\n`);
+      }
+    }
     return;
   }
 
   await fs.mkdir(path.dirname(triagePath), { recursive: true });
   await fs.writeFile(triagePath, final, "utf8");
   process.stderr.write(`wrote ${triagePath}\n`);
+
+  // Mint vault directories for the Read=truthy rows.
+  for (const p of promotions) {
+    const dir = path.join(VAULT, p.slug);
+    await fs.mkdir(dir, { recursive: true });
+    const refFile = path.join(dir, `${p.slug}.md`);
+    await fs.writeFile(refFile, renderBookFile(p.frontmatter), "utf8");
+  }
+  if (promotions.length > 0) {
+    process.stderr.write(`wrote ${promotions.length} vault directories under ${VAULT}\n`);
+  }
+}
+
+// ---------- vault-dir helpers (mirrors promote-goodreads.mjs) ----------
+
+async function listVaultDirectories(vault) {
+  const set = new Set();
+  let entries;
+  try {
+    entries = await fs.readdir(vault, { withFileTypes: true });
+  } catch {
+    return set;
+  }
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    if (e.name === "_meta" || e.name.startsWith(".") || e.name === "bin") continue;
+    set.add(e.name);
+  }
+  return set;
+}
+
+function sanitizeSlug(title) {
+  return title
+    .replace(/[/\\:*?"<>|]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function renderBookFile(fm) {
+  // Mirror the existing vault convention (see e.g. Assassin's
+  // Apprentice/Assassin's Apprentice.md). Hand-rolled YAML so quoting
+  // matches the rest of the corpus.
+  const lines = ["---"];
+  lines.push(yamlLine("title", fm.title));
+  lines.push(yamlLine("authors", fm.authors));
+  lines.push(yamlLine("series", fm.series));
+  lines.push(yamlLine("status", fm.status));
+  lines.push(yamlLine("progress", ""));
+  lines.push(yamlLine("started", null));
+  lines.push(yamlLine("finished", fm.finished ?? null));
+  lines.push(yamlLine("rating", fm.rating ?? null));
+  lines.push(yamlLine("would_reread", null));
+  lines.push(yamlLine("bingo_squares", []));
+  lines.push(yamlLine("tags", fm.tags ?? []));
+  lines.push(yamlLine("cover", null));
+  lines.push(yamlLine("pullquote", null));
+  lines.push(yamlLine("see_also", []));
+  lines.push("---");
+  lines.push("");
+  lines.push("## Notes");
+  lines.push("");
+  lines.push("*(Imported from Media List — no notes captured yet.)*");
+  lines.push("");
+  return lines.join("\n");
+}
+
+function yamlLine(key, value) {
+  if (value === null || value === undefined) return `${key}: null`;
+  if (Array.isArray(value)) {
+    if (value.length === 0) return `${key}: []`;
+    return `${key}: [${value.map(quoteIfNeeded).join(", ")}]`;
+  }
+  if (typeof value === "boolean" || typeof value === "number") return `${key}: ${value}`;
+  if (typeof value === "string") {
+    if (value === "") return `${key}: ""`;
+    return `${key}: ${quoteIfNeeded(value)}`;
+  }
+  return `${key}: ${JSON.stringify(value)}`;
+}
+
+function quoteIfNeeded(value) {
+  if (typeof value !== "string") return JSON.stringify(value);
+  const needsQuote =
+    /[:#@!&*%?>|"'`{}[\],]/.test(value) ||
+    /^(?:true|false|null|yes|no|on|off|~)$/i.test(value) ||
+    /^[+-]?\d/.test(value) ||
+    /^\s|\s$/.test(value);
+  if (!needsQuote) return value;
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
 function formatBullet({ title, author, why, source, indexNum }) {
