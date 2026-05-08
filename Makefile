@@ -59,6 +59,8 @@ vault-backfill: ## Dry-run all vault backfills (source, tags, see_also, plus cor
 	@node scripts/backfill-see-also.mjs
 	@echo "→ see_also (from tag overlap)"
 	@node scripts/backfill-see-also-from-tags.mjs
+	@echo "→ see_also (bidirectional reciprocity)"
+	@node scripts/backfill-see-also-bidirectional.mjs
 
 vault-backfill-apply: ## Apply all vault backfills — writes to the vault
 	@echo "→ source --apply"
@@ -71,5 +73,7 @@ vault-backfill-apply: ## Apply all vault backfills — writes to the vault
 	@node scripts/backfill-see-also.mjs --apply
 	@echo "→ see_also-from-tags --apply"
 	@node scripts/backfill-see-also-from-tags.mjs --apply
+	@echo "→ see_also-bidirectional --apply"
+	@node scripts/backfill-see-also-bidirectional.mjs --apply
 
 .DEFAULT_GOAL := help
