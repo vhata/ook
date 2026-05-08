@@ -176,7 +176,6 @@ The unfiltered drawer. Strike most. Keep one.
 - **Book-as-shader**: procedural fragment shader generates a unique abstract per book from tags + rating + length. Cosmetic, mesmerising. `#wild #visual #shader`
 - **3D reading room**: every finished book a physical volume in a virtual space. Probably terrible, possibly transcendent. `#wild #3d #spatial`
 - **Meta-bingo card**: 5×5 of past bingo cards. Each cell a year's card. Click → that year. `#wild #bingo #meta`
-- **`/print/[year]` print mode**: formats year as a real-paper bibliography, mailable. `#wild #print #year`
 - **Static-export branch**: generate a fully-static archive that needs no Vercel. Posterity hedge. `#wild #posterity #static`
 - **ePub export of your reviews**: your own book, of you, by you, about you reading. `#wild #epub #archive`
 - **Bookcrossing log**: track physical lending — "this copy is currently with Sarah." `#wild #lending`
