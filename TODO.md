@@ -77,7 +77,6 @@ Source notes:
 Cosmetic and atmospheric ideas. Mostly low-stakes; pick whichever delights.
 
 - Page-count sizing for bookspines on `/shelf`. The shelf renders uniform-height spines today; once a `pages` field lands in the vault, scale spine height by `sqrt(pages)` for an authentic shelf shape. `#polish #shelf #pages`
-- **Procedural cover for the coverless**: hand-drawn-looking abstract jacket generated from title letterforms when no real cover exists. Beats the current "no cover" placeholder. `#feature #visual #covers`
 - **Bookmark-ribbon progress strip**: silk-ribbon-style indicator on currently-reading cards showing chapter or % progress. Needs structured progress data. `#feature #visual #currently-reading`
 - **Page-turn micro-interaction**: animate the switch between review/quotes/synopsis tabs as a page-curl. `#polish #visual #per-book`
 - **Embossed/letterpress alternative theme**: a third theme beyond light/dark, vintage printer's aesthetic. `#feature #visual #theme`
