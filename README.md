@@ -8,9 +8,9 @@ Live at https://b-ook.vercel.app — vault data lives in private `vhata/books`, 
 
 **Home page** — currently-reading, recently-finished, the year's bingo card, TBR piles, a rotating pullquote, an "on this day" strip when there are past-year matches, and a "Remember this?" serendipity card surfacing a finished book from over a year ago.
 
-**Per-book pages** with tiered spoiler reveal (catalog always · synopsis/review/quotes one click · deep notes fetched after explicit opt-in), an outbound link row (Goodreads · Hardcover · Storygraph · Bookwyrm) for any IDs in frontmatter, a "Threads" sidebar of algorithmically-similar books alongside user-curated see-also links, a "Stuck" badge on books that earned full attention, marginalia-style quotes rendering, and a postal-stamp flourish for finished books. Books without a `cover:` URL get a procedural hash-coloured SVG cover.
+**Per-book pages** with tiered spoiler reveal (catalog always · synopsis/review/quotes one click · deep notes fetched after explicit opt-in), an outbound link row (Goodreads · Hardcover · Storygraph · Bookwyrm) for any IDs in frontmatter, a Share row exposing the per-book QR and postcard endpoints, a "Threads" sidebar of algorithmically-similar books alongside user-curated see-also links, a "Stuck" badge on books that earned full attention, marginalia-style quotes rendering, and a postal-stamp flourish for finished books. Books without a `cover:` URL get a procedural hash-coloured SVG cover.
 
-**Other routes** — `/log` (reading log grouped by month, with a drought banner for quiet stretches and manual entries from `_meta/log.md`); `/stats` (years-in-reading index, rating-over-time chart, word-frequency cloud across reviews, finishing-patterns callout) and `/stats/[year]` (annual stats with rating histogram, top tags/authors, GitHub-style heatmap, weekday-vs-weekend split, year-end cover mosaic, link to the printable bibliography); `/series` (group by series with `#N` ordering); `/shelf` (every finished book as a vertical SVG spine, sortable); `/discover` (most-connected book pairs by see-also/series/author/tag); `/tags` and `/tags/[tag]` (taxonomy + filter); `/triage` (pool of books to decide on — recommendations from `_meta/triage.md` plus unfleshed Goodreads imports); `/changelog` (recent vault edits grouped by Monday-anchored week); `/vault-health` (frontmatter shape audit, split by source); `/print/[year]` (printable A4 bibliography); `/random` (jump to a random finished book); `/feed.xml` and `/feed.json` (subscribable feeds of finished books). Per-book share endpoints: `/books/[slug]/qr` (QR PNG) and `/books/[slug]/postcard.png` (cover-and-pullquote postcard via `next/og`). Time-machine view at `/?at=YYYY-MM-DD`. Light/dark theme toggle plus seasonal accent drift.
+**Other routes** — `/log` (reading log grouped by month, with a drought banner for quiet stretches and manual entries from `_meta/log.md`); `/stats` (years-in-reading index, rating-over-time chart, word-frequency cloud across reviews, finishing-patterns callout) and `/stats/[year]` (annual stats with rating histogram, top tags/authors, GitHub-style heatmap, weekday-vs-weekend split, year-end cover mosaic, link to the printable bibliography); `/series` (group by series with `#N` ordering); `/shelf` (every finished book as a vertical SVG spine, sortable); `/discover` (most-connected book pairs by see-also/series/author/tag); `/tags` and `/tags/[tag]` (taxonomy + filter, with a "Strongest pairings" overview at the index); `/triage` (pool of books to decide on — recommendations from `_meta/triage.md` plus unfleshed Goodreads imports); `/changelog` (recent vault edits grouped by Monday-anchored week); `/vault-health` (frontmatter shape audit, split by source) and `/schema` (corpus-wide field-coverage view — companion to vault-health); `/print/[year]` (printable A4 bibliography); `/random` (jump to a random finished book); `/feed.xml` and `/feed.json` (subscribable feeds of finished books). Per-book share endpoints: `/books/[slug]/qr` (QR PNG) and `/books/[slug]/postcard.png` (cover-and-pullquote postcard via `next/og`). Time-machine view at `/?at=YYYY-MM-DD`. Light/dark theme toggle plus seasonal accent drift. `robots.txt` and `sitemap.xml` shipped via app-router conventions.
 
 ## How to run
 
@@ -18,14 +18,25 @@ Set `BOOKS_DIR` in `.env.local` to the absolute path of your books vault (see `.
 
 ## Scripts
 
-Vault-side helpers in `scripts/`. All default to dry-run; pass `--apply` to write.
+Vault-side helpers in `scripts/`. All default to dry-run; pass `--apply` to write. The Makefile umbrella runs the routine ones in dependency order: `make vault-lint` (read-only audit), `make vault-backfill` (dry-run all), `make vault-backfill-apply` (write all).
 
-- **`promote-goodreads.mjs`** — bulk-mint per-book vault directories from `_meta/goodreads.md`. Used to backfill the reading history.
+**Bulk imports.**
+
+- **`promote-goodreads.mjs`** — bulk-mint per-book vault directories from `_meta/goodreads.md`.
 - **`import-triage.mjs`** — convert a CSV of recommendations into `_meta/triage.md`; promotes Read=truthy rows to vault directories.
+
+**Backfills (corpus-derived, idempotent).**
+
 - **`backfill-source.mjs`** — set the `source: goodreads | media-list | manual` frontmatter field on every book based on body markers.
-- **`backfill-see-also.mjs`** — derive cross-references from same-series and same-author peers.
 - **`backfill-tags.mjs`** — fetch subjects from Open Library and map them through a curated vocabulary.
-- **`vault-lint.mjs`** — local CLI that runs the same checks as `/vault-health`.
+- **`backfill-tags-from-peers.mjs`** — extend tags for thinly-tagged books by tallying tags across same-series, same-author, and see-also peers under signal-source-aware thresholds.
+- **`backfill-see-also.mjs`** — derive cross-references from same-series and same-author peers.
+- **`backfill-see-also-from-tags.mjs`** — extend see-also via tag-Jaccard similarity, with diversity caps to keep heavily-tagged series from crowding out other recommendations.
+- **`backfill-see-also-bidirectional.mjs`** — close the loop: where `A → B` but `B` doesn't link back, propose adding `A` to `B`'s see-also.
+
+**Audit + build.**
+
+- **`vault-lint.mjs`** — local CLI that runs the same checks as `/vault-health`, including the corpus-level orphan and asymmetric-see-also detectors.
 - **`fetch-vault.mjs`** + **`build-index.mjs`** — the prebuild chain: clone the vault on Vercel, then build a single-file index for fast cold starts.
 
 ## Documents
