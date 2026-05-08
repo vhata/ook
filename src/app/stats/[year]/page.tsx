@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Cover } from "@/components/Cover";
+import { HomeMark } from "@/components/HomeMark";
 import { foxingFor } from "@/lib/foxing";
 import { getAllBooks, getStatsYears, getYearActivity, getYearStats } from "@/lib/books";
 import type { Book, DayActivity, RatingBucket, YearStats } from "@/lib/types";
@@ -33,12 +34,7 @@ export default async function StatsYearPage({ params }: { params: Params }) {
 
   return (
     <main className="mx-auto box-border w-full max-w-[900px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
-      <Link
-        href="/"
-        className="border-rule text-ink-soft hover:text-ink mb-9 inline-block rounded-full border px-3 py-1.5 text-xs whitespace-nowrap"
-      >
-        ← back
-      </Link>
+      <HomeMark />
 
       <Header year={year} years={allYears} />
 
@@ -106,6 +102,14 @@ function Header({ year, years }: { year: number; years: number[] }) {
         What the year looked like, in numbers. Derived from book frontmatter — finished books are
         the ones with a <code className="font-mono text-[14px]">finished</code> date in {year}.
       </p>
+      <div className="mt-4">
+        <Link
+          href={`/print/${year}`}
+          className="text-ink-soft hover:text-accent text-[11px] tracking-[0.14em] uppercase"
+        >
+          ↗ printable bibliography
+        </Link>
+      </div>
     </header>
   );
 }

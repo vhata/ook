@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import remarkDirective from "remark-directive";
 import { Cover } from "@/components/Cover";
 import DeepNotes from "@/components/DeepNotes";
+import { HomeMark } from "@/components/HomeMark";
 import RevealSection from "@/components/RevealSection";
 import Spoiler from "@/components/Spoiler";
 import { Stamp } from "@/components/Stamp";
@@ -55,12 +56,7 @@ export default async function BookPage({ params }: { params: Params }) {
 
   return (
     <main className="mx-auto box-border w-full max-w-[1140px] px-6 py-12 sm:px-14 sm:pt-10 sm:pb-20">
-      <Link
-        href="/"
-        className="border-rule text-ink-soft hover:text-ink mb-8 inline-block rounded-full border px-3 py-1.5 text-xs whitespace-nowrap"
-      >
-        ← back
-      </Link>
+      <HomeMark />
 
       <BookHeader book={book} bingoYear={bingoYear} />
 

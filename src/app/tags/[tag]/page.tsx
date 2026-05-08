@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Cover } from "@/components/Cover";
+import { HomeMark } from "@/components/HomeMark";
 import { getBooksByTag } from "@/lib/books";
 import type { Book } from "@/lib/types";
 
@@ -21,12 +22,7 @@ export default async function TagPage({ params }: { params: Params }) {
 
   return (
     <main className="mx-auto box-border w-full max-w-[900px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
-      <Link
-        href="/tags"
-        className="border-rule text-ink-soft hover:text-ink mb-9 inline-block rounded-full border px-3 py-1.5 text-xs whitespace-nowrap"
-      >
-        ← all tags
-      </Link>
+      <HomeMark />
 
       <header className="border-rule mb-11 border-b pb-6">
         <div className="text-ink-soft mb-3 text-[11px] tracking-[0.18em] uppercase">Tag</div>

@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { HomeMark } from "@/components/HomeMark";
 import { getAllBooks } from "@/lib/books";
 import type { Book } from "@/lib/types";
 
@@ -33,12 +33,9 @@ export default async function PrintYearPage({ params }: { params: Params }) {
   if (finished.length === 0) {
     return (
       <main className="mx-auto box-border w-full max-w-[700px] px-6 py-12 sm:px-10">
-        <Link
-          href={`/stats/${year}`}
-          className="border-rule text-ink-soft hover:text-ink mb-9 inline-block rounded-full border px-3 py-1.5 text-xs whitespace-nowrap print:hidden"
-        >
-          ← back
-        </Link>
+        <div className="print:hidden">
+          <HomeMark />
+        </div>
         <p className="font-serif text-ink-soft text-[16px] italic">Nothing finished in {year}.</p>
       </main>
     );
@@ -50,12 +47,9 @@ export default async function PrintYearPage({ params }: { params: Params }) {
 
   return (
     <main className="bg-bg text-ink mx-auto box-border w-full max-w-[680px] px-6 py-10 print:max-w-none print:px-0 print:py-0">
-      <Link
-        href={`/stats/${year}`}
-        className="border-rule text-ink-soft hover:text-ink mb-8 inline-block rounded-full border px-3 py-1.5 text-xs whitespace-nowrap print:hidden"
-      >
-        ← back to stats
-      </Link>
+      <div className="print:hidden">
+        <HomeMark />
+      </div>
 
       <header className="mb-10 text-center print:mb-12">
         <div className="text-ink-soft mb-2 text-[10px] tracking-[0.24em] uppercase print:text-[9px]">

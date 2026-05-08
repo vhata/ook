@@ -62,6 +62,12 @@ export default function Controls() {
         series
       </Link>
       <Link
+        href="/shelf"
+        className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
+      >
+        shelf
+      </Link>
+      <Link
         href="/discover"
         className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
       >
@@ -78,6 +84,12 @@ export default function Controls() {
         className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
       >
         stats
+      </Link>
+      <Link
+        href="/changelog"
+        className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
+      >
+        changelog
       </Link>
       <Link
         href="/random"

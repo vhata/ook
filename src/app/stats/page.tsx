@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { HomeMark } from "@/components/HomeMark";
 import { getAllBooks, getFinishPairs, getReviewWordFrequency, getStatsYears } from "@/lib/books";
 import type { Book } from "@/lib/types";
 
@@ -49,12 +50,7 @@ export default async function StatsIndex() {
 
   return (
     <main className="mx-auto box-border w-full max-w-[900px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
-      <Link
-        href="/"
-        className="border-rule text-ink-soft hover:text-ink mb-9 inline-block rounded-full border px-3 py-1.5 text-xs whitespace-nowrap"
-      >
-        ← back
-      </Link>
+      <HomeMark />
 
       <header className="border-rule mb-11 border-b pb-6">
         <div className="text-ink-soft mb-3 text-[11px] tracking-[0.18em] uppercase">

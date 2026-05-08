@@ -1,5 +1,5 @@
-import Link from "next/link";
 import DroppedBook from "@/components/DroppedBook";
+import { HomeMark } from "@/components/HomeMark";
 
 export default function NotFound() {
   return (
@@ -12,12 +12,9 @@ export default function NotFound() {
       <p className="font-serif text-ink-soft mt-4 text-[16px] italic">
         Nothing here. Probably a typo, or it hasn&rsquo;t been added to the vault yet.
       </p>
-      <Link
-        href="/"
-        className="border-rule text-ink-soft hover:text-ink mt-9 inline-block rounded-full border px-3 py-1.5 text-xs whitespace-nowrap"
-      >
-        ← back home
-      </Link>
+      <div className="mt-9">
+        <HomeMark />
+      </div>
     </main>
   );
 }
