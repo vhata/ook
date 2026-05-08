@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
+import { cache } from "react";
 import matter from "gray-matter";
 import type {
   Book,
@@ -93,18 +94,48 @@ function parsePullquote(value: unknown): Pullquote | null {
   return { text, source: typeof obj.source === "string" ? obj.source : null };
 }
 
-async function gitLastEdited(repoDir: string, file: string): Promise<string | null> {
+// One git invocation per request, populating a path → last-edited-date
+// map. Replaces the old per-file `git log` shell-out which spawned ~232
+// child processes on a 232-book vault and timed the function out.
+//
+// `git log --name-only --pretty=format:%cs` walks every commit newest-
+// first, printing the date followed by each changed file. Taking the
+// first date we see for each path = its most-recent edit. Wrapped in
+// React's `cache()` so the (still-large) string parse only happens
+// once per request.
+const getLastEditedMap = cache(async (repoDir: string): Promise<Map<string, string>> => {
+  const map = new Map<string, string>();
   try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["log", "-1", "--format=%cs", "--", path.relative(repoDir, file)],
-      { cwd: repoDir },
-    );
-    const date = stdout.trim();
-    return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+    const { stdout } = await execFileAsync("git", ["log", "--name-only", "--pretty=format:%cs"], {
+      cwd: repoDir,
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    let currentDate: string | null = null;
+    for (const rawLine of stdout.split("\n")) {
+      const line = rawLine;
+      if (!line) {
+        // Blank line separates commits — nothing to do.
+        continue;
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(line)) {
+        currentDate = line;
+        continue;
+      }
+      if (currentDate && !map.has(line)) {
+        map.set(line, currentDate);
+      }
+    }
   } catch {
-    return null;
+    // Vault not a git repo, or git unavailable — empty map; lastEdited
+    // becomes null for everything. No render-time impact.
   }
+  return map;
+});
+
+async function gitLastEdited(repoDir: string, file: string): Promise<string | null> {
+  const map = await getLastEditedMap(repoDir);
+  const rel = path.relative(repoDir, file);
+  return map.get(rel) ?? null;
 }
 
 async function readBookDir(slug: string): Promise<Book | null> {
@@ -190,7 +221,12 @@ export function externalLinks(book: Book): ExternalLink[] {
   return links;
 }
 
-export async function getAllBooks(): Promise<Book[]> {
+// Wrapped in React's `cache()` so the home page's six call sites
+// (currently-reading, recently-finished, on-this-day, rotating
+// pullquote, serendipity, bingo derivation) parse the vault once
+// per request instead of six times. Critical at 200+ books where
+// each parse round-trips gray-matter for every file.
+export const getAllBooks = cache(async (): Promise<Book[]> => {
   let entries;
   try {
     entries = await fs.readdir(booksDir(), { withFileTypes: true });
@@ -205,7 +241,7 @@ export async function getAllBooks(): Promise<Book[]> {
 
   const books = await Promise.all(slugs.map(readBookDir));
   return books.filter((b): b is Book => b !== null);
-}
+});
 
 export async function getCurrentlyReading(): Promise<Book[]> {
   const all = await getAllBooks();
