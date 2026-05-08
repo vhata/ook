@@ -182,7 +182,7 @@ The unfiltered drawer. Strike most. Keep one.
 
 ### Tooling & vault hygiene (brainstormed 2026-05-03)
 
-- **`make vault-lint` subcommand**: validate every book's frontmatter against the schema, flag missing fields, surface drift before it shows up as a render bug. Co-locates schema check with schema reader. `#tooling #vault #lint`
+- Wire `scripts/vault-lint.mjs` into the Makefile as `make vault-lint`. The script + `/vault-health` page are shipped; just need the Makefile target so it's part of the canonical commands list. `#tooling #vault #lint`
 - **Schema explorer page on the site**: auto-documented frontmatter schema with live examples from the vault. `#feature #docs #schema`
 - **Frontmatter migration tool**: bulk-update fields safely across all books. CLI in vault repo, but ook can render a "schema version" badge. `#tooling #vault #migration`
 - **Orphan detector**: books in vault that nothing references; broken `see_also` links. Surface inside `make vault-lint`. `#tooling #vault #lint`
