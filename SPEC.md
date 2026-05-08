@@ -12,10 +12,13 @@ What I'm reading, what I've read, and the bingo card I'm chasing.
 
 - **Vault** — the books directory at `~/Google Drive/My Drive/Obsidian/books`, tracked in its own `vhata/books` git repo. Sits nested inside a larger Obsidian-vault directory whose own repo (`vhata/obsidian`) gitignores this folder, so the two never double-track. Holds per-book directories and the `_meta/` infrastructure.
 - **Reference notes** — the per-book Markdown file (`<Title>/<Title>.md`) with YAML frontmatter and a body of structured prose. The primary lookup tool while reading.
-- **Frontmatter schema** — the YAML block at the top of each reference-notes file. Source of structured metadata (status, rating, bingo squares, cover, pullquote, see_also, etc.). Defined in `books/CLAUDE.md`.
-- **Capture flow** — the low-friction agent prompts triggered by reading milestones (finishing a book, starting a book, abandoning or pausing one, claiming a bingo square, adding a TBR, logging a non-book event), plus an on-demand or weekly check-in that surfaces stale fields. Two or three small questions, never a wall of fields. Every prompt offers `(skip)` and the agent stops after three skips in a flow.
+- **Frontmatter schema** — the YAML block at the top of each reference-notes file. Source of structured metadata (status, rating, bingo squares, cover, pullquote, see_also, source, etc.). Defined in `books/CLAUDE.md`.
+- **Source field** — `source: goodreads | media-list | manual` on every book, distinguishing books with personal reading history (Goodreads — likely has rating + finished date) from word-of-mouth recommendations (Media List) from hand-built records. Drives the in-vault agent's check-in priority.
+- **Capture flow** — the low-friction agent prompts triggered by reading milestones (finishing a book, starting a book, abandoning or pausing one, claiming a bingo square, adding a TBR, logging a non-book event), plus an on-demand or weekly check-in that surfaces stale fields. Includes the "Goodreads gap" check-in: a slow drip of "you read this — when?" prompts for `source: goodreads` books missing dates or ratings. Two or three small questions, never a wall of fields. Every prompt offers `(skip)` and the agent stops after three skips in a flow.
 - **Tiered spoiler model** — three levels of content visibility on per-book pages. Tier 0 (catalog: title, author, status, rating, dates, bingo) is always shown. Tier 1 (synopsis, review, quotes) is server-rendered and revealed by a one-click button. Tier 2 (deep reference notes) is fetched client-side from a separate API endpoint only after an explicit opt-in click — never appears in initial HTML, so search engines don't index spoilers.
-- **Bingo square** — one cell in the year's bingo card (`_meta/bingo-<year>.md`). Each square has a designated book; "done" means the book has been read.
+- **Bingo square** — one cell in the year's bingo card (`_meta/bingo-<year>.md`). Each square has a designated book; "done" means the book has been read (derived from the bound book's status, not stored on the square).
+- **Triage pool** — `_meta/triage.md`, a list of books the reader is considering but hasn't committed to. Same shape as `_meta/tbr.md` (frontmatter + H2 piles + bullets). Surfaced at `/triage` alongside imported-but-not-yet-fleshed-out Goodreads entries.
+- **Vault index** — `_index.json` at the root of the cloned vault, built once during `prebuild` (`scripts/build-index.mjs`). The runtime reads it on each request instead of walking + parsing every reference file. Falls back to live walk in dev (where the index isn't built so we don't write into the user's actual Obsidian folder).
 
 ## Functionality
 
@@ -31,7 +34,7 @@ Untagged. Milestones tracked in `FEATURES.md`.
 
 ## Out of scope
 
-- **A reading-tracker app.** Capture, status updates, and notes happen inside Obsidian or via the in-vault agent. `ook` is render-only; it does not write to the vault.
+- **A reading-tracker app.** Capture, status updates, and notes happen inside Obsidian or via the in-vault agent. The runtime renderer never writes to the vault (enforced by lint). Vault-side helpers in `scripts/` (bulk import, backfills, vault-lint) do write — they're operator tooling run from the host, not part of the deployed app. A future MCP write surface (deferred, branched) is the only sanctioned in-app write path; until it lands, the public site stays read-only.
 - **A general-purpose Goodreads/StoryGraph alternative.** This is one reader's site, not a multi-user platform.
 - **Recommendations or social features.** No "people who read X also read Y." No comments, ratings from others, or feeds.
 - **Cover art hosting.** Cover images, if rendered, come from external sources (Open Library, etc.) — they're not stored in the vault.

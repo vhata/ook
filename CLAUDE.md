@@ -28,4 +28,20 @@ When a new feature, polish item, or design idea surfaces in conversation — whe
 
 **How to apply:** when you reach for the Vercel CLI (`vercel ls`, `vercel inspect`, `vercel env add`, `vercel --prod`, etc.), prefix with `npx -y vercel@latest`. Do not run a bare `vercel` even if it appears to be on PATH — you might be talking to a stale version that errors mid-deploy. The same rule covers `gh` (assume installed via brew), but it does NOT cover npm/pnpm/git themselves — those are baseline dev tooling.
 
-<!-- Add patterns as feedback surfaces them. Each pattern: lead with the rule, then a Why: line and a How to apply: line. -->
+### Bulk imports stamp `source` going forward; backfill the rest
+
+**Why:** the corpus is now ~230 books and growing. Distinguishing books with personal reading data (Goodreads imports — likely have a rating + date) from word-of-mouth recommendations (media-list) is what lets the in-vault agent ask the right follow-ups for the right rows, instead of nagging uniformly about every blank field.
+
+**How to apply:** when you write a new ingestion path that mints vault directories from an external source, set `source: goodreads | media-list | manual` on every record at write time — never leave it for a later sweep. For existing data, `scripts/backfill-source.mjs` infers the field from body markers and is safe to re-run. Touching the field schema (e.g. adding a fourth provenance) means updating: `src/lib/types.ts` (`BookSource`), `scripts/build-index.mjs` (parse), `src/lib/vault-health.ts` (audit splits), and `books/CLAUDE.md` in the vault repo (capture flow priority).
+
+### Build-time `_index.json` is the read path; the vault walk is the fallback
+
+**Why:** at ~230 books, parsing every reference file at request time blows the serverless function timeout. Shifting parse work to build time (`scripts/build-index.mjs`, run during `prebuild` after `fetch-vault.mjs`) means each request reads one JSON file instead of ~700.
+
+**How to apply:** when you add a new field that the runtime renders, add it to the per-book record produced by `scripts/build-index.mjs` _and_ to the walk-fallback parser in `src/lib/books.ts` — both code paths need to emit the same shape. The vault-walk fallback is the dev-mode path (no `BOOKS_DEPLOY_KEY`, no index built); don't let it diverge silently. Cold-start performance lives or dies on this; if you find yourself adding per-request fs walks anywhere, stop and route them through the index instead.
+
+### Vercel function bundles need an explicit vault include
+
+**Why:** Next's automatic file-tracing doesn't see the cloned `.vault/` directory as a code-imported asset, so without an override the cloned vault gets stripped from per-route serverless bundles and routes 500 in production with the local-dev success behind them.
+
+**How to apply:** keep `outputFileTracingIncludes: { "*": ["./.vault/**/*"] }` in `next.config.ts` as a wildcard. Resist the urge to enumerate routes — every new route that reads vault data would silently break, and the symptom (works on dev, dies on Vercel) eats hours.
