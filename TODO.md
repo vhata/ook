@@ -186,4 +186,3 @@ The unfiltered drawer. Strike most. Keep one.
 - **Schema explorer page on the site**: auto-documented frontmatter schema with live examples from the vault. `#feature #docs #schema`
 - **Frontmatter migration tool**: bulk-update fields safely across all books. CLI in vault repo, but ook can render a "schema version" badge. `#tooling #vault #migration`
 - **Orphan detector**: books in vault that nothing references; broken `see_also` links. Surface inside `make vault-lint`. `#tooling #vault #lint`
-- **Diffable vault view**: what changed week-over-week, surfaced at `/changelog` or similar. `#feature #vault #diff`
