@@ -226,7 +226,26 @@ export function externalLinks(book: Book): ExternalLink[] {
 // pullquote, serendipity, bingo derivation) parse the vault once
 // per request instead of six times. Critical at 200+ books where
 // each parse round-trips gray-matter for every file.
+//
+// Two-tier read:
+//   1. Prefer the prebuilt index at `<vault>/_index.json` when it
+//      exists (production: `scripts/build-index.mjs` runs in the
+//      prebuild step and writes a single JSON file with every
+//      book's parsed frontmatter). One file read per request.
+//   2. Fall back to walking the vault and parsing every reference
+//      file (dev mode, where the index isn't built so we don't
+//      scribble into the user's actual Obsidian folder).
 export const getAllBooks = cache(async (): Promise<Book[]> => {
+  // Fast path: prebuilt index.
+  try {
+    const indexPath = path.join(booksDir(), "_index.json");
+    const raw = await fs.readFile(indexPath, "utf8");
+    const parsed = JSON.parse(raw) as { books?: Book[] };
+    if (Array.isArray(parsed.books)) return parsed.books;
+  } catch {
+    // Index missing or malformed — fall through to walking.
+  }
+
   let entries;
   try {
     entries = await fs.readdir(booksDir(), { withFileTypes: true });
