@@ -58,7 +58,11 @@ export default async function VaultHealthPage() {
         <p className="font-serif text-ink-soft mt-3 max-w-[560px] text-[17px] italic">
           Books with missing-but-expected frontmatter, broken cross-references, and other shape
           drift. Same checks as{" "}
-          <code className="font-mono text-[14px]">scripts/vault-lint.mjs</code>.
+          <code className="font-mono text-[14px]">scripts/vault-lint.mjs</code>. See{" "}
+          <a href="/schema" className="text-accent underline underline-offset-2">
+            /schema
+          </a>{" "}
+          for the corpus-wide field-coverage view.
         </p>
       </header>
 
