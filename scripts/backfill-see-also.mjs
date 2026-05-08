@@ -194,8 +194,10 @@ async function writeUpdatedSeeAlso(filePath, slugs) {
     updated = raw.replace(seeAlsoRe, newLine);
   } else {
     // Insert before the closing frontmatter delimiter. Match the
-    // SECOND `---` (the first is the opener).
-    const frontmatterClose = /^---\s*$/m;
+    // SECOND `---` (the first is the opener). The `g` flag is
+    // critical — without it, `replace` only fires once, on the
+    // opener, and never reaches the closer.
+    const frontmatterClose = /^---\s*$/gm;
     let count = 0;
     updated = raw.replace(frontmatterClose, () => {
       count++;

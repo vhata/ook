@@ -126,6 +126,7 @@ async function main() {
           finished: null,
           rating: null,
           tags: [],
+          source: "media-list",
         },
       });
       continue;
@@ -263,6 +264,7 @@ function renderBookFile(fm) {
   lines.push(yamlLine("cover", null));
   lines.push(yamlLine("pullquote", null));
   lines.push(yamlLine("see_also", []));
+  if (fm.source) lines.push(yamlLine("source", fm.source));
   lines.push("---");
   lines.push("");
   lines.push("## Notes");

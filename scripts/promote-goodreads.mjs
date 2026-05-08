@@ -279,6 +279,7 @@ function buildFrontmatter(entry, cleaned) {
     cover: null,
     pullquote: null,
     see_also: [],
+    source: "goodreads",
     goodreads_id: entry.goodreads_id ?? null,
   };
   if (entry.isbn13) fm.isbn13 = String(entry.isbn13);

@@ -27,6 +27,21 @@ export default async function VaultHealthPage() {
     return a.localeCompare(b);
   });
 
+  // Split slugs by source so the Goodreads-sourced ones (the
+  // high-priority "you read this — when?" check-ins) sit in their
+  // own panel.
+  const slugsBySource: Record<string, string[]> = {
+    goodreads: [],
+    "media-list": [],
+    manual: [],
+    unknown: [],
+  };
+  for (const slug of slugsSorted) {
+    const source = bySlug.get(slug)![0]?.source ?? "unknown";
+    const key = source ?? "unknown";
+    slugsBySource[key].push(slug);
+  }
+
   const cleanCount = report.books - bySlug.size;
 
   return (
@@ -54,13 +69,74 @@ export default async function VaultHealthPage() {
           Vault is in great shape — no findings.
         </div>
       ) : (
-        <ol className="m-0 mt-10 list-none space-y-6 p-0">
-          {slugsSorted.map((slug) => (
-            <BookFindingsRow key={slug} slug={slug} findings={bySlug.get(slug)!} />
-          ))}
-        </ol>
+        <div className="mt-10 space-y-12">
+          {slugsBySource.goodreads.length > 0 && (
+            <SourcePanel
+              title="From Goodreads"
+              note="Imported from your Goodreads history — highest-value check-ins. Filling in finished date or rating brings these into /log and /stats."
+              slugs={slugsBySource.goodreads}
+              bySlug={bySlug}
+            />
+          )}
+          {slugsBySource["media-list"].length > 0 && (
+            <SourcePanel
+              title="From Media List"
+              note="Word-of-mouth recommendations you marked as read. Mostly missing data is expected; flesh out the ones that stuck."
+              slugs={slugsBySource["media-list"]}
+              bySlug={bySlug}
+            />
+          )}
+          {slugsBySource.manual.length > 0 && (
+            <SourcePanel
+              title="Hand-built"
+              note="Books you added directly. Anything flagged here is probably worth a quick look."
+              slugs={slugsBySource.manual}
+              bySlug={bySlug}
+            />
+          )}
+          {slugsBySource.unknown.length > 0 && (
+            <SourcePanel
+              title="No source set"
+              note="Books that haven't been tagged with a source. Run scripts/backfill-source.mjs."
+              slugs={slugsBySource.unknown}
+              bySlug={bySlug}
+            />
+          )}
+        </div>
       )}
     </main>
+  );
+}
+
+function SourcePanel({
+  title,
+  note,
+  slugs,
+  bySlug,
+}: {
+  title: string;
+  note: string;
+  slugs: string[];
+  bySlug: Map<string, Finding[]>;
+}) {
+  return (
+    <section>
+      <div className="mb-3 flex items-baseline gap-3">
+        <h2 className="font-serif text-ink m-0 text-[24px] leading-tight font-medium tracking-[-0.012em]">
+          {title}
+        </h2>
+        <span className="bg-rule h-px flex-1" />
+        <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
+          {slugs.length} {slugs.length === 1 ? "book" : "books"}
+        </span>
+      </div>
+      <p className="font-serif text-ink-soft mt-0 mb-5 max-w-[640px] text-[14px] italic">{note}</p>
+      <ol className="m-0 list-none space-y-4 p-0">
+        {slugs.map((slug) => (
+          <BookFindingsRow key={slug} slug={slug} findings={bySlug.get(slug)!} />
+        ))}
+      </ol>
+    </section>
   );
 }
 

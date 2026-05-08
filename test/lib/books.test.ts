@@ -293,6 +293,7 @@ describe("externalLinks", () => {
       hardcoverSlug: null,
       storygraphSlug: null,
       bookwyrmUrl: null,
+      source: null,
       ...overrides,
     };
   }
@@ -353,6 +354,7 @@ describe("bookStuck", () => {
       hardcoverSlug: null,
       storygraphSlug: null,
       bookwyrmUrl: null,
+      source: null,
       ...overrides,
     };
   }

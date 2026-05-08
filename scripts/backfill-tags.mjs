@@ -280,7 +280,9 @@ async function writeUpdatedTags(filePath, tags) {
   if (tagsRe.test(raw)) {
     updated = raw.replace(tagsRe, newLine);
   } else {
-    const frontmatterClose = /^---\s*$/m;
+    // `g` flag matters: without it `replace` would fire on the
+    // opening `---` and stop without ever reaching the closer.
+    const frontmatterClose = /^---\s*$/gm;
     let count = 0;
     updated = raw.replace(frontmatterClose, () => {
       count++;

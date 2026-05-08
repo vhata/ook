@@ -29,7 +29,14 @@ export type Book = {
   hardcoverSlug: string | null;
   storygraphSlug: string | null;
   bookwyrmUrl: string | null;
+  // Where this book record came from. "goodreads" — imported from
+  // the user's Goodreads CSV (likely has personal reading history
+  // attached). "media-list" — word-of-mouth recommendation. "manual"
+  // — hand-built. Null means the field hasn't been backfilled yet.
+  source: BookSource | null;
 };
+
+export type BookSource = "goodreads" | "media-list" | "manual";
 
 export type ExternalLink = {
   label: string;

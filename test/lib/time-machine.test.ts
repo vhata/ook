@@ -34,6 +34,7 @@ function book(overrides: Partial<Book>): Book {
     hardcoverSlug: null,
     storygraphSlug: null,
     bookwyrmUrl: null,
+    source: null,
     ...overrides,
   };
 }

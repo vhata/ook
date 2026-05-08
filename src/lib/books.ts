@@ -180,7 +180,13 @@ async function readBookDir(slug: string): Promise<Book | null> {
     hardcoverSlug: parseNullableString(data.hardcover_slug),
     storygraphSlug: parseNullableString(data.storygraph_slug),
     bookwyrmUrl: parseNullableString(data.bookwyrm_url),
+    source: parseSource(data.source),
   };
+}
+
+function parseSource(value: unknown): "goodreads" | "media-list" | "manual" | null {
+  if (value === "goodreads" || value === "media-list" || value === "manual") return value;
+  return null;
 }
 
 // Build the list of outbound links the book actually has IDs for. Order is

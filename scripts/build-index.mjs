@@ -96,6 +96,10 @@ async function main() {
       hardcoverSlug: parseNullableString(data.hardcover_slug),
       storygraphSlug: parseNullableString(data.storygraph_slug),
       bookwyrmUrl: parseNullableString(data.bookwyrm_url),
+      source:
+        data.source === "goodreads" || data.source === "media-list" || data.source === "manual"
+          ? data.source
+          : null,
     });
   }
 

@@ -13,6 +13,11 @@ export type Severity = "error" | "warning" | "info";
 export type Finding = {
   slug: string;
   title: string;
+  // Source the book came from — drives the priority panels on
+  // /vault-health. Goodreads-sourced books with gaps are the
+  // highest-value check-in target since the user has personal
+  // history attached but might be missing the date / rating.
+  source: "goodreads" | "media-list" | "manual" | null;
   severity: Severity;
   field: string;
   message: string;
@@ -61,7 +66,14 @@ export async function getHealthReport(): Promise<HealthReport> {
 export function checkBook(book: Book, allSlugs: Set<string>): Finding[] {
   const out: Finding[] = [];
   const push = (severity: Severity, field: string, message: string) =>
-    out.push({ slug: book.slug, title: book.title, severity, field, message });
+    out.push({
+      slug: book.slug,
+      title: book.title,
+      source: book.source,
+      severity,
+      field,
+      message,
+    });
 
   // Required fields.
   // (Title can legitimately equal the slug — that's the vault convention.
