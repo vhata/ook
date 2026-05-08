@@ -181,8 +181,35 @@ function BookHeader({ book, bingoYear }: { book: Book; bingoYear: number | null 
           </div>
         )}
         <ExternalLinkRow book={book} />
+        <ShareRow slug={book.slug} />
       </div>
     </header>
+  );
+}
+
+function ShareRow({ slug }: { slug: string }) {
+  const enc = encodeURIComponent(slug);
+  return (
+    <div className="text-ink-soft mt-3 flex flex-wrap items-center gap-2 text-[11px] tracking-[0.08em] uppercase">
+      <span className="text-ink-dim">Share</span>
+      <a
+        href={`/books/${enc}/qr`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-ink hover:text-accent decoration-rule hover:decoration-accent underline underline-offset-[3px]"
+      >
+        ↓ QR
+      </a>
+      <span className="text-ink-dim">·</span>
+      <a
+        href={`/books/${enc}/postcard.png`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-ink hover:text-accent decoration-rule hover:decoration-accent underline underline-offset-[3px]"
+      >
+        ↓ postcard
+      </a>
+    </div>
   );
 }
 
