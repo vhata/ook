@@ -6,13 +6,18 @@
 // is the easiest way to seed it from a spreadsheet you've been
 // keeping somewhere else.
 //
-// CSV format is loose. Required columns: title (or "Title"). All
-// other columns are optional and recognised case-insensitively:
-//   - title / Title — book title (required)
+// CSV format is loose. Required column: title (or "Title", trailing
+// whitespace tolerated). All other columns are optional and
+// recognised case-insensitively:
+//   - title / Title — book title (required; rows without it are skipped)
 //   - author / Author — author(s); multiple separated by commas or "&"
-//   - why / Why / note / Note — one-line note about why it's interesting
-//   - source / Source — where the recommendation came from
-//   - pile / Pile / shelf — H2 section to file under (default: "Maybe")
+//   - why / Why / note / Note / reason — one-line note
+//   - source / Source / from / via — where the recommendation came from
+//   - pile / Pile / shelf / series / section / category — H2 section name.
+//     "series" auto-detected so a column named "Series" piles books by
+//     series ("Cradle" pile, "Shadows of the Apt" pile, etc.)
+//   - # / index / book / vol — series position suffix appended to title
+//   - read / Read / done — when truthy, the row is skipped (already read)
 //
 // Defaults to dry-run (prints the markdown to stdout). Pass --apply
 // to actually write to the vault. Pass --vault to set the vault
@@ -60,25 +65,45 @@ async function main() {
   const authorCol = idx("author");
   const whyCol = pickFirst(header, ["why", "note", "notes", "reason"]);
   const sourceCol = pickFirst(header, ["source", "from", "via"]);
-  const pileCol = pickFirst(header, ["pile", "shelf", "section", "category"]);
+  const pileCol = pickFirst(header, ["pile", "shelf", "series", "section", "category"]);
+  const indexCol = pickFirst(header, ["#", "index", "book", "vol", "volume"]);
+  const readCol = pickFirst(header, ["read", "done", "finished"]);
 
   // Group entries into piles (H2 sections of triage.md).
   const piles = new Map();
   let parsed = 0;
+  let skippedNoTitle = 0;
+  let skippedRead = 0;
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     const title = (row[titleCol] ?? "").trim();
-    if (!title) continue;
+    if (!title) {
+      skippedNoTitle++;
+      continue;
+    }
+    if (readCol >= 0 && isTruthy((row[readCol] ?? "").trim())) {
+      skippedRead++;
+      continue;
+    }
     const author = authorCol >= 0 ? (row[authorCol] ?? "").trim() : "";
     const why = whyCol >= 0 ? (row[whyCol] ?? "").trim() : "";
     const source = sourceCol >= 0 ? (row[sourceCol] ?? "").trim() : "";
-    const pileName = pileCol >= 0 ? (row[pileCol] ?? "").trim() || DEFAULT_PILE : DEFAULT_PILE;
+    const indexNum = indexCol >= 0 ? (row[indexCol] ?? "").trim() : "";
+    const pileRaw = pileCol >= 0 ? (row[pileCol] ?? "").trim() : "";
+    // Empty pile-column value falls through to the default; for series-
+    // by-pile imports this collects standalones into one bucket.
+    const pileName = pileRaw || (indexNum ? "Other" : DEFAULT_PILE);
     const list = piles.get(pileName) ?? [];
-    list.push({ title, author, why, source });
+    list.push({ title, author, why, source, indexNum, pileName: pileRaw });
     piles.set(pileName, list);
     parsed++;
   }
-  process.stderr.write(`${parsed} entries from ${path.basename(CSV)}\n`);
+  process.stderr.write(
+    `${parsed} entries from ${path.basename(CSV)}` +
+      (skippedRead ? ` (skipped ${skippedRead} already-read)` : "") +
+      (skippedNoTitle ? ` (skipped ${skippedNoTitle} with no title)` : "") +
+      "\n",
+  );
 
   // Render the markdown. Frontmatter mirrors tbr.md style.
   const today = new Date().toISOString().slice(0, 10);
@@ -132,19 +157,30 @@ async function main() {
   process.stderr.write(`wrote ${triagePath}\n`);
 }
 
-function formatBullet({ title, author, why, source }) {
+function formatBullet({ title, author, why, source, indexNum }) {
   // Match the tbr.md convention so the existing parser handles it:
   //   - **Title** — Author. *why*
   //
-  // When `source` is present, fold it into the why field as a tagged
-  // suffix. Easier to read than a separate column on the rendered page.
+  // The pile heading (H2) already carries the series name — adding
+  // "#N" alone (rather than "Series Name #N") keeps the bullet tidy.
   let bullet = `- **${title}**`;
+  if (indexNum) bullet += ` #${indexNum}`;
   if (author) bullet += ` — ${author}.`;
   const annotations = [];
   if (why) annotations.push(why);
   if (source) annotations.push(`(via ${source})`);
   if (annotations.length > 0) bullet += ` *${annotations.join(" ")}*`;
   return bullet;
+}
+
+// "Truthy" for the read column — matches "1", "x", "y", "yes", "true",
+// "✓", and any non-empty string that isn't explicitly a "no" value.
+// Generous on purpose: spreadsheet conventions are wildly varied.
+function isTruthy(value) {
+  if (!value) return false;
+  const v = value.toLowerCase().trim();
+  if (v === "" || v === "0" || v === "no" || v === "n" || v === "false") return false;
+  return true;
 }
 
 function pickFirst(header, candidates) {
