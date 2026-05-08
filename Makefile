@@ -48,20 +48,28 @@ clean: ## Remove build output
 vault-lint: ## Audit vault frontmatter (read-only)
 	node scripts/vault-lint.mjs
 
-vault-backfill: ## Dry-run all vault backfills (source + see_also + tags)
+vault-backfill: ## Dry-run all vault backfills (source, tags, see_also, plus corpus-derived passes)
 	@echo "→ source"
 	@node scripts/backfill-source.mjs
-	@echo "→ see_also"
-	@node scripts/backfill-see-also.mjs
-	@echo "→ tags"
+	@echo "→ tags (Open Library)"
 	@node scripts/backfill-tags.mjs
+	@echo "→ tags (from peers — series/author/see_also)"
+	@node scripts/backfill-tags-from-peers.mjs
+	@echo "→ see_also (series + author)"
+	@node scripts/backfill-see-also.mjs
+	@echo "→ see_also (from tag overlap)"
+	@node scripts/backfill-see-also-from-tags.mjs
 
 vault-backfill-apply: ## Apply all vault backfills — writes to the vault
 	@echo "→ source --apply"
 	@node scripts/backfill-source.mjs --apply
-	@echo "→ see_also --apply"
-	@node scripts/backfill-see-also.mjs --apply
-	@echo "→ tags --apply"
+	@echo "→ tags --apply (Open Library)"
 	@node scripts/backfill-tags.mjs --apply
+	@echo "→ tags-from-peers --apply"
+	@node scripts/backfill-tags-from-peers.mjs --apply
+	@echo "→ see_also --apply (series + author)"
+	@node scripts/backfill-see-also.mjs --apply
+	@echo "→ see_also-from-tags --apply"
+	@node scripts/backfill-see-also-from-tags.mjs --apply
 
 .DEFAULT_GOAL := help
