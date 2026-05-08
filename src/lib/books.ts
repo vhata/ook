@@ -802,6 +802,42 @@ export async function getTagIndex(): Promise<TagSummary[]> {
   return summaries;
 }
 
+// Tag pairs that co-occur on at least MIN_COUNT (default 2) books in the
+// corpus, returned in count-desc order. Each pair is alphabetically
+// canonicalised so {scifi, hard-scifi} == {hard-scifi, scifi}. Powers
+// the "Strongest pairings" section on /tags.
+export type TagPair = {
+  tags: [string, string];
+  count: number;
+};
+
+// Pure helper — exposed for unit tests and used by the async wrapper below.
+export function computeTagPairs(books: Pick<Book, "tags">[], limit = 10, minCount = 2): TagPair[] {
+  const counts = new Map<string, number>();
+  for (const book of books) {
+    const tags = [...new Set(book.tags)].sort();
+    for (let i = 0; i < tags.length; i++) {
+      for (let j = i + 1; j < tags.length; j++) {
+        const key = `${tags[i]}|${tags[j]}`;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+    }
+  }
+  const out: TagPair[] = [];
+  for (const [key, count] of counts) {
+    if (count < minCount) continue;
+    const [a, b] = key.split("|");
+    out.push({ tags: [a, b], count });
+  }
+  out.sort((a, b) => b.count - a.count || a.tags[0].localeCompare(b.tags[0]));
+  return out.slice(0, limit);
+}
+
+export async function getTagPairs(limit = 10, minCount = 2): Promise<TagPair[]> {
+  const books = await getAllBooks();
+  return computeTagPairs(books, limit, minCount);
+}
+
 // Books that carry a specific tag, returned in finish-date desc order
 // then by title. Powers /tags/[tag].
 export async function getBooksByTag(tag: string): Promise<Book[]> {

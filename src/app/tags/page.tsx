@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { HomeMark } from "@/components/HomeMark";
-import { getTagIndex } from "@/lib/books";
+import { getTagIndex, getTagPairs, type TagPair } from "@/lib/books";
 import type { TagSummary } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ export const metadata = {
 };
 
 export default async function TagsIndexPage() {
-  const tags = await getTagIndex();
+  const [tags, pairs] = await Promise.all([getTagIndex(), getTagPairs(10)]);
   // Tag-cloud sizing: linear scale between 12px and 28px against the
   // most-frequent tag. Single-tag corner case stays at the floor.
   const max = Math.max(1, ...tags.map((t) => t.count));
@@ -36,6 +36,8 @@ export default async function TagsIndexPage() {
         </div>
       ) : (
         <>
+          {pairs.length > 0 && <PairingsSection pairs={pairs} />}
+
           <section className="bg-surface border-rule mb-12 rounded border p-6">
             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
               {tags.map((t) => (
@@ -62,6 +64,54 @@ export default async function TagsIndexPage() {
         </>
       )}
     </main>
+  );
+}
+
+function PairingsSection({ pairs }: { pairs: TagPair[] }) {
+  const max = Math.max(1, ...pairs.map((p) => p.count));
+  return (
+    <section className="mb-12">
+      <div className="text-ink-soft mb-3 text-[10px] tracking-[0.18em] uppercase">
+        Strongest pairings
+      </div>
+      <ol className="m-0 list-none space-y-2 p-0">
+        {pairs.map((p) => {
+          const pct = Math.round((p.count / max) * 100);
+          return (
+            <li
+              key={`${p.tags[0]}|${p.tags[1]}`}
+              className="border-rule flex items-center gap-3 border-b py-1.5"
+            >
+              <div className="flex flex-1 items-center gap-1.5 text-[13px]">
+                <Link
+                  href={`/tags/${encodeURIComponent(p.tags[0])}`}
+                  className="text-ink hover:text-accent font-serif"
+                >
+                  {p.tags[0]}
+                </Link>
+                <span className="text-ink-dim">+</span>
+                <Link
+                  href={`/tags/${encodeURIComponent(p.tags[1])}`}
+                  className="text-ink hover:text-accent font-serif"
+                >
+                  {p.tags[1]}
+                </Link>
+              </div>
+              <div className="bg-surface-mute relative h-1.5 w-32 overflow-hidden rounded-full">
+                <div
+                  className="bg-accent absolute inset-y-0 left-0"
+                  style={{ width: `${pct}%` }}
+                  aria-hidden="true"
+                />
+              </div>
+              <div className="text-ink-soft min-w-[40px] text-right font-mono text-[11px]">
+                {p.count}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 
