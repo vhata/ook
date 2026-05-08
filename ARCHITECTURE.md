@@ -65,6 +65,38 @@ Corpus size as of May 2026 is ~230 books after a Goodreads bulk-import. To keep 
 
 `.env.example` documents the same set with safe defaults.
 
+## Branched work
+
+### `feral/mcp` — write surface (built, deferred from merge)
+
+The deferred MCP write surface from `docs/proposals/mcp-write-surface.md` is fully built on the `feral/mcp` branch (currently nine commits ahead of main, rebased onto main twice). It's parked rather than abandoned: the user wanted to land it after sleeping on it, and the public render side keeps shipping in the meantime. A fresh session should treat it as **available infrastructure that can be merged when the user signals**, not as work to redo.
+
+What's on the branch:
+
+- **Storage:** `src/lib/store/` — `Store` interface with `MemoryStore` (tests + dev) and `UpstashStore` (production via Vercel Marketplace) adapters. Vault indexer materialises a fast read view; `/api/admin/reindex` rebuilds it on demand.
+- **Auth:** `src/lib/auth/` + `/api/auth/{register,login,logout}/*` — single-user WebAuthn passkey flow via `@simplewebauthn/server`. First registration is open; subsequent ones need an active session or a one-shot backup code minted at first registration.
+- **MCP server:** `src/lib/mcp/` plus `/api/mcp/[transport]`. In-process tool functions (`listBooks`, `getBook`, `commitPatch`, `listBingo`, `bindBookToBingoSquare`, `createBook`, `appendLogEntry`); the route is thin SDK glue over them.
+- **Vault client:** `src/lib/github.ts` — `VaultClient` interface with a `GitHubVaultClient` (Octokit + `GITHUB_BOOKS_PAT`) and a `LocalFsVaultClient` (BOOKS_DIR + `node:fs`) adapter. The local-fs adapter is the only intentional `fs.writeFile` in `src/`, scoped via `eslint-disable` comments and only active when no PAT is set.
+- **Owner console:** `/admin` — passkey-gated. Free-text textarea → server-side Claude API loop with read-only MCP tools + a `propose_patch` tool that _stages_ a `CommitPatchInput` rather than writing → diff preview → confirm → commit. Backed by `/api/admin/agent` and `/api/admin/agent/commit`.
+- **Living docs on the branch.** The branch's own `SPEC.md` and `ARCHITECTURE.md` describe its surfaces in more detail (commit `a063041`). When merging, prefer those versions; this main-side note is a pointer, not a substitute.
+
+Disciplines specific to the branch (load-bearing for any future revival):
+
+- **The agent never commits.** `propose_patch` is the only write-shaped tool exposed to Claude in `/admin`; it physically returns the staged patch to the client rather than mutating anything. The diff preview is the structural safety net.
+- **Sections are opt-in on `get_book`.** Reduces prompt-injection surface — if the patch only touches `progress`, the agent has no excuse to fetch `quotes`.
+- **Commit-patch validates after applying.** Title must remain non-empty; status must remain a valid `BookStatus`; authors must remain a string array if present.
+- **Optimistic store updates.** Every write committed via the vault client also updates the corresponding store key in-process so subsequent reads don't wait for the webhook reindex.
+
+Env vars required only when the branch is in play (kept here as a note so a future merge knows what to provision in Vercel):
+
+| Var                                                                                                                         | Purpose                                                                     |
+| --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                        | Provisioned via Vercel Marketplace; auto-injected. Falls back to in-memory. |
+| `OOK_AUTH_SESSION_SECRET`                                                                                                   | 32+ byte secret for cookie signing. `openssl rand -hex 32`.                 |
+| `OOK_AUTH_RP_ID`, `OOK_AUTH_RP_NAME`, `OOK_AUTH_EXPECTED_ORIGIN`, `OOK_AUTH_OWNER_USERNAME`, `OOK_AUTH_SESSION_TTL_SECONDS` | WebAuthn config; sensible defaults from `OOK_SITE_URL`.                     |
+| `GITHUB_BOOKS_PAT`, `GITHUB_BOOKS_REPO`, `GITHUB_BOOKS_BRANCH`                                                              | Fine-grained PAT for `commit_patch` writes. Falls back to local-fs in dev.  |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                                                                      | Claude API for `/admin` orchestration. Set a monthly cap before going live. |
+
 ## Open questions
 
 - **`summary.md` content.** The convention says it's a "full-spoiler plot summary," but tier 1 puts it one click away. For books where the summary really is full-spoiler (Ra), one option is moving that content into the reference notes (tier 2) and reserving `summary.md` for tier-1 synopses. Decide as the user populates more.

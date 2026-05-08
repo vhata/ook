@@ -27,6 +27,7 @@ What I'm reading, what I've read, and the bingo card I'm chasing.
 - **Secondary surfaces** derived from the same vault data: a reading log grouped by month, annual stats per year, a series browser, a tag taxonomy, a discovery view of connected books, an outbound link row (Goodreads / Hardcover / Storygraph / Bookwyrm) when frontmatter IDs are populated, subscribable feeds (Atom + JSON Feed) of finished books, and per-route Open Graph share images. The SPEC stays at "what the project does at a glance"; route-level enumeration lives in `ARCHITECTURE.md`.
 - **Vault as source of truth.** All data is read from the vault (Markdown + YAML frontmatter). No database, no duplicate state. The vault is maintained by the reader and an in-vault Claude agent governed by `books/CLAUDE.md`.
 - **Spoiler hygiene by tier.** Catalog facts are always public. Synopses are one click away (server-rendered, indexable). Deep notes are explicit-opt-in only and never reach search engines.
+- **Owner-only write surface (built, deferred — branch `feral/mcp`).** A passkey-gated `/admin` page on the deployed site accepts free-text vault updates ("started Piranesi today, on page 30") and orchestrates them through a Claude API loop with MCP tools attached. The agent never commits directly; it stages a patch, the owner sees a diff, and the commit goes through the GitHub Contents API to `vhata/books`. The same MCP tool-set is exposed at `/api/mcp/[transport]` for external clients (Claude Code, Claude Desktop). The branch has been built and rebased onto main; merge has been deferred deliberately and the public site stays anonymous + read-only until then.
 
 ## Roadmap
 
@@ -34,7 +35,7 @@ Untagged. Milestones tracked in `FEATURES.md`.
 
 ## Out of scope
 
-- **A reading-tracker app.** Capture, status updates, and notes happen inside Obsidian or via the in-vault agent. The runtime renderer never writes to the vault (enforced by lint). Vault-side helpers in `scripts/` (bulk import, backfills, vault-lint) do write — they're operator tooling run from the host, not part of the deployed app. A future MCP write surface (deferred, branched) is the only sanctioned in-app write path; until it lands, the public site stays read-only.
+- **A reading-tracker app for the public.** The render layer is anonymous and read-only; it never writes to the vault (enforced by lint). The owner has a built-but-unmerged write path on `feral/mcp` — see "Functionality" above. Host-side `scripts/` (bulk import, backfills, vault-lint) also write, deliberately, but those run from the operator's machine and are not part of the deployed app. Capture by the public is and stays out of scope.
 - **A general-purpose Goodreads/StoryGraph alternative.** This is one reader's site, not a multi-user platform.
 - **Recommendations or social features.** No "people who read X also read Y." No comments, ratings from others, or feeds.
 - **Cover art hosting.** Cover images, if rendered, come from external sources (Open Library, etc.) — they're not stored in the vault.
