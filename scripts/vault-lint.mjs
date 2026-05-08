@@ -32,7 +32,7 @@ await main();
 async function main() {
   const books = await readAllBooks(VAULT);
   const slugSet = new Set(books.map((b) => b.slug));
-  const findings = books.flatMap((b) => checkBook(b, slugSet));
+  const findings = books.flatMap((b) => checkBook(b, slugSet)).concat(checkCorpus(books));
 
   let filtered = findings.filter((f) => severityRank(f.severity) >= severityRank(SEVERITY_FLOOR));
   if (FIELD_FILTER) filtered = filtered.filter((f) => f.field === FIELD_FILTER);
@@ -129,6 +129,48 @@ function checkBook(book, allSlugs) {
   for (const other of book.seeAlso) {
     if (!allSlugs.has(other)) {
       push("error", "see_also", `Broken see_also reference: "${other}" — no such book.`);
+    }
+  }
+
+  return out;
+}
+
+// Mirrors src/lib/vault-health.ts:checkCorpus. Graph-shape checks that
+// per-book inspection can't see — orphans and asymmetric see_also.
+function checkCorpus(books) {
+  const out = [];
+  const push = (book, severity, field, message) =>
+    out.push({ slug: book.slug, title: book.title, severity, field, message });
+
+  const inbound = new Map();
+  for (const book of books) {
+    for (const ref of book.seeAlso) {
+      const set = inbound.get(ref) ?? new Set();
+      set.add(book.slug);
+      inbound.set(ref, set);
+    }
+  }
+
+  for (const book of books) {
+    const back = inbound.get(book.slug) ?? new Set();
+    if (back.size === 0 && book.bingoSquares.length === 0) {
+      push(
+        book,
+        "info",
+        "orphan",
+        "No incoming see_also references and no bingo binding — disconnected from the graph.",
+      );
+    }
+    const outbound = new Set(book.seeAlso);
+    for (const referrer of back) {
+      if (!outbound.has(referrer)) {
+        push(
+          book,
+          "info",
+          "see_also",
+          `Asymmetric: "${referrer}" links here, but this book doesn't link back.`,
+        );
+      }
     }
   }
 

@@ -40,6 +40,7 @@ export async function getHealthReport(): Promise<HealthReport> {
   for (const book of books) {
     findings.push(...checkBook(book, slugSet));
   }
+  findings.push(...checkCorpus(books));
 
   const bySeverity = { error: 0, warning: 0, info: 0 };
   const byField: Record<string, number> = {};
@@ -130,6 +131,65 @@ export function checkBook(book: Book, allSlugs: Set<string>): Finding[] {
   // Future-self note: when more disciplines settle, encode them here.
   // The lint rule on file-write is mechanizable; this is for
   // semantic shape that lint can't see.
+
+  return out;
+}
+
+// Corpus-level checks — see across the whole vault rather than per-book.
+// Surfaces graph-shape findings: books nothing references, asymmetric
+// see_also pairs.
+export function checkCorpus(books: Book[]): Finding[] {
+  const out: Finding[] = [];
+  const push = (book: Book, severity: Severity, field: string, message: string) =>
+    out.push({
+      slug: book.slug,
+      title: book.title,
+      source: book.source,
+      severity,
+      field,
+      message,
+    });
+
+  // Build the inbound see_also graph: which books reference this slug.
+  const inbound = new Map<string, Set<string>>();
+  for (const book of books) {
+    for (const ref of book.seeAlso) {
+      const set = inbound.get(ref) ?? new Set<string>();
+      set.add(book.slug);
+      inbound.set(ref, set);
+    }
+  }
+
+  for (const book of books) {
+    const back = inbound.get(book.slug) ?? new Set<string>();
+
+    // Orphan: nothing references this book and it isn't bound to a
+    // bingo square. Likely fine — sometimes books just stand alone —
+    // but worth surfacing as an enrichment opportunity.
+    if (back.size === 0 && book.bingoSquares.length === 0) {
+      push(
+        book,
+        "info",
+        "orphan",
+        "No incoming see_also references and no bingo binding — disconnected from the graph.",
+      );
+    }
+
+    // Asymmetric see_also: another book points here, but this one
+    // doesn't point back. Reciprocity isn't required, but the
+    // imbalance is often unintentional after a backfill pass.
+    const outbound = new Set(book.seeAlso);
+    for (const referrer of back) {
+      if (!outbound.has(referrer)) {
+        push(
+          book,
+          "info",
+          "see_also",
+          `Asymmetric: "${referrer}" links here, but this book doesn't link back.`,
+        );
+      }
+    }
+  }
 
   return out;
 }

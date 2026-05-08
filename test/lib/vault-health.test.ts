@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkBook } from "../../src/lib/vault-health";
+import { checkBook, checkCorpus } from "../../src/lib/vault-health";
 import type { Book } from "../../src/lib/types";
 
 function book(overrides: Partial<Book> = {}): Book {
@@ -82,5 +82,46 @@ describe("checkBook", () => {
       slugs,
     );
     expect(findings).toEqual([]);
+  });
+});
+
+describe("checkCorpus", () => {
+  it("flags an orphan when nothing references the book and no bingo binding", () => {
+    const a = book({ slug: "a", title: "A" });
+    const findings = checkCorpus([a]);
+    const orphan = findings.find((f) => f.slug === "a" && f.field === "orphan");
+    expect(orphan?.severity).toBe("info");
+  });
+
+  it("does NOT flag an orphan when something references the book", () => {
+    const a = book({ slug: "a", seeAlso: ["b"] });
+    const b = book({ slug: "b" });
+    const findings = checkCorpus([a, b]);
+    expect(findings.some((f) => f.slug === "b" && f.field === "orphan")).toBe(false);
+  });
+
+  it("does NOT flag an orphan when the book has bingo bindings", () => {
+    const a = book({ slug: "a", bingoSquares: ["A1"] });
+    const findings = checkCorpus([a]);
+    expect(findings.some((f) => f.slug === "a" && f.field === "orphan")).toBe(false);
+  });
+
+  it("flags asymmetric see_also when one side links and the other doesn't", () => {
+    const a = book({ slug: "a", seeAlso: ["b"] });
+    const b = book({ slug: "b", seeAlso: [] });
+    const findings = checkCorpus([a, b]);
+    const asym = findings.find(
+      (f) => f.slug === "b" && f.field === "see_also" && f.message.includes("Asymmetric"),
+    );
+    expect(asym?.severity).toBe("info");
+  });
+
+  it("does NOT flag asymmetric see_also when both sides link", () => {
+    const a = book({ slug: "a", seeAlso: ["b"] });
+    const b = book({ slug: "b", seeAlso: ["a"] });
+    const findings = checkCorpus([a, b]);
+    expect(findings.some((f) => f.field === "see_also" && f.message.includes("Asymmetric"))).toBe(
+      false,
+    );
   });
 });
