@@ -367,6 +367,115 @@ export async function getTbr(): Promise<Tbr | null> {
   };
 }
 
+// Triage list — recommendations the reader is considering but hasn't
+// committed to TBR yet. Same shape as tbr.md (frontmatter + H2 piles
+// + bulleted entries) so the existing parser handles both. Returns
+// null when `_meta/triage.md` is absent.
+export async function getTriage(): Promise<Tbr | null> {
+  const file = path.join(booksDir(), META_DIR, "triage.md");
+  if (!(await fileExists(file))) return null;
+
+  const raw = await fs.readFile(file, "utf8");
+  const { data, content } = matter(raw);
+  const trimmed = content.trim();
+
+  return {
+    title: typeof data.title === "string" ? data.title : "Triage",
+    updated: parseNullableString(data.updated),
+    body: trimmed,
+    piles: parseTbrPiles(trimmed),
+  };
+}
+
+// "Imported but not yet fleshed out" — Goodreads entries from
+// `_meta/goodreads.md` whose title doesn't have a corresponding vault
+// directory. Surfaces the gap visually so the reader can see what's
+// still waiting to become a real per-book page (the workflow that
+// `scripts/promote-goodreads.mjs` automates).
+
+export type UnfleshedGoodreadsEntry = {
+  goodreadsId: number | null;
+  title: string;
+  authors: string[];
+  shelf: "read" | "currently-reading" | "to-read" | string;
+  rating: number | null;
+  dateRead: string | null;
+};
+
+export async function getUnfleshedGoodreadsEntries(
+  limit?: number,
+): Promise<UnfleshedGoodreadsEntry[]> {
+  const file = path.join(booksDir(), META_DIR, "goodreads.md");
+  if (!(await fileExists(file))) return [];
+
+  const raw = await fs.readFile(file, "utf8");
+  const { data } = matter(raw);
+  const rawEntries = Array.isArray(data.entries) ? (data.entries as Record<string, unknown>[]) : [];
+  if (rawEntries.length === 0) return [];
+
+  // Existing vault directory names, lowercased for case-insensitive
+  // membership checks (filesystem can be case-insensitive).
+  const existing = new Set<string>();
+  try {
+    const dirents = await fs.readdir(booksDir(), { withFileTypes: true });
+    for (const d of dirents) {
+      if (d.isDirectory() && !d.name.startsWith(".") && d.name !== META_DIR && d.name !== "bin") {
+        existing.add(d.name.toLowerCase());
+      }
+    }
+  } catch {
+    // No vault dir — every entry is unfleshed.
+  }
+
+  const out: UnfleshedGoodreadsEntry[] = [];
+  for (const e of rawEntries) {
+    const title = String(e.title ?? "").trim();
+    if (!title) continue;
+    const cleanedTitle = stripSeriesParenthetical(title);
+    if (existing.has(cleanedTitle.toLowerCase())) continue;
+
+    out.push({
+      goodreadsId: typeof e.goodreads_id === "number" ? e.goodreads_id : null,
+      title: cleanedTitle,
+      authors: Array.isArray(e.authors)
+        ? (e.authors.filter((a) => typeof a === "string") as string[])
+        : [],
+      shelf: typeof e.shelf === "string" ? e.shelf : "unknown",
+      rating: typeof e.rating === "number" && e.rating > 0 ? e.rating : null,
+      dateRead: parseNullableString(e.date_read),
+    });
+  }
+
+  // Reading-recency order: read entries by date desc, then currently-
+  // reading, then to-read.
+  out.sort((a, b) => {
+    const ra = shelfOrder(a.shelf);
+    const rb = shelfOrder(b.shelf);
+    if (ra !== rb) return ra - rb;
+    return (b.dateRead ?? "").localeCompare(a.dateRead ?? "");
+  });
+
+  return limit !== undefined ? out.slice(0, limit) : out;
+}
+
+function shelfOrder(shelf: string): number {
+  if (shelf === "read") return 0;
+  if (shelf === "currently-reading") return 1;
+  if (shelf === "to-read") return 2;
+  return 3;
+}
+
+// Strip a trailing "(Series, #N)" parenthetical from a title — same
+// heuristic the promote-goodreads script uses, kept narrow on purpose
+// so we don't lose meaningful parentheticals like "(A Brief History)".
+function stripSeriesParenthetical(title: string): string {
+  const m = /^(.+?)\s*\((.+?)\)\s*$/.exec(title);
+  if (!m) return title;
+  const inside = m[2];
+  if (!/[#\d]/.test(inside)) return title;
+  return m[1].trim();
+}
+
 // Parse the markdown body into typed sub-piles. Each `## Heading` starts a
 // new pile; bullets `- **Title** — Author. *Why...*` become entries.
 // Prose between the heading and the first bullet is captured as the pile's

@@ -86,6 +86,12 @@ export default function Controls() {
         stats
       </Link>
       <Link
+        href="/triage"
+        className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
+      >
+        triage
+      </Link>
+      <Link
         href="/changelog"
         className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2.5 py-1 whitespace-nowrap sm:px-3"
       >
