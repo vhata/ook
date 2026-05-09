@@ -6,9 +6,14 @@ Flat backlog. Each entry tagged with `#area`. Done items deleted, not struck thr
 
 ## Backlog
 
-### Write surface (MCP, mobile, /admin) — built, awaiting merge decision
+### Hi-pri (do tomorrow)
 
-- **Mobile-friendly write surface for the vault — BUILT on `feral/mcp`, deferred from merge.** The full proposal at `docs/proposals/mcp-write-surface.md` has been implemented end-to-end on the `feral/mcp` branch (currently nine commits ahead of main, rebased onto main twice). All three prerequisites that were called out at handoff time are now resolved on main: (a) the `src/**` lint rule shipped (see `eslint.config.mjs`); (b) bingo `done` is now derived from the bound book's `status`; (c) storage is Upstash Redis via Marketplace, not Vercel KV. The `/admin` console, the WebAuthn passkey flow, the MCP transport at `/api/mcp/[transport]`, and the seven tools (`list_books`, `get_book`, `commit_patch`, `list_bingo`, `bind_book_to_bingo_square`, `create_book`, `append_log_entry`) all exist and work behind `propose_patch` → diff-preview → confirm. See the "Branched work" section of `ARCHITECTURE.md` for the surfaces, disciplines, and env vars; see the branch's own `SPEC.md` and `ARCHITECTURE.md` (commit `a063041`) for the canonical descriptions. **Pending decision:** merge to main and provision the Vercel env vars, or leave parked. Not a new build. `#deferred #write-surface #mcp #mobile #auth`
+- **Light up the Hardcover series-roster pipeline.** The script + renderer + Make targets all shipped (commit `b32eaaf`); the renderer falls back to gap detection until a roster file exists, so this is feature-flag-style — nothing breaks while it's deferred. To turn it on:
+  1. Sign up at hardcover.app, create an API token at https://hardcover.app/account/api.
+  2. Stash the token in 1Password and export locally: `export HARDCOVER_TOKEN='hc_…'`.
+  3. **Probe the GraphQL shape first** — the query in `scripts/backfill-series-rosters.mjs` was not live-tested at write time. Run `node scripts/backfill-series-rosters.mjs --series "Discworld" --debug`. If the raw response prints with `data.series[0].series_books[].book.{title, slug, contributions[].author.name}`, you're good. If it differs, the two functions to adjust are `fetchRoster` (the query) and `transformRoster` (the response mapping), both clearly marked in the file.
+  4. Apply for real: `make vault-series-rosters-apply`. Writes `_meta/series-rosters.json` to the vault.
+  5. Commit + push the books repo. The existing webhook → `/api/webhooks/books/reindex` fires; `/series` starts rendering missing entries with their canonical title + author from Hardcover; the header denominator becomes the canonical total ("X of 41 read"). `#hi-pri #hardcover #series #setup`
 
 ### Site / render
 
