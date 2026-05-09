@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { relativeTime } from "@/lib/relative-time";
 
 type CommitPatchInput = {
   slug: string;
@@ -26,24 +27,6 @@ type LastReindex = {
   books: number;
   bingoCards: number;
 };
-
-// "5 min ago" / "2 hr ago" / "yesterday" / "3 days ago". Single-precision,
-// rounds down. Returns "just now" for anything under 60s.
-function relativeTime(iso: string, now: Date = new Date()): string {
-  const then = new Date(iso);
-  const seconds = Math.floor((now.getTime() - then.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hr ago`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "yesterday";
-  if (days < 30) return `${days} days ago`;
-  // Fall back to a date for older — at this point the operator's
-  // probably more interested in the absolute timestamp anyway.
-  return then.toISOString().slice(0, 10);
-}
 
 // Free-text input → agent → diff preview → confirm. Single-turn for v1
 // — if the agent needs clarification it asks; the user submits a new

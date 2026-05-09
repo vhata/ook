@@ -61,4 +61,46 @@ describe("reindex", () => {
     const second = await reindex(store);
     expect(second.removed).toBeGreaterThan(0);
   });
+
+  it("stamps a lastReindex record with default source 'manual'", async () => {
+    const store = new MemoryStore();
+    setStore(store);
+    const before = Date.now();
+    await reindex(store);
+    const stamp = await store.get<{
+      at: string;
+      source: string;
+      books: number;
+      bingoCards: number;
+    }>(keys.lastReindex());
+    expect(stamp).not.toBeNull();
+    expect(stamp?.source).toBe("manual");
+    expect(stamp?.books).toBe(2);
+    expect(stamp?.bingoCards).toBe(2);
+    expect(new Date(stamp!.at).getTime()).toBeGreaterThanOrEqual(before);
+  });
+
+  it("records the explicit source when one is passed", async () => {
+    const store = new MemoryStore();
+    setStore(store);
+    await reindex(store, "webhook");
+    const stamp = await store.get<{ source: string }>(keys.lastReindex());
+    expect(stamp?.source).toBe("webhook");
+
+    await reindex(store, "admin");
+    const stamp2 = await store.get<{ source: string }>(keys.lastReindex());
+    expect(stamp2?.source).toBe("admin");
+  });
+
+  it("replaces the previous lastReindex on subsequent reindex", async () => {
+    const store = new MemoryStore();
+    setStore(store);
+    await reindex(store, "webhook");
+    const first = await store.get<{ at: string }>(keys.lastReindex());
+    // Sleep a tick to make the timestamps comparable.
+    await new Promise((r) => setTimeout(r, 5));
+    await reindex(store, "admin");
+    const second = await store.get<{ at: string }>(keys.lastReindex());
+    expect(new Date(second!.at).getTime()).toBeGreaterThan(new Date(first!.at).getTime());
+  });
 });
