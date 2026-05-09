@@ -22,11 +22,17 @@ export function setStore(store: Store | null): void {
 // vars are present; otherwise falls back to in-memory. The fallback is
 // noisy on purpose — in production we want to know if Upstash isn't
 // wired up rather than silently losing writes on every cold start.
+//
+// Vercel Marketplace Upstash provisioning historically injected the
+// canonical `UPSTASH_REDIS_REST_*` names but newer integrations inject
+// only the Vercel-KV-compatible `KV_REST_API_*` aliases (same credentials,
+// different keys). Try both, with the canonical names winning when both
+// are present.
 export function getStore(): Store {
   if (_store) return _store;
 
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
   if (url && token) {
     _store = new UpstashStore(url, token);
     return _store;
@@ -38,8 +44,9 @@ export function getStore(): Store {
     // than let writes silently disappear.
     throw new Error(
       "Store not configured: set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN " +
-        "(provision Upstash Redis through the Vercel Marketplace), or set " +
-        "OOK_ALLOW_MEMORY_STORE=1 if you really want the in-memory adapter in production.",
+        "(or the Vercel-KV-compat aliases KV_REST_API_URL + KV_REST_API_TOKEN; " +
+        "Marketplace Upstash provisioning typically injects the latter pair). " +
+        "Set OOK_ALLOW_MEMORY_STORE=1 only if you really want the in-memory adapter in production.",
     );
   }
 
