@@ -34,6 +34,10 @@ export default function AdminConsole() {
   const [committed, setCommitted] = useState<{
     commits: Array<{ path: string; sha: string; url: string | null }>;
   } | null>(null);
+  const [reindexing, setReindexing] = useState(false);
+  const [reindexResult, setReindexResult] = useState<{ books: number; bingoCards: number } | null>(
+    null,
+  );
 
   async function submit() {
     setBusy(true);
@@ -95,6 +99,25 @@ export default function AdminConsole() {
     location.reload();
   }
 
+  async function triggerReindex() {
+    setReindexing(true);
+    setError(null);
+    setReindexResult(null);
+    try {
+      const res = await fetch("/api/admin/reindex", { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail ?? data.error ?? `${res.status}`);
+      }
+      const data = (await res.json()) as { books: number; bingoCards: number };
+      setReindexResult({ books: data.books, bingoCards: data.bingoCards });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setReindexing(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="space-y-3">
@@ -115,14 +138,30 @@ export default function AdminConsole() {
           >
             {busy ? "..." : "Stage a patch"}
           </button>
-          <button
-            type="button"
-            onClick={signOut}
-            className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase"
-          >
-            Sign out
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={triggerReindex}
+              disabled={reindexing}
+              className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase disabled:opacity-60"
+              title="Rebuild the store's view of the vault from a fresh scan"
+            >
+              {reindexing ? "Reindexing…" : "Reindex"}
+            </button>
+            <button
+              type="button"
+              onClick={signOut}
+              className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
+        {reindexResult && (
+          <div className="text-ink-soft text-[11px] italic">
+            Indexed {reindexResult.books} books, {reindexResult.bingoCards} bingo cards.
+          </div>
+        )}
       </div>
 
       {error && (
