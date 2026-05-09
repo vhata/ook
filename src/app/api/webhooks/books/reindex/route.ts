@@ -60,6 +60,6 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ ok: true, event, note: "no reindex for this event" });
   }
 
-  const result = await reindex();
+  const result = await reindex(undefined, "webhook");
   return Response.json({ ok: true, event: "push", ...result });
 }

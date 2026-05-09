@@ -62,6 +62,7 @@ export const keys = {
   bingo: (year: number) => `bingo:${year}`,
   booksIndex: () => `books:index`,
   bingoYears: () => `bingo:years`,
+  lastReindex: () => `store:last-reindex`,
 
   // Auth keys.
   authChallenge: (id: string) => `auth:challenge:${id}`,

@@ -30,7 +30,23 @@ export type ReindexResult = {
   removed: number;
 };
 
-export async function reindex(store: Store = getStore()): Promise<ReindexResult> {
+// Where the reindex was triggered from. "admin" = manual button click;
+// "webhook" = GitHub push to vhata/books; "manual" = a script or other
+// caller. Stored alongside the timestamp so the operator can tell at a
+// glance whether automation is keeping the store fresh.
+export type ReindexSource = "admin" | "webhook" | "manual";
+
+export type LastReindex = {
+  at: string; // ISO timestamp
+  source: ReindexSource;
+  books: number;
+  bingoCards: number;
+};
+
+export async function reindex(
+  store: Store = getStore(),
+  source: ReindexSource = "manual",
+): Promise<ReindexResult> {
   const [books, bingoCards] = await Promise.all([getAllBooks(), getAllBingoCards()]);
 
   const removed =
@@ -50,6 +66,16 @@ export async function reindex(store: Store = getStore()): Promise<ReindexResult>
   if (bingoCards.length > 0) {
     await store.sadd(keys.bingoYears(), ...bingoCards.map((c) => String(c.year)));
   }
+
+  // Stamp the last-reindex record. Read on the GET side of the
+  // /api/admin/reindex endpoint so the /admin UI can surface freshness.
+  const lastReindex: LastReindex = {
+    at: new Date().toISOString(),
+    source,
+    books: books.length,
+    bingoCards: bingoCards.length,
+  };
+  await store.set(keys.lastReindex(), lastReindex);
 
   return { books: books.length, bingoCards: bingoCards.length, removed };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type CommitPatchInput = {
   slug: string;
@@ -20,6 +20,31 @@ type AgentResult =
       conversation: ConversationTurn[];
     };
 
+type LastReindex = {
+  at: string;
+  source: "admin" | "webhook" | "manual";
+  books: number;
+  bingoCards: number;
+};
+
+// "5 min ago" / "2 hr ago" / "yesterday" / "3 days ago". Single-precision,
+// rounds down. Returns "just now" for anything under 60s.
+function relativeTime(iso: string, now: Date = new Date()): string {
+  const then = new Date(iso);
+  const seconds = Math.floor((now.getTime() - then.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days} days ago`;
+  // Fall back to a date for older — at this point the operator's
+  // probably more interested in the absolute timestamp anyway.
+  return then.toISOString().slice(0, 10);
+}
+
 // Free-text input → agent → diff preview → confirm. Single-turn for v1
 // — if the agent needs clarification it asks; the user submits a new
 // message, conversation history isn't carried across turns. Keeps the
@@ -35,9 +60,26 @@ export default function AdminConsole() {
     commits: Array<{ path: string; sha: string; url: string | null }>;
   } | null>(null);
   const [reindexing, setReindexing] = useState(false);
-  const [reindexResult, setReindexResult] = useState<{ books: number; bingoCards: number } | null>(
-    null,
-  );
+  const [lastReindex, setLastReindex] = useState<LastReindex | null>(null);
+
+  // Fetch the last-reindex record on mount so the UI doesn't show
+  // stale state after a page refresh.
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/admin/reindex")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.lastReindex) return;
+        setLastReindex(data.lastReindex as LastReindex);
+      })
+      .catch(() => {
+        // Stay silent; the section just doesn't render when we have
+        // nothing to show. No need to surface a fetch error in the UI.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function submit() {
     setBusy(true);
@@ -102,7 +144,6 @@ export default function AdminConsole() {
   async function triggerReindex() {
     setReindexing(true);
     setError(null);
-    setReindexResult(null);
     try {
       const res = await fetch("/api/admin/reindex", { method: "POST" });
       if (!res.ok) {
@@ -110,7 +151,12 @@ export default function AdminConsole() {
         throw new Error(data.detail ?? data.error ?? `${res.status}`);
       }
       const data = (await res.json()) as { books: number; bingoCards: number };
-      setReindexResult({ books: data.books, bingoCards: data.bingoCards });
+      setLastReindex({
+        at: new Date().toISOString(),
+        source: "admin",
+        books: data.books,
+        bingoCards: data.bingoCards,
+      });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -157,9 +203,10 @@ export default function AdminConsole() {
             </button>
           </div>
         </div>
-        {reindexResult && (
+        {lastReindex && (
           <div className="text-ink-soft text-[11px] italic">
-            Indexed {reindexResult.books} books, {reindexResult.bingoCards} bingo cards.
+            Last refreshed {relativeTime(lastReindex.at)} via {lastReindex.source} ·{" "}
+            {lastReindex.books} books, {lastReindex.bingoCards} bingo cards.
           </div>
         )}
       </div>

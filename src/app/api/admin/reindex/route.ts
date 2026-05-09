@@ -1,37 +1,38 @@
-import { reindex } from "@/lib/store/index-vault";
+import { reindex, type LastReindex } from "@/lib/store/index-vault";
 
-// POST /api/admin/reindex — rebuilds the store's view of the vault.
+// POST /api/admin/reindex — rebuilds the store's view of the vault
+// from the current vault filesystem.
 //
-// Triggered by the GitHub webhook on `vhata/books` (configured to call
-// this endpoint in addition to the existing Vercel deploy hook), or
-// manually from the /admin UI.
+// Manual path: the /admin UI's Reindex button. The webhook path lives
+// at /api/webhooks/books/reindex and stamps `source: webhook` instead.
 //
-// **Auth:** the route is gated by the global auth middleware that
-// covers /api/mcp/* and /admin (see src/middleware.ts once the auth
-// task lands). Until that lands, requests to this endpoint will be
-// rejected unless they carry a valid session cookie.
+// **Auth:** gated by `src/proxy.ts`, which requires a valid session
+// cookie on /api/admin/* routes.
 
 export const dynamic = "force-dynamic";
 
 export async function POST(): Promise<Response> {
-  const result = await reindex();
+  const result = await reindex(undefined, "admin");
   return Response.json({ ok: true, ...result });
 }
 
 // GET returns metadata about the current index — counts only, no data
-// — so an admin can sanity-check freshness without triggering a
-// rebuild. Useful in the /admin UI as a "last reindexed" indicator.
+// — plus the `lastReindex` record (timestamp + source) so the /admin
+// UI can show "last refreshed N min ago via webhook". An admin can
+// sanity-check freshness without triggering a rebuild.
 export async function GET(): Promise<Response> {
   // Don't import getStore at module top level — we want the test
   // override to apply if a test-installed adapter is in place.
   const { getStore, keys } = await import("@/lib/store");
   const store = getStore();
-  const [bookSlugs, bingoYears] = await Promise.all([
+  const [bookSlugs, bingoYears, lastReindex] = await Promise.all([
     store.smembers(keys.booksIndex()),
     store.smembers(keys.bingoYears()),
+    store.get<LastReindex>(keys.lastReindex()),
   ]);
   return Response.json({
     books: bookSlugs.length,
     bingoYears: bingoYears.map(Number).sort((a, b) => b - a),
+    lastReindex,
   });
 }
