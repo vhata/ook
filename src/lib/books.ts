@@ -15,6 +15,7 @@ import type {
   ExternalLink,
   LogEntry,
   Pullquote,
+  RosterMissing,
   SeriesGroup,
   SeriesMember,
   SeriesMembership,
@@ -757,6 +758,7 @@ export async function getAllSeries(): Promise<SeriesGroup[]> {
       else groups.set(name, [member]);
     }
   }
+  const rosters = await loadSeriesRosters();
   const result: SeriesGroup[] = [];
   for (const [name, members] of groups) {
     members.sort((a, b) => {
@@ -769,7 +771,15 @@ export async function getAllSeries(): Promise<SeriesGroup[]> {
       return a.title.localeCompare(b.title);
     });
     const gaps = computeIndexGaps(members);
-    result.push({ name, members, gaps });
+    const roster = rosters.get(name) ?? rosters.get(name.toLowerCase()) ?? null;
+    const rosterMissing = roster ? computeRosterMissing(members, roster.books) : [];
+    result.push({
+      name,
+      members,
+      gaps,
+      rosterMissing,
+      rosterCount: roster?.count ?? undefined,
+    });
   }
   // Detect sub-series relationships: X is a sub-series of Y iff
   // every member of X is also a member of Y, X has at least two
@@ -869,6 +879,115 @@ export type TagPair = {
   tags: [string, string];
   count: number;
 };
+
+// Roster file lives at `<vault>/_meta/series-rosters.json`. Populated
+// by `scripts/backfill-series-rosters.mjs`. Cached per request via
+// React `cache()` because the same series page may call `getAllSeries`
+// multiple times across components within one render.
+type RosterFile = {
+  rosters?: Record<
+    string,
+    {
+      name?: string;
+      hardcoverSlug?: string | null;
+      count?: number | null;
+      books?: Array<{
+        position?: number | null;
+        title?: string | null;
+        slug?: string | null;
+        authors?: string[];
+      }>;
+    }
+  >;
+};
+
+const loadSeriesRosters = cache(
+  async (): Promise<
+    Map<
+      string,
+      {
+        count: number | null;
+        books: Array<{
+          position: number | null;
+          title: string;
+          slug: string | null;
+          authors: string[];
+        }>;
+      }
+    >
+  > => {
+    const file = path.join(booksDir(), META_DIR, "series-rosters.json");
+    let raw: string;
+    try {
+      raw = await fs.readFile(file, "utf8");
+    } catch {
+      return new Map();
+    }
+    let parsed: RosterFile;
+    try {
+      parsed = JSON.parse(raw) as RosterFile;
+    } catch {
+      return new Map();
+    }
+    const out = new Map<
+      string,
+      {
+        count: number | null;
+        books: Array<{
+          position: number | null;
+          title: string;
+          slug: string | null;
+          authors: string[];
+        }>;
+      }
+    >();
+    for (const [name, entry] of Object.entries(parsed.rosters ?? {})) {
+      const books = (entry.books ?? [])
+        .filter((b): b is { title: string } & typeof b => typeof b.title === "string")
+        .map((b) => ({
+          position: typeof b.position === "number" ? b.position : null,
+          title: b.title as string,
+          slug: typeof b.slug === "string" ? b.slug : null,
+          authors: Array.isArray(b.authors) ? b.authors.filter((a) => typeof a === "string") : [],
+        }));
+      out.set(name, { count: typeof entry.count === "number" ? entry.count : null, books });
+    }
+    return out;
+  },
+);
+
+// For a given series, return the roster entries whose position isn't
+// matched by any known vault member's integer index. Roster entries
+// without a position are skipped — we have nowhere to put them in
+// the numbered list.
+function computeRosterMissing(
+  members: { index: number | null }[],
+  rosterBooks: Array<{
+    position: number | null;
+    title: string;
+    slug: string | null;
+    authors: string[];
+  }>,
+): RosterMissing[] {
+  const known = new Set(
+    members
+      .map((m) => m.index)
+      .filter((idx): idx is number => idx !== null && Number.isInteger(idx)),
+  );
+  const out: RosterMissing[] = [];
+  for (const b of rosterBooks) {
+    if (b.position === null || !Number.isInteger(b.position)) continue;
+    if (known.has(b.position)) continue;
+    out.push({
+      position: b.position,
+      title: b.title,
+      authors: b.authors,
+      hardcoverSlug: b.slug,
+    });
+  }
+  out.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  return out;
+}
 
 // Integer indexes between the lowest and highest known integer index
 // in a series that aren't represented in the vault. Decimal indexes

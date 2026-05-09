@@ -7,11 +7,12 @@
 ## Run `make` (no target) for the list.
 
 .PHONY: help install dev build check format lint typecheck test e2e clean \
-	vault-lint vault-backfill vault-backfill-apply
+	vault-lint vault-backfill vault-backfill-apply vault-series-rosters \
+	vault-series-rosters-apply
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?##' $(MAKEFILE_LIST) \
-		| awk -F ':.*?##' '{printf "  \033[1m%-22s\033[0m %s\n", $$1, $$2}'
+		| awk -F ':.*?##' '{printf "  \033[1m%-28s\033[0m %s\n", $$1, $$2}'
 
 install: ## Install dependencies
 	pnpm install
@@ -75,5 +76,11 @@ vault-backfill-apply: ## Apply all vault backfills — writes to the vault
 	@node scripts/backfill-see-also-from-tags.mjs --apply
 	@echo "→ see_also-bidirectional --apply"
 	@node scripts/backfill-see-also-bidirectional.mjs --apply
+
+vault-series-rosters: ## Dry-run: fetch full series rosters from Hardcover
+	@node scripts/backfill-series-rosters.mjs
+
+vault-series-rosters-apply: ## Apply: write _meta/series-rosters.json
+	@node scripts/backfill-series-rosters.mjs --apply
 
 .DEFAULT_GOAL := help

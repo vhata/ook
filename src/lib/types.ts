@@ -149,6 +149,22 @@ export type SeriesGroup = {
   // to know the true start/end), so this surfaces gaps the corpus
   // can prove exist.
   gaps: number[];
+  // Members the roster (from `_meta/series-rosters.json`, populated
+  // by `make vault-series-rosters-apply`) knows about but the vault
+  // doesn't have a directory for. Includes the title + author from
+  // Hardcover so the placeholder reads like a real book row.
+  rosterMissing: RosterMissing[];
+  // Total book count for the series according to the roster (when
+  // available). Lets the header read "5 of 41 read in vault" instead
+  // of "5 of 5".
+  rosterCount?: number;
+};
+
+export type RosterMissing = {
+  position: number | null;
+  title: string;
+  authors: string[];
+  hardcoverSlug: string | null;
 };
 
 // One book may belong to multiple series — Discworld is the canonical
