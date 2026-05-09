@@ -83,7 +83,8 @@ The user-facing surfaces:
 - **`/api/mcp/[transport]`** — MCP HTTP transport for external agents (Claude Code, Claude Desktop). Same auth gate; same tools. Stateless, JSON-mode `WebStandardStreamableHTTPServerTransport`.
 - **`/api/auth/{register,login,logout}/*`** — WebAuthn registration and sign-in via `@simplewebauthn/server`. Single-user; first registration is open (the owner claims the site), subsequent registrations require either an active session or a one-shot backup code generated at first registration.
 - **`/api/admin/agent`, `/api/admin/agent/commit`** — the orchestration pair that backs the `/admin` console: the first calls Claude with read-only tools + a special `propose_patch` tool that stages a `CommitPatchInput` without committing; the second runs the staged patch through `commitPatch` after re-validating the schema.
-- **`/api/admin/reindex`** — webhook target / admin button for rebuilding the materialised view.
+- **`/api/admin/reindex`** — admin button for rebuilding the materialised view (passkey-gated).
+- **`/api/webhooks/books/reindex`** — GitHub-webhook target on `vhata/books`. Verifies `X-Hub-Signature-256` against `OOK_BOOKS_WEBHOOK_SECRET` (HMAC-SHA256), then calls the same `reindex()`. NOT covered by the session-cookie proxy gate — HMAC IS the auth check. Configured on the books repo with `Just the push event`.
 
 Storage: `src/lib/store/` exports a `Store` interface with two adapters — `MemoryStore` (default; tests + local dev) and `UpstashStore` (production, via Vercel Marketplace). `src/lib/store/index-vault.ts` is the indexer; `src/lib/store/index.ts` exports the `keys` namespace centralising every key shape.
 
@@ -100,13 +101,14 @@ Disciplines specific to the write surface:
 
 Env vars required for the write surface to operate in production:
 
-| Var                                                                                                                         | Purpose                                                                     |
-| --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                        | Provisioned via Vercel Marketplace; auto-injected. Falls back to in-memory. |
-| `OOK_AUTH_SESSION_SECRET`                                                                                                   | 32+ byte secret for cookie signing. `openssl rand -hex 32`.                 |
-| `OOK_AUTH_RP_ID`, `OOK_AUTH_RP_NAME`, `OOK_AUTH_EXPECTED_ORIGIN`, `OOK_AUTH_OWNER_USERNAME`, `OOK_AUTH_SESSION_TTL_SECONDS` | WebAuthn config; sensible defaults from `OOK_SITE_URL`.                     |
-| `GITHUB_BOOKS_PAT`, `GITHUB_BOOKS_REPO`, `GITHUB_BOOKS_BRANCH`                                                              | Fine-grained PAT for `commit_patch` writes. Falls back to local-fs in dev.  |
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                                                                      | Claude API for `/admin` orchestration. Set a monthly cap before going live. |
+| Var                                                                                                                         | Purpose                                                                                                                                   |
+| --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                        | Provisioned via Vercel Marketplace; auto-injected. Falls back to in-memory.                                                               |
+| `OOK_AUTH_SESSION_SECRET`                                                                                                   | 32+ byte secret for cookie signing. `openssl rand -hex 32`.                                                                               |
+| `OOK_AUTH_RP_ID`, `OOK_AUTH_RP_NAME`, `OOK_AUTH_EXPECTED_ORIGIN`, `OOK_AUTH_OWNER_USERNAME`, `OOK_AUTH_SESSION_TTL_SECONDS` | WebAuthn config; sensible defaults from `OOK_SITE_URL`.                                                                                   |
+| `GITHUB_BOOKS_PAT`, `GITHUB_BOOKS_REPO`, `GITHUB_BOOKS_BRANCH`                                                              | Fine-grained PAT for `commit_patch` writes. Falls back to local-fs in dev.                                                                |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                                                                      | Claude API for `/admin` orchestration. Set a monthly cap before going live.                                                               |
+| `OOK_BOOKS_WEBHOOK_SECRET`                                                                                                  | Shared secret for HMAC verification on the `/api/webhooks/books/reindex` route. Same value goes into the GitHub webhook's "Secret" field. |
 
 ## Open questions
 
