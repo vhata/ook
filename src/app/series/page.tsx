@@ -69,12 +69,64 @@ function SeriesSection({ group }: { group: SeriesGroup }) {
           {group.members.length === 1 ? " read" : " read in vault"}
         </span>
       </header>
-      <ol className="m-0 list-none space-y-3 p-0">
-        {group.members.map((m) => (
-          <SeriesEntry key={m.slug} member={m} />
-        ))}
-      </ol>
+      <ol className="m-0 list-none space-y-3 p-0">{renderEntries(group)}</ol>
     </section>
+  );
+}
+
+// Interleaves real members with gap placeholders in index order. Members
+// without an integer index (null, decimals) are appended at the end —
+// gap placeholders only sit between integer-indexed entries.
+function renderEntries(group: SeriesGroup): React.ReactNode[] {
+  const integerMembers = group.members.filter((m) => m.index !== null && Number.isInteger(m.index));
+  const otherMembers = group.members.filter((m) => m.index === null || !Number.isInteger(m.index));
+  const gapSet = new Set(group.gaps);
+  if (integerMembers.length === 0) {
+    return group.members.map((m) => <SeriesEntry key={m.slug} member={m} />);
+  }
+  const minIdx = integerMembers[0].index!;
+  const maxIdx = integerMembers[integerMembers.length - 1].index!;
+  const out: React.ReactNode[] = [];
+  let cursor = 0;
+  for (let i = minIdx; i <= maxIdx; i++) {
+    if (gapSet.has(i)) {
+      out.push(<MissingEntry key={`gap-${i}`} index={i} seriesName={group.name} />);
+    } else if (cursor < integerMembers.length && integerMembers[cursor].index === i) {
+      const m = integerMembers[cursor];
+      out.push(<SeriesEntry key={m.slug} member={m} />);
+      cursor++;
+    }
+  }
+  for (const m of otherMembers) {
+    out.push(<SeriesEntry key={m.slug} member={m} />);
+  }
+  return out;
+}
+
+// Greyed-out placeholder for an integer index that exists in the
+// numbering gap but has no entry in the vault. Shape mirrors a real
+// SeriesEntry so the visual rhythm of the list isn't broken.
+function MissingEntry({ index, seriesName }: { index: number; seriesName: string }) {
+  return (
+    <li>
+      <div
+        className="border-rule bg-surface-mute/40 text-ink-dim flex items-center gap-4 rounded border border-dashed p-3"
+        title={`Missing entry — ${seriesName} #${index} isn't in the vault yet.`}
+      >
+        <div className="bg-surface border-rule text-ink-dim flex h-10 w-7 shrink-0 items-center justify-center rounded-sm border font-mono text-[10px] tracking-[0.04em]">
+          #{index}
+        </div>
+        <div className="bg-surface border-rule h-[54px] w-9 shrink-0 rounded-sm border" />
+        <div className="min-w-0 flex-1">
+          <div className="font-serif truncate text-[15px] leading-tight italic">
+            (not in the vault)
+          </div>
+          <div className="text-ink-dim truncate text-[11px] tracking-[0.04em] uppercase">
+            gap in numbering
+          </div>
+        </div>
+      </div>
+    </li>
   );
 }
 

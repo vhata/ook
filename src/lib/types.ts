@@ -143,6 +143,12 @@ export type SeriesGroup = {
   // a sub-series of Discworld, etc. Computed at /series build time
   // from corpus relationships, not stored in vault frontmatter.
   subseriesOf?: string;
+  // Integer indexes that are missing BETWEEN known members — if the
+  // vault has #1, #3, and #5, this is `[2, 4]`. We never invent
+  // entries before the first known index or after the last (no way
+  // to know the true start/end), so this surfaces gaps the corpus
+  // can prove exist.
+  gaps: number[];
 };
 
 // One book may belong to multiple series — Discworld is the canonical

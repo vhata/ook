@@ -768,7 +768,8 @@ export async function getAllSeries(): Promise<SeriesGroup[]> {
       if (aDate && bDate) return aDate.localeCompare(bDate);
       return a.title.localeCompare(b.title);
     });
-    result.push({ name, members });
+    const gaps = computeIndexGaps(members);
+    result.push({ name, members, gaps });
   }
   // Detect sub-series relationships: X is a sub-series of Y iff
   // every member of X is also a member of Y, X has at least two
@@ -868,6 +869,27 @@ export type TagPair = {
   tags: [string, string];
   count: number;
 };
+
+// Integer indexes between the lowest and highest known integer index
+// in a series that aren't represented in the vault. Decimal indexes
+// (#1.5) are ignored — they'd produce false "missing" entries since
+// we can't know whether a #1.5 was supposed to exist between #1 and #2.
+//
+// Returns [] when there are fewer than two integer-indexed members
+// (no gap is well-defined) or when no members have integer indexes.
+export function computeIndexGaps(members: { index: number | null }[]): number[] {
+  const integers = members
+    .map((m) => m.index)
+    .filter((idx): idx is number => idx !== null && Number.isInteger(idx))
+    .sort((a, b) => a - b);
+  if (integers.length < 2) return [];
+  const present = new Set(integers);
+  const gaps: number[] = [];
+  for (let i = integers[0] + 1; i < integers[integers.length - 1]; i++) {
+    if (!present.has(i)) gaps.push(i);
+  }
+  return gaps;
+}
 
 // Pure helper — exposed for unit tests and used by the async wrapper below.
 export function computeTagPairs(books: Pick<Book, "tags">[], limit = 10, minCount = 2): TagPair[] {

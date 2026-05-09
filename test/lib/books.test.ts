@@ -24,6 +24,7 @@ import {
   getTbr,
   getYearActivity,
   getYearStats,
+  computeIndexGaps,
   parseSeriesField,
   parseSeriesMemberships,
 } from "../../src/lib/books";
@@ -462,6 +463,41 @@ describe("parseSeriesMemberships", () => {
       { name: "A", index: 1 },
       { name: "B", index: 2 },
     ]);
+  });
+});
+
+describe("computeIndexGaps", () => {
+  it("finds integer gaps between known indexes", () => {
+    expect(computeIndexGaps([{ index: 1 }, { index: 3 }, { index: 5 }])).toEqual([2, 4]);
+  });
+
+  it("returns no gaps for a contiguous run", () => {
+    expect(computeIndexGaps([{ index: 1 }, { index: 2 }, { index: 3 }])).toEqual([]);
+  });
+
+  it("doesn't extend past the lowest or highest known index", () => {
+    // We don't know whether the series starts at #1 or how far past
+    // #5 it goes — only fill the proven middle.
+    expect(computeIndexGaps([{ index: 3 }, { index: 5 }])).toEqual([4]);
+  });
+
+  it("ignores decimal indexes when computing gaps", () => {
+    // #1.5 doesn't make #2 fillable around it.
+    expect(computeIndexGaps([{ index: 1 }, { index: 1.5 }, { index: 3 }])).toEqual([2]);
+  });
+
+  it("ignores members with null index", () => {
+    expect(computeIndexGaps([{ index: 1 }, { index: null }, { index: 3 }])).toEqual([2]);
+  });
+
+  it("returns [] for fewer than two integer-indexed members", () => {
+    expect(computeIndexGaps([])).toEqual([]);
+    expect(computeIndexGaps([{ index: 1 }])).toEqual([]);
+    expect(computeIndexGaps([{ index: null }, { index: null }])).toEqual([]);
+  });
+
+  it("handles unsorted input by sorting first", () => {
+    expect(computeIndexGaps([{ index: 5 }, { index: 1 }, { index: 3 }])).toEqual([2, 4]);
   });
 });
 
