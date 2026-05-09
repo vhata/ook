@@ -137,6 +137,12 @@ export type SeriesMember = {
 export type SeriesGroup = {
   name: string;
   members: SeriesMember[];
+  // When this series is a sub-series of a larger one (every member
+  // also belongs to the parent series and the parent has strictly
+  // more members), the parent's name lives here. Tiffany Aching is
+  // a sub-series of Discworld, etc. Computed at /series build time
+  // from corpus relationships, not stored in vault frontmatter.
+  subseriesOf?: string;
 };
 
 // One book may belong to multiple series — Discworld is the canonical

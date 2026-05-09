@@ -46,11 +46,24 @@ export default async function SeriesPage() {
 function SeriesSection({ group }: { group: SeriesGroup }) {
   const finished = group.members.filter((m) => m.status === "finished").length;
   return (
-    <section>
+    <section id={`series-${slugifySeriesName(group.name)}`}>
       <header className="mb-4 flex items-baseline justify-between gap-3">
-        <h2 className="font-serif text-ink m-0 text-[24px] leading-tight font-medium tracking-[-0.012em]">
-          {group.name}
-        </h2>
+        <div className="min-w-0">
+          <h2 className="font-serif text-ink m-0 text-[24px] leading-tight font-medium tracking-[-0.012em]">
+            {group.name}
+          </h2>
+          {group.subseriesOf && (
+            <div className="text-ink-dim mt-1 text-[11px] tracking-[0.14em] uppercase italic">
+              sub-series of{" "}
+              <a
+                href={`#series-${slugifySeriesName(group.subseriesOf)}`}
+                className="hover:text-accent not-italic underline underline-offset-[3px]"
+              >
+                {group.subseriesOf}
+              </a>
+            </div>
+          )}
+        </div>
         <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
           {finished} of {group.members.length}
           {group.members.length === 1 ? " read" : " read in vault"}
@@ -63,6 +76,13 @@ function SeriesSection({ group }: { group: SeriesGroup }) {
       </ol>
     </section>
   );
+}
+
+function slugifySeriesName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function SeriesEntry({ member }: { member: SeriesMember }) {

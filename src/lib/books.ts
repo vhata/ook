@@ -770,6 +770,34 @@ export async function getAllSeries(): Promise<SeriesGroup[]> {
     });
     result.push({ name, members });
   }
+  // Detect sub-series relationships: X is a sub-series of Y iff
+  // every member of X is also a member of Y, X has at least two
+  // members (so a multi-tagged standalone book doesn't get folded
+  // into its bigger series), and X is strictly smaller than Y.
+  // When multiple parents qualify, pick the smallest — closest to
+  // the sub-series in size.
+  for (const group of result) {
+    if (group.members.length < 2) continue;
+    const own = new Set(group.members.map((m) => m.slug));
+    let bestParent: SeriesGroup | null = null;
+    for (const candidate of result) {
+      if (candidate === group) continue;
+      if (candidate.members.length <= group.members.length) continue;
+      const candidateSlugs = new Set(candidate.members.map((m) => m.slug));
+      let allIncluded = true;
+      for (const slug of own) {
+        if (!candidateSlugs.has(slug)) {
+          allIncluded = false;
+          break;
+        }
+      }
+      if (!allIncluded) continue;
+      if (bestParent === null || candidate.members.length < bestParent.members.length) {
+        bestParent = candidate;
+      }
+    }
+    if (bestParent) group.subseriesOf = bestParent.name;
+  }
   result.sort((a, b) => a.name.localeCompare(b.name));
   return result;
 }

@@ -62,7 +62,11 @@ export default async function BookPage({ params }: { params: Params }) {
       <BookHeader book={book} bingoYear={bingoYear} />
 
       <div className="grid grid-cols-1 gap-9 md:grid-cols-[180px_1fr]">
-        <Toc seeAlso={seeAlso} similar={similar} />
+        <Toc
+          seriesMemberships={parseSeriesMemberships(book.series)}
+          seeAlso={seeAlso}
+          similar={similar}
+        />
 
         <div className="min-w-0">
           {book.pullquote && (
@@ -254,15 +258,40 @@ function ExternalLinkRow({ book }: { book: Book }) {
 }
 
 function Toc({
+  seriesMemberships,
   seeAlso,
   similar,
 }: {
+  seriesMemberships: { name: string; index: number | null }[];
   seeAlso: Book[];
   similar: Array<{ book: Connection["a"]; score: number; reasons: ConnectionReason[] }>;
 }) {
-  if (seeAlso.length === 0 && similar.length === 0) return <aside className="hidden md:block" />;
+  if (seriesMemberships.length === 0 && seeAlso.length === 0 && similar.length === 0) {
+    return <aside className="hidden md:block" />;
+  }
   return (
     <aside className="self-start md:sticky md:top-6">
+      {seriesMemberships.length > 0 && (
+        <>
+          <div className="text-ink-soft mb-3 text-[10px] tracking-[0.18em] uppercase">Series</div>
+          <ul className="m-0 mb-7 list-none p-0">
+            {seriesMemberships.map((m, i) => (
+              <li key={`${m.name}-${i}`} className="mb-2">
+                <Link
+                  href={`/series#series-${m.name
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "-")
+                    .replace(/^-|-$/g, "")}`}
+                  className="font-serif text-ink hover:text-accent text-[13px] leading-[1.35]"
+                >
+                  {m.name}
+                  {m.index !== null && <span className="text-ink-dim font-mono"> #{m.index}</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       {seeAlso.length > 0 && (
         <>
           <div className="text-ink-soft mb-3 text-[10px] tracking-[0.18em] uppercase">See also</div>
