@@ -267,6 +267,7 @@ function defaultBook(slug: string): Book {
     hardcoverSlug: null,
     storygraphSlug: null,
     bookwyrmUrl: null,
+    source: null,
   };
 }
 
