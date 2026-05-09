@@ -17,6 +17,7 @@ import type {
   Pullquote,
   SeriesGroup,
   SeriesMember,
+  SeriesMembership,
   TagSummary,
   Tbr,
   TbrEntry,
@@ -690,42 +691,71 @@ export async function getManualLogEntries(): Promise<LogEntry[]> {
   return entries;
 }
 
-// Parses a series field like "Realm of the Elderlings #3" into name + index.
-// Bare series names ("The Library at Mount Char") return `null` index.
-// Decimal indices (#1.5 — for novellas) are accepted.
+// Parses a single-membership series string like "Realm of the Elderlings #3"
+// into name + index. Bare series names ("The Library at Mount Char") return
+// `null` index. Decimal indices (#1.5 — for novellas) are accepted.
+//
+// Multi-series strings (`; `-delimited) return only the FIRST membership;
+// callers that want the full set use `parseSeriesMemberships` below.
 export function parseSeriesField(raw: string): { name: string; index: number | null } {
-  const m = /^(.+?)\s*#(\d+(?:\.\d+)?)\s*$/.exec(raw);
-  if (m) {
-    const idx = Number(m[2]);
-    return { name: m[1].trim(), index: Number.isFinite(idx) ? idx : null };
-  }
+  const memberships = parseSeriesMemberships(raw);
+  if (memberships.length > 0) return memberships[0];
   return { name: raw.trim(), index: null };
 }
 
+// One book may belong to multiple series. The vault encodes this via a
+// `; `-delimited string: `series: "Discworld, #32; Tiffany Aching #2"`.
+// Each membership is parsed independently — name + optional `#N` index.
+//
+// Tolerates trailing commas / stray whitespace around series names since
+// the vault format is hand-written. Empty input → empty array.
+export function parseSeriesMemberships(raw: string | null | undefined): SeriesMembership[] {
+  if (typeof raw !== "string" || raw.trim().length === 0) return [];
+  const out: SeriesMembership[] = [];
+  for (const segment of raw.split(";")) {
+    const cleaned = segment.replace(/^\s*,?\s*|\s*,?\s*$/g, "");
+    if (cleaned.length === 0) continue;
+    const m = /^(.+?)\s*,?\s*#(\d+(?:\.\d+)?)\s*$/.exec(cleaned);
+    if (m) {
+      const idx = Number(m[2]);
+      out.push({
+        name: m[1].replace(/\s*,\s*$/, "").trim(),
+        index: Number.isFinite(idx) ? idx : null,
+      });
+    } else {
+      out.push({ name: cleaned, index: null });
+    }
+  }
+  return out;
+}
+
 // Group every book that has a `series` field into a series catalogue.
-// Members within each series are sorted by parsed index (nulls last), then
-// by finish date, then by start date — falling back to title as a tiebreak.
+// Multi-series books (Discworld + Witches, etc.) appear under each of
+// their series memberships with that series' specific index. Members
+// within each series are sorted by parsed index (nulls last), then by
+// finish date, then by start date — falling back to title as a tiebreak.
 // Series themselves are sorted by name.
 export async function getAllSeries(): Promise<SeriesGroup[]> {
   const books = await getAllBooks();
   const groups = new Map<string, SeriesMember[]>();
   for (const b of books) {
-    if (!b.series) continue;
-    const { name, index } = parseSeriesField(b.series);
-    const member: SeriesMember = {
-      slug: b.slug,
-      title: b.title,
-      authors: b.authors,
-      status: b.status,
-      rating: b.rating,
-      finished: b.finished,
-      started: b.started,
-      cover: b.cover,
-      index,
-    };
-    const existing = groups.get(name);
-    if (existing) existing.push(member);
-    else groups.set(name, [member]);
+    const memberships = parseSeriesMemberships(b.series);
+    for (const { name, index } of memberships) {
+      const member: SeriesMember = {
+        slug: b.slug,
+        title: b.title,
+        authors: b.authors,
+        status: b.status,
+        rating: b.rating,
+        finished: b.finished,
+        started: b.started,
+        cover: b.cover,
+        index,
+      };
+      const existing = groups.get(name);
+      if (existing) existing.push(member);
+      else groups.set(name, [member]);
+    }
   }
   const result: SeriesGroup[] = [];
   for (const [name, members] of groups) {

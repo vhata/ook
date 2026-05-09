@@ -139,6 +139,15 @@ export type SeriesGroup = {
   members: SeriesMember[];
 };
 
+// One book may belong to multiple series — Discworld is the canonical
+// case (every Witches/Watch/Tiffany Aching book is also a Discworld
+// book, with its own `#N` per series). Encoded in the vault as a
+// `; `-delimited string: `series: "Discworld, #32; Tiffany Aching #2"`.
+export type SeriesMembership = {
+  name: string;
+  index: number | null;
+};
+
 export type DayActivity = {
   // ISO date string (YYYY-MM-DD).
   date: string;

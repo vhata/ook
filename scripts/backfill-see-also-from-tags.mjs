@@ -81,12 +81,14 @@ async function main() {
     const seriesCount = new Map();
     const authorCount = new Map();
     // Seed diversity counters with whatever's already in see_also so
-    // we don't blow past caps the user has already hand-set.
+    // we don't blow past caps the user has already hand-set. For
+    // multi-series books each membership counts separately.
     for (const slug of book.seeAlso) {
       const existing = bySlug.get(slug);
       if (!existing) continue;
-      const sk = stripSeriesIndex(existing.series);
-      if (sk) seriesCount.set(sk, (seriesCount.get(sk) ?? 0) + 1);
+      for (const m of parseSeriesMemberships(existing.series)) {
+        seriesCount.set(m.name, (seriesCount.get(m.name) ?? 0) + 1);
+      }
       const ak = existing.authors[0];
       if (ak) authorCount.set(ak, (authorCount.get(ak) ?? 0) + 1);
     }
@@ -94,13 +96,15 @@ async function main() {
       if (merged.length >= MAX_SEE_ALSO) break;
       if (have.has(c.slug)) continue;
       const cand = bySlug.get(c.slug);
-      const sk = stripSeriesIndex(cand?.series);
+      const candMemberships = cand ? parseSeriesMemberships(cand.series) : [];
       const ak = cand?.authors[0];
-      if (sk && (seriesCount.get(sk) ?? 0) >= MAX_PER_SERIES) continue;
+      if (candMemberships.some((m) => (seriesCount.get(m.name) ?? 0) >= MAX_PER_SERIES)) continue;
       if (ak && (authorCount.get(ak) ?? 0) >= MAX_PER_AUTHOR) continue;
       merged.push(c.slug);
       have.add(c.slug);
-      if (sk) seriesCount.set(sk, (seriesCount.get(sk) ?? 0) + 1);
+      for (const m of candMemberships) {
+        seriesCount.set(m.name, (seriesCount.get(m.name) ?? 0) + 1);
+      }
       if (ak) authorCount.set(ak, (authorCount.get(ak) ?? 0) + 1);
     }
 
@@ -155,14 +159,28 @@ async function readVault(vaultDir) {
   return out;
 }
 
-function stripSeriesIndex(series) {
-  if (typeof series !== "string" || series.trim().length === 0) return null;
-  const cleaned = series
-    .replace(/\s*#[\d.]+.*$/, "")
-    .replace(/\s*,\s*Book\s+\d+.*$/i, "")
-    .replace(/\s*\(.*\)\s*$/, "")
-    .trim();
-  return cleaned || null;
+// Mirrors src/lib/books.ts:parseSeriesMemberships — handles the
+// `; `-delimited multi-series form ("Discworld, #32; Tiffany Aching #2")
+// so multi-series books are diversity-counted under every series they
+// belong to, not just the first.
+function parseSeriesMemberships(raw) {
+  if (typeof raw !== "string" || raw.trim().length === 0) return [];
+  const out = [];
+  for (const segment of raw.split(";")) {
+    const cleaned = segment.replace(/^\s*,?\s*|\s*,?\s*$/g, "");
+    if (cleaned.length === 0) continue;
+    const m = /^(.+?)\s*,?\s*#(\d+(?:\.\d+)?)\s*$/.exec(cleaned);
+    if (m) {
+      const idx = Number(m[2]);
+      out.push({
+        name: m[1].replace(/\s*,\s*$/, "").trim(),
+        index: Number.isFinite(idx) ? idx : null,
+      });
+    } else {
+      out.push({ name: cleaned, index: null });
+    }
+  }
+  return out;
 }
 
 async function writeUpdatedSeeAlso(filePath, slugs) {

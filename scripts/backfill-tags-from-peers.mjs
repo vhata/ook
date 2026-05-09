@@ -59,11 +59,10 @@ async function main() {
   const byAuthor = new Map();
   const seeAlsoBackrefs = new Map(); // slug → set of slugs that reference it
   for (const b of books) {
-    const seriesKey = stripSeriesIndex(b.series);
-    if (seriesKey) {
-      const arr = bySeriesName.get(seriesKey) ?? [];
+    for (const m of parseSeriesMemberships(b.series)) {
+      const arr = bySeriesName.get(m.name) ?? [];
       arr.push(b);
-      bySeriesName.set(seriesKey, arr);
+      bySeriesName.set(m.name, arr);
     }
     const author = b.authors[0];
     if (author) {
@@ -83,10 +82,16 @@ async function main() {
   for (const book of books) {
     if (book.tags.length >= LIMIT_TAGS) continue;
 
-    const seriesKey = stripSeriesIndex(book.series);
-    const seriesPeers = (seriesKey ? (bySeriesName.get(seriesKey) ?? []) : []).filter(
-      (b) => b.slug !== book.slug,
-    );
+    // Series peers: union across every series this book belongs to,
+    // deduped by slug so a multi-series book doesn't double-count.
+    const seriesPeerSet = new Map();
+    for (const m of parseSeriesMemberships(book.series)) {
+      for (const peer of bySeriesName.get(m.name) ?? []) {
+        if (peer.slug === book.slug) continue;
+        seriesPeerSet.set(peer.slug, peer);
+      }
+    }
+    const seriesPeers = [...seriesPeerSet.values()];
     const authorKey = book.authors[0];
     const authorPeers = (authorKey ? (byAuthor.get(authorKey) ?? []) : [])
       .filter((b) => b.slug !== book.slug)
@@ -174,14 +179,28 @@ async function main() {
   if (!APPLY) process.stderr.write("(dry-run; rerun with --apply to write)\n");
 }
 
-function stripSeriesIndex(series) {
-  if (typeof series !== "string" || series.trim().length === 0) return null;
-  const cleaned = series
-    .replace(/\s*#[\d.]+.*$/, "")
-    .replace(/\s*,\s*Book\s+\d+.*$/i, "")
-    .replace(/\s*\(.*\)\s*$/, "")
-    .trim();
-  return cleaned || null;
+// Mirrors src/lib/books.ts:parseSeriesMemberships — handles the
+// `; `-delimited multi-series form ("Discworld, #32; Tiffany Aching #2")
+// so multi-series books contribute to peer tallies for every series
+// they belong to.
+function parseSeriesMemberships(raw) {
+  if (typeof raw !== "string" || raw.trim().length === 0) return [];
+  const out = [];
+  for (const segment of raw.split(";")) {
+    const cleaned = segment.replace(/^\s*,?\s*|\s*,?\s*$/g, "");
+    if (cleaned.length === 0) continue;
+    const m = /^(.+?)\s*,?\s*#(\d+(?:\.\d+)?)\s*$/.exec(cleaned);
+    if (m) {
+      const idx = Number(m[2]);
+      out.push({
+        name: m[1].replace(/\s*,\s*$/, "").trim(),
+        index: Number.isFinite(idx) ? idx : null,
+      });
+    } else {
+      out.push({ name: cleaned, index: null });
+    }
+  }
+  return out;
 }
 
 async function readVault(vaultDir) {

@@ -25,6 +25,7 @@ import {
   getYearActivity,
   getYearStats,
   parseSeriesField,
+  parseSeriesMemberships,
 } from "../../src/lib/books";
 import type { Book } from "../../src/lib/types";
 
@@ -407,6 +408,60 @@ describe("parseSeriesField", () => {
       name: "Hyperion Cantos",
       index: 2,
     });
+  });
+
+  it("returns the first membership for `; `-delimited multi-series strings", () => {
+    expect(parseSeriesField("Discworld, #32; Tiffany Aching #2")).toEqual({
+      name: "Discworld",
+      index: 32,
+    });
+  });
+});
+
+describe("parseSeriesMemberships", () => {
+  it("returns a single membership for a plain `Name #N` string", () => {
+    expect(parseSeriesMemberships("Mistborn #1")).toEqual([{ name: "Mistborn", index: 1 }]);
+  });
+
+  it("returns one entry per `; `-delimited segment for multi-series", () => {
+    expect(parseSeriesMemberships("Discworld, #32; Tiffany Aching #2")).toEqual([
+      { name: "Discworld", index: 32 },
+      { name: "Tiffany Aching", index: 2 },
+    ]);
+  });
+
+  it("handles a series name without a #N", () => {
+    expect(parseSeriesMemberships("The Library at Mount Char")).toEqual([
+      { name: "The Library at Mount Char", index: null },
+    ]);
+  });
+
+  it("returns an empty array for null / undefined / empty / whitespace input", () => {
+    expect(parseSeriesMemberships(null)).toEqual([]);
+    expect(parseSeriesMemberships(undefined)).toEqual([]);
+    expect(parseSeriesMemberships("")).toEqual([]);
+    expect(parseSeriesMemberships("   ")).toEqual([]);
+  });
+
+  it("tolerates trailing commas and stray whitespace around series names", () => {
+    expect(parseSeriesMemberships("Discworld, #12; Witches #3")).toEqual([
+      { name: "Discworld", index: 12 },
+      { name: "Witches", index: 3 },
+    ]);
+  });
+
+  it("accepts decimal indices per membership", () => {
+    expect(parseSeriesMemberships("Mistborn #1.5; Wax and Wayne #0.5")).toEqual([
+      { name: "Mistborn", index: 1.5 },
+      { name: "Wax and Wayne", index: 0.5 },
+    ]);
+  });
+
+  it("skips empty segments (consecutive semicolons)", () => {
+    expect(parseSeriesMemberships("A #1;; B #2")).toEqual([
+      { name: "A", index: 1 },
+      { name: "B", index: 2 },
+    ]);
   });
 });
 
