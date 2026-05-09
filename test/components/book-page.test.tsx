@@ -54,7 +54,12 @@ vi.mock("../../src/lib/books", async () => {
     getAllBooks: async () => [baseBook],
     getBookBySlug: async (slug: string) =>
       slug === "piranesi"
-        ? { book: baseBook, review: "## Notes\n\nA wonderful book.", quotes: "> A quote." }
+        ? {
+            book: baseBook,
+            body: "",
+            review: "## Notes\n\nA wonderful book.",
+            quotes: "> A quote.",
+          }
         : null,
     findBingoYearForBook: async () => null,
     getSimilarBooks: async () => [],
@@ -108,6 +113,31 @@ describe("BookPage server component", { timeout: 15000 }, () => {
     await expect(BookPage({ params: Promise.resolve({ slug: "does-not-exist" }) })).rejects.toThrow(
       /NEXT_NOT_FOUND/,
     );
+  });
+
+  it("renders multi-series memberships as separate dot-delimited entries", async () => {
+    // Stash the current mock to restore later — vi.doMock would also
+    // work but importing twice in the same test file is finicky.
+    const multiSeriesBook = { ...baseBook, series: "Discworld, #32; Tiffany Aching #2" };
+    const lib = await import("../../src/lib/books");
+    const original = lib.getBookBySlug;
+    (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
+      slug === "piranesi" ? { book: multiSeriesBook, body: "", review: null, quotes: null } : null;
+
+    try {
+      const BookPage = await importPage();
+      const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      const { container } = render(tree);
+
+      // The line should contain BOTH series names with their indices,
+      // and NOT the raw `; `-delimited string.
+      const text = container.textContent ?? "";
+      expect(text).toContain("Discworld #32");
+      expect(text).toContain("Tiffany Aching #2");
+      expect(text).not.toContain("Discworld, #32; Tiffany Aching #2");
+    } finally {
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
+    }
   });
 
   it("renders the Share row with QR + postcard links", async () => {

@@ -17,6 +17,7 @@ import {
   getAllBooks,
   getBookBySlug,
   getSimilarBooks,
+  parseSeriesMemberships,
 } from "@/lib/books";
 import { remarkSpoilerDirective, slugify } from "@/lib/markdown";
 import type { Book, Connection, ConnectionReason } from "@/lib/types";
@@ -166,7 +167,7 @@ function BookHeader({ book, bingoYear }: { book: Book; bingoYear: number | null 
           {book.title}
         </h1>
         <div className="text-ink-soft mt-3 text-[18px]">{book.authors.join(", ")}</div>
-        {book.series && <div className="text-ink-dim mt-2 text-[13px] italic">{book.series}</div>}
+        <SeriesLine seriesField={book.series} />
         {book.tags.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {book.tags.map((tag) => (
@@ -209,6 +210,22 @@ function ShareRow({ slug }: { slug: string }) {
       >
         ↓ postcard
       </a>
+    </div>
+  );
+}
+
+function SeriesLine({ seriesField }: { seriesField: string | null }) {
+  const memberships = parseSeriesMemberships(seriesField);
+  if (memberships.length === 0) return null;
+  return (
+    <div className="text-ink-dim mt-2 text-[13px] italic">
+      {memberships.map((m, i) => (
+        <span key={`${m.name}-${i}`}>
+          {i > 0 && <span className="not-italic"> · </span>}
+          {m.name}
+          {m.index !== null && ` #${m.index}`}
+        </span>
+      ))}
     </div>
   );
 }
