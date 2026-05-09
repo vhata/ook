@@ -34,6 +34,10 @@ Vault-side helpers in `scripts/`. All default to dry-run; pass `--apply` to writ
 - **`backfill-see-also-from-tags.mjs`** — extend see-also via tag-Jaccard similarity, with diversity caps to keep heavily-tagged series from crowding out other recommendations.
 - **`backfill-see-also-bidirectional.mjs`** — close the loop: where `A → B` but `B` doesn't link back, propose adding `A` to `B`'s see-also.
 
+**External enrichment (operator-run, internet-touching).**
+
+- **`backfill-series-rosters.mjs`** — fetch the canonical full member list for each series the vault knows about from Hardcover GraphQL and write `_meta/series-rosters.json` to the vault. Run via `make vault-series-rosters` (dry-run) and `make vault-series-rosters-apply`. Requires `HARDCOVER_TOKEN` in env. Internet only at user-initiated `make` time; the cache is committed so the build stays offline-clean. The `/series` renderer reads it at request time to surface missing-from-vault entries with their canonical title and author, and to use the canonical total in the header ("3 of 41 read").
+
 **Audit + build.**
 
 - **`vault-lint.mjs`** — local CLI that runs the same checks as `/vault-health`, including the corpus-level orphan and asymmetric-see-also detectors.

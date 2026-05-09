@@ -33,16 +33,20 @@ Corpus size as of May 2026 is ~230 books after a Goodreads bulk-import. To keep 
 - **`src/app/api/books/[slug]/notes/route.ts`** — tier 2 endpoint. Returns the deep reference-notes markdown as JSON. Lives outside SSR so the body never appears in initial HTML.
 - **`src/components/`** — client components for tiered reveals (`RevealSection`, `DeepNotes`), inline spoiler blur (`Spoiler`), the cover image (`Cover`, with procedural fallback), the home wordmark / "go home" affordance (`HomeMark`), the postal-stamp flourish on finished books (`Stamp`), the top-right navigation/theme controls (`Controls`), and the 404 illustration (`DroppedBook`).
 - **`src/app/opengraph-image.tsx`** + **`src/app/books/[slug]/opengraph-image.tsx`** — per-route Open Graph share images via Next 16's file convention. Use `next/og` `ImageResponse` with Source Serif 4 fetched from Google Fonts at generation time (`src/lib/og-fonts.ts`). Statically optimised by Next.
-- **`scripts/`** — host-side helpers, all defaulting to dry-run where they write:
+- **`scripts/`** — host-side helpers, all defaulting to dry-run where they write. The umbrella `make vault-backfill` / `make vault-backfill-apply` runs the routine ones in dependency order; series rosters and bulk imports are kept off the umbrella because they want explicit invocation.
   - `fetch-vault.mjs` — prebuild clone of `vhata/books` into `./.vault/` using `BOOKS_DEPLOY_KEY`. Local dev no-ops.
   - `build-index.mjs` — prebuild parse of every reference file into `<vault>/_index.json`. Gated on `BOOKS_DEPLOY_KEY` so local dev never scribbles into the user's actual Obsidian folder.
   - `promote-goodreads.mjs` — bulk-mint per-book vault directories from `_meta/goodreads.md`; stamps `source: goodreads`.
   - `import-triage.mjs` — convert a CSV of recommendations into `_meta/triage.md`; promotes Read=truthy rows to vault directories with `source: media-list`.
   - `backfill-source.mjs` — tag every book's `source` based on body markers. Idempotent.
-  - `backfill-see-also.mjs` — derive cross-references from same-series and same-author peers. Pure derivation, no network.
+  - `backfill-see-also.mjs` — derive cross-references from same-series and same-author peers. Pure derivation, no network. Multi-series-aware via `parseSeriesMemberships`.
+  - `backfill-see-also-from-tags.mjs` — extend `see_also` via tag-Jaccard similarity with diversity caps (≤ 1 per series, ≤ 2 per author).
+  - `backfill-see-also-bidirectional.mjs` — close the loop where `A → B` but not `B → A`; additive only, never bumps existing entries.
   - `backfill-tags.mjs` — fetch Open Library subjects (by ISBN, fall back to title+author search) and map through a curated vocabulary into existing vault tag style. Rate-limited.
-  - `vault-lint.mjs` — local CLI mirror of `/vault-health`.
-- **The vault** — external to this repo, lives at `BOOKS_DIR` (or `<cwd>/.vault` in production). The deployed app never writes to it (lint-enforced); the host-side `scripts/` above do, deliberately. Schema and write conventions are owned by `books/CLAUDE.md` in the vault.
+  - `backfill-tags-from-peers.mjs` — extend tags for thinly-tagged books by tallying tags across same-series, same-author, and see_also peers under signal-source-aware thresholds.
+  - `backfill-series-rosters.mjs` — fetch each series the vault knows about from Hardcover GraphQL and write `_meta/series-rosters.json`. Operator-run via `make vault-series-rosters[-apply]`. Requires `HARDCOVER_TOKEN`. Internet-only at user-initiated time; the cache is committed to the books vault so the build stays offline-clean.
+  - `vault-lint.mjs` — local CLI mirror of `/vault-health` (per-book + corpus-level orphan / asymmetric-see-also checks).
+- **The vault** — external to this repo, lives at `BOOKS_DIR` (or `<cwd>/.vault` in production). The deployed app never writes to it via filesystem (lint-enforced under `src/**`); the host-side `scripts/` above do, deliberately. The `/admin` write surface mutates via the GitHub Contents API rather than the filesystem. Schema and write conventions are owned by `books/CLAUDE.md` in the vault.
 
 ## Disciplines
 
@@ -57,21 +61,30 @@ Corpus size as of May 2026 is ~230 books after a Goodreads bulk-import. To keep 
 
 ## Environment
 
+Render side (always required for the deploy):
+
 | Var                | Where set                 | Purpose                                                                                            | Required? |
 | ------------------ | ------------------------- | -------------------------------------------------------------------------------------------------- | --------- |
 | `BOOKS_DIR`        | `.env.local`              | Absolute path to the local books vault. Falls back to `<cwd>/.vault` (populated by prebuild).      | No        |
 | `OOK_SITE_URL`     | `.env.local` / Vercel env | Public canonical URL used for absolute links in feeds and metadata. Falls back to the prod URL.    | No        |
 | `BOOKS_DEPLOY_KEY` | Vercel env (production)   | SSH private key used by `scripts/fetch-vault.mjs` to clone `vhata/books` at build time. Prod only. | Prod only |
 
-Write surface (only relevant on `feral/mcp`):
+Write surface (`/admin` + MCP — provisioned with the merge):
 
-| Var                                                                                                                         | Purpose                                                                         | Required for the write surface?             |
-| --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------- |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                        | Provisioned via Vercel Marketplace; auto-injected. Falls back to in-memory.     | Yes in prod (or `OOK_ALLOW_MEMORY_STORE=1`) |
-| `OOK_AUTH_SESSION_SECRET`                                                                                                   | 32+ byte secret for cookie signing. `openssl rand -hex 32`.                     | Yes                                         |
-| `OOK_AUTH_RP_ID`, `OOK_AUTH_RP_NAME`, `OOK_AUTH_EXPECTED_ORIGIN`, `OOK_AUTH_OWNER_USERNAME`, `OOK_AUTH_SESSION_TTL_SECONDS` | WebAuthn config; sensible defaults from `OOK_SITE_URL`.                         | No                                          |
-| `GITHUB_BOOKS_PAT`, `GITHUB_BOOKS_REPO`, `GITHUB_BOOKS_BRANCH`                                                              | Fine-grained PAT for `commit_patch` writes. Falls back to local-fs in dev.      | Yes in prod                                 |
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                                                                      | Claude API for the `/admin` orchestration. Set a monthly cap before going live. | Yes for `/admin`                            |
+| Var                                                                                                                         | Purpose                                                                                                                                                                          | Required for the write surface?             |
+| --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`                                                                        | Provisioned via Vercel Marketplace; auto-injected. The store factory also accepts the Vercel-KV-compat aliases `KV_REST_API_URL` / `KV_REST_API_TOKEN`. Falls back to in-memory. | Yes in prod (or `OOK_ALLOW_MEMORY_STORE=1`) |
+| `OOK_AUTH_SESSION_SECRET`                                                                                                   | 32+ byte secret for cookie signing. `openssl rand -hex 32`.                                                                                                                      | Yes                                         |
+| `OOK_AUTH_RP_ID`, `OOK_AUTH_RP_NAME`, `OOK_AUTH_EXPECTED_ORIGIN`, `OOK_AUTH_OWNER_USERNAME`, `OOK_AUTH_SESSION_TTL_SECONDS` | WebAuthn config; sensible defaults from `OOK_SITE_URL`.                                                                                                                          | No                                          |
+| `GITHUB_BOOKS_PAT`, `GITHUB_BOOKS_REPO`, `GITHUB_BOOKS_BRANCH`                                                              | Fine-grained PAT for `commit_patch` writes. Falls back to local-fs in dev.                                                                                                       | Yes in prod                                 |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`                                                                                      | Claude API for the `/admin` orchestration. Set a monthly cap before going live.                                                                                                  | Yes for `/admin`                            |
+| `OOK_BOOKS_WEBHOOK_SECRET`                                                                                                  | Shared secret for HMAC verification on `/api/webhooks/books/reindex`. Same value goes into the GitHub webhook's "Secret" field on `vhata/books`.                                 | Yes for the auto-reindex webhook            |
+
+Operator-only (local; never set on Vercel):
+
+| Var               | Where used                            | Purpose                                                                                                                                                                                                                        |
+| ----------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `HARDCOVER_TOKEN` | `scripts/backfill-series-rosters.mjs` | Bearer token for Hardcover GraphQL. The script is operator-run (`make vault-series-rosters[-apply]`); the result is committed to the vault, so the token never reaches Vercel. Free tier; create at hardcover.app/account/api. |
 
 `.env.example` documents the same set with safe defaults.
 

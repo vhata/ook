@@ -45,3 +45,9 @@ When a new feature, polish item, or design idea surfaces in conversation — whe
 **Why:** Next's automatic file-tracing doesn't see the cloned `.vault/` directory as a code-imported asset, so without an override the cloned vault gets stripped from per-route serverless bundles and routes 500 in production with the local-dev success behind them.
 
 **How to apply:** keep `outputFileTracingIncludes: { "*": ["./.vault/**/*"] }` in `next.config.ts` as a wildcard. Resist the urge to enumerate routes — every new route that reads vault data would silently break, and the symptom (works on dev, dies on Vercel) eats hours.
+
+### External-API enrichment goes through a vault-committed cache, not a build-time fetch
+
+**Why:** the build runs on Vercel, in CI on every push, and at every preview deploy. Adding a build-time API call to Hardcover / Open Library / Wikipedia would couple deploy success to the API's uptime, hit rate-limit caps when many builds run in a window, and require provisioning the API token in Vercel. Operator-initiated cache scripts (run from the laptop, output committed to the books vault) keep the build offline-clean and put the timing of the API spend under human control.
+
+**How to apply:** when you need data from an external API to enrich the renderer, write a `scripts/backfill-<thing>.mjs` that (a) reads its credentials from a local-only env var, (b) writes to a JSON or markdown cache under `_meta/`, (c) defaults to dry-run, (d) is wired into the Makefile. The renderer reads from the cached file at request time. `scripts/backfill-tags.mjs` (Open Library, writes to per-book frontmatter) and `scripts/backfill-series-rosters.mjs` (Hardcover, writes to `_meta/series-rosters.json`) are the worked examples; future external enrichments should match this shape. **Do not** call external APIs from `src/lib/` at request time — even with a per-request cache, you've reintroduced the API as a build/runtime dependency.
