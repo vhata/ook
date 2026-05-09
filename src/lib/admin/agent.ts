@@ -242,7 +242,7 @@ export async function runAgent(opts: {
       const text = JSON.stringify(result, null, 2);
       conversation.push({
         role: "tool",
-        text: `${call.name}(${JSON.stringify(call.input)}) → ${truncate(text, 400)}`,
+        text: `${call.name}(${JSON.stringify(call.input)}) → ${truncate(text, 8000)}`,
       });
       toolResults.push({
         type: "tool_result",
