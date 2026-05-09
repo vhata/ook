@@ -34,10 +34,13 @@ export function parseMarkdownFile(raw: string): ParsedFile {
   // construction (YAML scalars + arrays of strings).
   const data = JSON.parse(JSON.stringify(parsed.data)) as Record<string, unknown>;
 
-  // gray-matter doesn't expose the original frontmatter string
-  // verbatim, but it does give us `parsed.matter` (delimited block)
-  // — wrap it back to round-trip cleanly.
-  const fmRaw = (parsed.matter as string | undefined) ?? "";
+  // gray-matter v4's result has `orig` (the entire input verbatim) and
+  // `content` (everything after the closing delimiter), but no `matter`
+  // property — so we extract the raw frontmatter ourselves with a regex
+  // on the original input. Falls back to empty string if no frontmatter
+  // is present (in which case we'll have nothing useful to preserve and
+  // serialiseMarkdownFile will re-emit via yaml.dump anyway).
+  const fmRaw = extractFrontmatterRaw(raw);
 
   const body = parsed.content;
   const { lead, sections } = splitBodyIntoSections(body);
@@ -48,6 +51,16 @@ export function parseMarkdownFile(raw: string): ParsedFile {
     lead,
     sections,
   };
+}
+
+// Pull the YAML body between the opening `---` and closing `---`
+// delimiters of the input. Captures verbatim — preserves quoting,
+// key ordering, scalar/flow style — so the surgical-edit path can
+// rewrite only the lines it needs to. Returns "" if the input has no
+// frontmatter.
+function extractFrontmatterRaw(input: string): string {
+  const m = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/.exec(input);
+  return m ? m[1] : "";
 }
 
 function splitBodyIntoSections(body: string): { lead: string; sections: Section[] } {
@@ -123,7 +136,7 @@ function serialiseFrontmatter(file: ParsedFile): string {
   });
 }
 
-function serialiseBody(file: ParsedFile): string {
+export function serialiseBody(file: ParsedFile): string {
   const out: string[] = [];
   if (file.lead.length > 0) {
     out.push(file.lead);

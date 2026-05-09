@@ -64,6 +64,102 @@ describe("applyPatch — frontmatter changes", () => {
   });
 });
 
+describe("applyPatch — frontmatter fidelity (surgical edits)", () => {
+  // The earlier impl re-serialised the whole frontmatter on any
+  // change, churning key order / quoting on unrelated keys. The
+  // surgical pass only touches the changed key's line(s).
+
+  const FIDELITY_SAMPLE = `---
+title: "Piranesi"
+authors: [Susanna Clarke]
+status: finished
+finished: 2026-04-12
+rating: 5
+tags: [literary, fantasy]
+goodreads_id: "50202953"
+---
+
+## Synopsis
+
+A man lives in a house of statues.
+`;
+
+  it("changing one key leaves every other key's exact line untouched", () => {
+    const result = applyPatch(FIDELITY_SAMPLE, {
+      frontmatter_changes: { tags: ["literary", "fantasy", "atmospheric"] },
+    });
+    // Every line that was NOT `tags:` must appear verbatim.
+    const before = FIDELITY_SAMPLE.split("\n");
+    const after = result.after.split("\n");
+    for (const line of before) {
+      if (line.startsWith("tags:")) continue;
+      expect(after).toContain(line);
+    }
+  });
+
+  it("preserves unrelated keys' quoting style", () => {
+    const result = applyPatch(FIDELITY_SAMPLE, {
+      frontmatter_changes: { rating: 4 },
+    });
+    // The originally-quoted goodreads_id stays quoted; the
+    // originally-unquoted authors stay unquoted.
+    expect(result.after).toContain('goodreads_id: "50202953"');
+    expect(result.after).toContain("authors: [Susanna Clarke]");
+    expect(result.after).toContain('title: "Piranesi"');
+  });
+
+  it("removing a key only deletes that one line", () => {
+    const result = applyPatch(FIDELITY_SAMPLE, {
+      frontmatter_changes: { goodreads_id: null },
+    });
+    const before = FIDELITY_SAMPLE.split("\n");
+    const after = result.after.split("\n");
+    expect(after).not.toContain('goodreads_id: "50202953"');
+    // Every other line preserved.
+    for (const line of before) {
+      if (line.startsWith("goodreads_id:")) continue;
+      expect(after).toContain(line);
+    }
+  });
+
+  it("converts a block-style array to inline flow when that array is changed", () => {
+    const blockStyleSample = `---
+title: Test
+tags:
+  - scifi
+  - fantasy
+status: tbr
+---
+
+## Body
+`;
+    const result = applyPatch(blockStyleSample, {
+      frontmatter_changes: { tags: ["scifi", "fantasy", "ya"] },
+    });
+    expect(result.after).toContain("tags: [scifi, fantasy, ya]");
+    expect(result.after).not.toContain("- scifi");
+    // Status untouched.
+    expect(result.after).toContain("status: tbr");
+  });
+
+  it("adds a brand-new key adjacent to the existing block", () => {
+    const result = applyPatch(FIDELITY_SAMPLE, {
+      frontmatter_changes: { hardcover_slug: "piranesi" },
+    });
+    expect(result.after).toContain("hardcover_slug: piranesi");
+    // Existing keys still in their original positions.
+    expect(result.after).toContain('title: "Piranesi"');
+    expect(result.after).toContain("rating: 5");
+  });
+
+  it("quotes string values that contain YAML-special characters", () => {
+    const result = applyPatch(FIDELITY_SAMPLE, {
+      frontmatter_changes: { title: "A Title: With Colons" },
+    });
+    expect(result.after).toContain('title: "A Title: With Colons"');
+  });
+});
+
 describe("applyPatch — section changes", () => {
   it("replaces an existing section's content", () => {
     const result = applyPatch(SAMPLE, {
