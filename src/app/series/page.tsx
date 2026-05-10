@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Cover } from "@/components/Cover";
 import { HomeMark } from "@/components/HomeMark";
+import SeriesHashOpener from "@/components/SeriesHashOpener";
 import { getAllSeries } from "@/lib/books";
 import type { RosterMissing, SeriesGroup, SeriesMember } from "@/lib/types";
 
@@ -31,6 +32,7 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
 
   return (
     <main className="mx-auto box-border w-full max-w-[1140px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
+      <SeriesHashOpener />
       <HomeMark />
 
       <header className="border-rule mb-9 border-b pb-6">
