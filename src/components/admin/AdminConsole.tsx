@@ -188,6 +188,13 @@ export default function AdminConsole() {
           </button>
           <div className="flex items-center gap-4">
             <Link
+              href="/admin/backfill"
+              className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase"
+              title="Fill in missing metadata on older finished books"
+            >
+              Backfill →
+            </Link>
+            <Link
               href="/admin/audit"
               className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase"
               title="Recent commits to the books vault"
