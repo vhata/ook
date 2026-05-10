@@ -43,6 +43,7 @@ export default async function StatsYearPage({ params }: { params: Params }) {
       ) : (
         <>
           <Topline stats={stats} />
+          {stats.paceProjection && <PaceProjection stats={stats} />}
           {totalEvents > 0 && <Heatmap activity={activity} totalEvents={totalEvents} />}
           {totalEvents > 0 && <LongestStreak activity={activity} />}
           {totalEvents > 0 && <WeekendSplit activity={activity} />}
@@ -187,6 +188,25 @@ function Topline({ stats }: { stats: YearStats }) {
         </div>
       ))}
     </section>
+  );
+}
+
+function PaceProjection({ stats }: { stats: YearStats }) {
+  // Year-end pace caption. The container guarantees `paceProjection` is
+  // non-null at render time; we re-narrow here for type-safety.
+  const proj = stats.paceProjection;
+  if (!proj) return null;
+  // Day-of-year ≈ (finished / currentRate). Compute a fractional months-in
+  // figure from that so the kicker reads "3 months in" rather than "73
+  // days in" — it's a quieter signal of "how much of the year do we have
+  // to extrapolate from."
+  const dayOfYear = stats.finished / proj.currentRate;
+  const monthsIn = Math.max(1, Math.round(dayOfYear / 30));
+  const monthsLabel = monthsIn === 1 ? "1 month in" : `${monthsIn} months in`;
+  return (
+    <p className="text-ink-soft mt-3 text-[13px] italic">
+      on pace for ~{proj.booksAtCurrentRate} by year-end ({stats.finished} finished, {monthsLabel})
+    </p>
   );
 }
 

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import path from "node:path";
 import {
   bookStuck,
+  computePaceProjection,
   computeReadingPace,
   computeYearPagesTotal,
   estimateReadingDaysRemaining,
@@ -608,6 +609,78 @@ describe("getYearStats", () => {
     expect(stats.averageRating).toBeNull();
     expect(stats.topTags).toEqual([]);
     expect(stats.topAuthors).toEqual([]);
+  });
+});
+
+describe("getYearStats — paceProjection (integration)", () => {
+  // Date is injected via the optional `today` argument on `getYearStats`
+  // rather than `vi.useFakeTimers` — keeps the test self-documenting and
+  // matches the existing pattern in this file (`estimateReadingDaysRemaining`,
+  // `getOnThisDay`, `getSerendipity` all take a `today: Date`).
+
+  it("returns null for a past year, even when the year had finishes", async () => {
+    // Pin `today` to a year clearly after the fixture's 2026 data —
+    // viewed year is unambiguously past, paceProjection must be null.
+    const today = new Date("2028-06-01T12:00:00Z");
+    const stats = await getYearStats(2026, today);
+    expect(stats.paceProjection).toBeNull();
+  });
+
+  it("returns null when the current year has fewer than 3 finishes", async () => {
+    // Treat 2026 as the current year. Fixture has 1 finished book in
+    // 2026 (TestBook) — under the F >= 3 floor.
+    const today = new Date("2026-06-01T12:00:00Z");
+    const stats = await getYearStats(2026, today);
+    expect(stats.finished).toBe(1);
+    expect(stats.paceProjection).toBeNull();
+  });
+
+  it("returns null when the current year is fewer than 30 days in", async () => {
+    // 2026-01-15 → day-of-year 15. Under the 30-day floor.
+    const today = new Date("2026-01-15T12:00:00Z");
+    const stats = await getYearStats(2026, today);
+    expect(stats.paceProjection).toBeNull();
+  });
+});
+
+describe("computePaceProjection (pure)", () => {
+  // Fixture-independent unit tests on the pace math itself — the gating
+  // surface is the same one `getYearStats` calls through.
+
+  it("returns null when the viewed year isn't today's UTC year", () => {
+    expect(computePaceProjection(2024, 12, new Date("2026-04-10T12:00:00Z"))).toBeNull();
+    expect(computePaceProjection(2030, 12, new Date("2026-04-10T12:00:00Z"))).toBeNull();
+  });
+
+  it("returns null with fewer than 3 finishes", () => {
+    expect(computePaceProjection(2026, 0, new Date("2026-04-10T12:00:00Z"))).toBeNull();
+    expect(computePaceProjection(2026, 2, new Date("2026-04-10T12:00:00Z"))).toBeNull();
+  });
+
+  it("returns null when fewer than 30 days into the year", () => {
+    // 2026-01-29 → day-of-year 29.
+    expect(computePaceProjection(2026, 5, new Date("2026-01-29T12:00:00Z"))).toBeNull();
+  });
+
+  it("returns null on the final day of the year (nothing left to project)", () => {
+    // Non-leap 2026: day 365 is Dec 31. The gate is D < Y, so 365 is out.
+    expect(computePaceProjection(2026, 30, new Date("2026-12-31T12:00:00Z"))).toBeNull();
+  });
+
+  it("projects the year-end total when all gates pass", () => {
+    // Day-of-year 100 (2026-04-10), F=3, Y=365.
+    // round((3 / 100) * 365) = round(10.95) = 11.
+    const proj = computePaceProjection(2026, 3, new Date("2026-04-10T12:00:00Z"));
+    expect(proj).not.toBeNull();
+    expect(proj?.booksAtCurrentRate).toBe(11);
+    expect(proj?.currentRate).toBeCloseTo(3 / 100, 8);
+  });
+
+  it("uses 366 days for leap years", () => {
+    // 2028 is a leap year. Day 100 → 2028-04-09 UTC.
+    // F=10, D=100, Y=366 → round(10/100 * 366) = round(36.6) = 37.
+    const proj = computePaceProjection(2028, 10, new Date("2028-04-09T12:00:00Z"));
+    expect(proj?.booksAtCurrentRate).toBe(37);
   });
 });
 

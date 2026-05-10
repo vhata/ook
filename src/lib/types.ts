@@ -141,6 +141,14 @@ export type YearStats = {
   // "from N of M books with page data" so the user knows when the sum
   // under-counts.
   pagesCoverage: { withPages: number; total: number };
+  // End-of-year pace projection, populated only when the viewed year is
+  // the current calendar year, we're at least ~30 days in, and at least
+  // three books have been finished so far. `booksAtCurrentRate` is the
+  // year-end total if today's pace holds (`round(F / D * Y)`);
+  // `currentRate` is the finish rate (books per day-of-year) used to
+  // derive it. Null when any precondition fails — past years, sparse
+  // early-year data, the final day of the year, etc.
+  paceProjection: { booksAtCurrentRate: number; currentRate: number } | null;
 };
 
 export type LongestBook = {

@@ -1678,7 +1678,7 @@ export async function getYearActivity(year: number): Promise<DayActivity[]> {
 // fields — `longestBook` is null and `pagesByMonth` entries stay at 0
 // when coverage is thin, so the renderer can degrade silently rather
 // than fabricate.
-export async function getYearStats(year: number): Promise<YearStats> {
+export async function getYearStats(year: number, today: Date = new Date()): Promise<YearStats> {
   const [books, hardcover] = await Promise.all([getAllBooks(), loadHardcoverBooks()]);
   const inYear = (date: string | null) => date?.startsWith(`${year}-`);
 
@@ -1744,6 +1744,7 @@ export async function getYearStats(year: number): Promise<YearStats> {
   }
 
   const { totalPages, pagesCoverage } = computeYearPagesTotal(finishedThisYear, hardcover);
+  const paceProjection = computePaceProjection(year, finishedThisYear.length, today);
 
   return {
     year,
@@ -1760,6 +1761,7 @@ export async function getYearStats(year: number): Promise<YearStats> {
     pagesByMonth,
     totalPages,
     pagesCoverage,
+    paceProjection,
   };
 }
 
@@ -1789,6 +1791,47 @@ export function computeYearPagesTotal(
     totalPages: withPages === 0 ? null : sum,
     pagesCoverage: { withPages, total: finishedBooks.length },
   };
+}
+
+// End-of-year pace projection. Returns `null` unless ALL gates pass:
+//   - the viewed `year` is today's UTC year (no projecting the past);
+//   - the year still has room left in it (D < Y — skip Dec 31, which is
+//     just the final number with nothing to project);
+//   - at least 3 books finished this year (a single early finish would
+//     project absurdly);
+//   - at least 30 days into the year (day-to-day swings tame after Jan).
+// `booksAtCurrentRate` is `round((F / D) * Y)`, the year-end total if
+// today's pace holds. `currentRate` is books-per-day-of-year (raw
+// finishes / day count), kept on the projection so the renderer can
+// derive secondary captions ("3 months in" etc.) without re-doing the
+// math.
+export function computePaceProjection(
+  year: number,
+  finishedSoFar: number,
+  today: Date,
+): { booksAtCurrentRate: number; currentRate: number } | null {
+  if (year !== today.getUTCFullYear()) return null;
+  const D = dayOfYearUtc(today);
+  const Y = daysInYearUtc(year);
+  if (finishedSoFar < 3 || D < 30 || D >= Y) return null;
+  const currentRate = finishedSoFar / D;
+  return {
+    booksAtCurrentRate: Math.round(currentRate * Y),
+    currentRate,
+  };
+}
+
+// Day-of-year (1..366) for the given Date, in UTC. Jan 1 → 1.
+function dayOfYearUtc(d: Date): number {
+  const yearStart = Date.UTC(d.getUTCFullYear(), 0, 1);
+  const todayUtcMidnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return Math.floor((todayUtcMidnight - yearStart) / 86400000) + 1;
+}
+
+// Days in the given year, accounting for the Gregorian leap rule.
+function daysInYearUtc(year: number): number {
+  const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  return isLeap ? 366 : 365;
 }
 
 // Reading-velocity pace, in pages-per-finish-day, derived from finished
