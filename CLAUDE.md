@@ -65,4 +65,13 @@ The TODO entries in the "Agent prompts at state-change moments" section codify t
 
 **Why:** the build runs on Vercel, in CI on every push, and at every preview deploy. Adding a build-time API call to Hardcover / Open Library / Wikipedia would couple deploy success to the API's uptime, hit rate-limit caps when many builds run in a window, and require provisioning the API token in Vercel. Operator-initiated cache scripts (run from the laptop, output committed to the books vault) keep the build offline-clean and put the timing of the API spend under human control.
 
-**How to apply:** when you need data from an external API to enrich the renderer, write a `scripts/backfill-<thing>.mjs` that (a) reads its credentials from a local-only env var, (b) writes to a JSON or markdown cache under `_meta/`, (c) defaults to dry-run, (d) is wired into the Makefile. The renderer reads from the cached file at request time. `scripts/backfill-tags.mjs` (Open Library, writes to per-book frontmatter) and `scripts/backfill-series-rosters.mjs` (Hardcover, writes to `_meta/series-rosters.json`) are the worked examples; future external enrichments should match this shape. **Do not** call external APIs from `src/lib/` at request time — even with a per-request cache, you've reintroduced the API as a build/runtime dependency.
+**How to apply:** when you need data from an external API to enrich the renderer, write a `scripts/backfill-<thing>.mjs` that (a) reads its credentials from a local-only env var, (b) writes to a JSON or markdown cache under `_meta/`, (c) defaults to dry-run, (d) is wired into the Makefile. The renderer reads from the cached file at request time. Worked examples:
+
+- `scripts/backfill-tags.mjs` (Open Library → per-book frontmatter `tags:`)
+- `scripts/backfill-series-rosters.mjs` (Hardcover → `_meta/series-rosters.json`)
+- `scripts/backfill-hardcover-books.mjs` (Hardcover → `_meta/hardcover-books.json`)
+- `scripts/backfill-hardcover-reviews.mjs` (Hardcover → `_meta/hardcover-reviews.json`)
+- `scripts/sync-hardcover-status.mjs` (vault → Hardcover write-back; idempotency cache at `_meta/hardcover-sync-state.json`)
+- `scripts/backfill-hardcover-ids.mjs` (variant pattern: cache → per-book frontmatter, no network — reads `_meta/hardcover-books.json` and writes `hardcover_slug` / `hardcover_id` into each book's frontmatter)
+
+Future external enrichments should match this shape. **Do not** call external APIs from `src/lib/` at request time — even with a per-request cache, you've reintroduced the API as a build/runtime dependency.

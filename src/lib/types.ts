@@ -170,7 +170,7 @@ export type SeriesGroup = {
   // can prove exist.
   gaps: number[];
   // Members the roster (from `_meta/series-rosters.json`, populated
-  // by `make vault-series-rosters-apply`) knows about but the vault
+  // by `make vault-series-rosters`) knows about but the vault
   // doesn't have a directory for. Includes the title + author from
   // Hardcover so the placeholder reads like a real book row.
   rosterMissing: RosterMissing[];
