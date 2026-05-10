@@ -48,7 +48,7 @@ async function main() {
   if (!cache) {
     process.stderr.write(
       `no Hardcover cache at ${CACHE_FILE}\n` +
-        `run \`make vault-hardcover-books-apply\` first to populate it.\n`,
+        `run \`make vault-hardcover-books\` (and apply when prompted) first to populate it.\n`,
     );
     process.exit(2);
   }

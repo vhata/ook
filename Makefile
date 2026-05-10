@@ -5,15 +5,18 @@
 ## commands".
 ##
 ## Run `make` (no target) for the list.
+##
+## Backfill targets prompt to apply when run interactively (TTY stdin):
+## the script computes its changes, prints the diff, and asks
+## `Apply these N changes? [y/N]`. Non-interactive runs (CI, pipes)
+## exit after the diff with no writes. For non-interactive apply, run
+## the script directly with `--apply` — that path is what the
+## `vault-hygiene` GitHub Actions workflow uses.
 
 .PHONY: help install dev build check format lint typecheck test e2e clean \
-	vault-lint vault-backfill vault-backfill-apply vault-series-rosters \
-	vault-series-rosters-apply vault-hardcover-books vault-hardcover-books-apply \
-	vault-hardcover-reviews vault-hardcover-reviews-apply \
-	vault-hardcover-ids vault-hardcover-ids-apply \
-	vault-import-kindle vault-import-kindle-apply \
-	vault-hardcover-sync vault-hardcover-sync-apply \
-	deploy-status deploy-logs
+	vault-lint vault-backfill vault-series-rosters vault-hardcover-books \
+	vault-hardcover-reviews vault-hardcover-ids vault-import-kindle \
+	vault-hardcover-sync deploy-status deploy-logs
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?##' $(MAKEFILE_LIST) \
@@ -54,7 +57,7 @@ clean: ## Remove build output
 vault-lint: ## Audit vault frontmatter (read-only)
 	node scripts/vault-lint.mjs
 
-vault-backfill: ## Dry-run all vault backfills (source, tags, see_also, plus corpus-derived passes)
+vault-backfill: ## All vault backfills in dependency order — prompts per-script when interactive
 	@echo "→ source"
 	@node scripts/backfill-source.mjs
 	@echo "→ tags (Open Library)"
@@ -68,55 +71,23 @@ vault-backfill: ## Dry-run all vault backfills (source, tags, see_also, plus cor
 	@echo "→ see_also (bidirectional reciprocity)"
 	@node scripts/backfill-see-also-bidirectional.mjs
 
-vault-backfill-apply: ## Apply all vault backfills — writes to the vault
-	@echo "→ source --apply"
-	@node scripts/backfill-source.mjs --apply
-	@echo "→ tags --apply (Open Library)"
-	@node scripts/backfill-tags.mjs --apply
-	@echo "→ tags-from-peers --apply"
-	@node scripts/backfill-tags-from-peers.mjs --apply
-	@echo "→ see_also --apply (series + author)"
-	@node scripts/backfill-see-also.mjs --apply
-	@echo "→ see_also-from-tags --apply"
-	@node scripts/backfill-see-also-from-tags.mjs --apply
-	@echo "→ see_also-bidirectional --apply"
-	@node scripts/backfill-see-also-bidirectional.mjs --apply
-
-vault-series-rosters: ## Dry-run: fetch full series rosters from Hardcover
+vault-series-rosters: ## Fetch full series rosters from Hardcover; write _meta/series-rosters.json
 	@node scripts/backfill-series-rosters.mjs
 
-vault-series-rosters-apply: ## Apply: write _meta/series-rosters.json
-	@node scripts/backfill-series-rosters.mjs --apply
-
-vault-hardcover-books: ## Dry-run: look up every vault book on Hardcover by goodreads_id
+vault-hardcover-books: ## Look up every vault book on Hardcover by goodreads_id; write _meta/hardcover-books.json
 	@node scripts/backfill-hardcover-books.mjs
 
-vault-hardcover-books-apply: ## Apply: write _meta/hardcover-books.json (rating, ratings_count, pages)
-	@node scripts/backfill-hardcover-books.mjs --apply
-
-vault-hardcover-reviews: ## Dry-run: fetch top short Hardcover reviews per book
+vault-hardcover-reviews: ## Fetch top short Hardcover reviews per book; write _meta/hardcover-reviews.json
 	@node scripts/backfill-hardcover-reviews.mjs
 
-vault-hardcover-reviews-apply: ## Apply: write _meta/hardcover-reviews.json (top 3 reviews per book)
-	@node scripts/backfill-hardcover-reviews.mjs --apply
-
-vault-hardcover-ids: ## Dry-run: copy hardcover_slug + hardcover_id from the cache into per-book frontmatter
+vault-hardcover-ids: ## Copy hardcover_slug + hardcover_id from the cache into per-book frontmatter
 	@node scripts/backfill-hardcover-ids.mjs
 
-vault-hardcover-ids-apply: ## Apply: write hardcover_slug + hardcover_id frontmatter from _meta/hardcover-books.json
-	@node scripts/backfill-hardcover-ids.mjs --apply
-
-vault-import-kindle: ## Dry-run: parse a Kindle My Clippings.txt and append matched highlights into per-book quotes.md (FILE=path)
+vault-import-kindle: ## Parse a Kindle My Clippings.txt and append matched highlights into per-book quotes.md (FILE=path)
 	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)")
 
-vault-import-kindle-apply: ## Apply: write quotes.md updates from a Kindle My Clippings.txt (FILE=path)
-	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)") --apply
-
-vault-hardcover-sync: ## Dry-run: push vault status/rating/dates to Hardcover
+vault-hardcover-sync: ## Push vault status/rating/dates to Hardcover via insert_user_book mutations
 	@node scripts/sync-hardcover-status.mjs
-
-vault-hardcover-sync-apply: ## Apply: mutate Hardcover (status, rating, started, finished)
-	@node scripts/sync-hardcover-status.mjs --apply
 
 deploy-status: ## Recent Vercel deploys for this project (status, env, age)
 	@npx -y vercel@latest ls 2>&1 | head -16
