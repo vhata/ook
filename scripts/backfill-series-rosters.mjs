@@ -10,9 +10,10 @@
 // nature — and committed to the books vault. Build is offline-clean;
 // the cache is the data.
 //
-// Auth: requires HARDCOVER_TOKEN in env. Free tier; create a token
-// at https://hardcover.app/account/api after signing up. The token is
-// sent as `Authorization: Bearer <token>`.
+// Auth: requires HARDCOVER_TOKEN in env. Free tier; create a token at
+// https://hardcover.app/account/api after signing up. The value is a
+// JWT (begins `eyJ…`) with hasura-user-role claims; pass the bare
+// token without the `Bearer ` prefix — the script wraps it.
 //
 // Usage:
 //   HARDCOVER_TOKEN=... node scripts/backfill-series-rosters.mjs [--apply]
@@ -26,14 +27,17 @@
 //   --rate-ms MS   request spacing (default 1100ms ≈ 55/min, under Hardcover's 60/min cap)
 //   --debug        print the raw GraphQL response for each series
 //
-// IMPORTANT — this script's GraphQL query was not live-tested by the
-// agent that wrote it (no network access at write time). Run with
-// --series=<one-of-yours> --debug first; if the response shape isn't
-// `data.series[0].series_books[].book.{title,slug,contributions[].author.name}`
-// (the assumed Hasura/Hardcover convention), adjust the query around
-// the marked block in `fetchRoster()` to match what Hardcover actually
-// returns. The transformation logic in `transformRoster()` is the
-// only other thing that depends on the response shape.
+// Schema notes (Hardcover's Hasura, validated 2026-05-09):
+// - `series` has a `book_series` list (NOT `series_books`); each row has
+//   { position: float8, featured: Boolean!, compilation: Boolean!, book: books }.
+// - Hardcover stores translations and alt editions as separate `books`
+//   joined to the same series at the same position. The script filters
+//   `compilation: false` server-side and dedupes by position client-side
+//   (highest `users_count` wins — that's the canonical English edition).
+// - Series-name lookups use `_eq`; `_ilike` is forbidden by Hardcover's
+//   permissions. Multiple records may share a name (duplicate stubs);
+//   the query asks for top-5 by books_count desc and the transform picks
+//   the most-populated one.
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -168,16 +172,18 @@ async function readExistingRosters(file) {
 async function fetchRoster(name) {
   const query = /* GraphQL */ `
     query SeriesByName($name: String!) {
-      series(where: { name: { _ilike: $name } }, limit: 1) {
+      series(where: { name: { _eq: $name } }, order_by: { books_count: desc }, limit: 5) {
         id
         name
         slug
         books_count
-        series_books(order_by: { position: asc }) {
+        book_series(where: { compilation: { _eq: false } }, order_by: { position: asc }) {
           position
+          featured
           book {
             title
             slug
+            users_count
             contributions(limit: 1) {
               author {
                 name
@@ -193,11 +199,13 @@ async function fetchRoster(name) {
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${TOKEN}`,
+      "user-agent": "ook/1.0 (+https://github.com/vhata/ook)",
     },
     body: JSON.stringify({ query, variables: { name } }),
   });
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status} from Hardcover`);
+    const body = await res.text().catch(() => "<no body>");
+    throw new Error(`HTTP ${res.status} from Hardcover — body: ${body}`);
   }
   const json = await res.json();
   if (json.errors) {
@@ -207,16 +215,49 @@ async function fetchRoster(name) {
 }
 
 function transformRoster(raw, queriedName) {
-  const series = raw?.data?.series?.[0];
-  if (!series) return null;
-  const books = (series.series_books ?? []).map((sb) => ({
-    position: sb.position ?? null,
-    title: sb.book?.title ?? null,
-    slug: sb.book?.slug ?? null,
-    authors: (sb.book?.contributions ?? [])
-      .map((c) => c.author?.name)
-      .filter((n) => typeof n === "string"),
-  }));
+  // Hardcover sorts series-name lookups duplicate-first sometimes; when several
+  // records share a name, prefer the one with the most populated book_series
+  // (translations and stubs share names with the canonical Pratchett-grade
+  // entry). Among results from the limit:5 query, pick the one with the most
+  // joined rows; tiebreak with books_count.
+  const candidates = raw?.data?.series ?? [];
+  if (candidates.length === 0) return null;
+  const series = [...candidates].sort((a, b) => {
+    const ar = (a.book_series ?? []).length;
+    const br = (b.book_series ?? []).length;
+    if (ar !== br) return br - ar;
+    return (b.books_count ?? 0) - (a.books_count ?? 0);
+  })[0];
+
+  // Per-position dedupe: Hardcover stores translations and alt editions as
+  // separate book records joined to the same series at the same position
+  // (e.g. position 1 has The Colour of Magic in 13 languages). Group by
+  // position and keep the row whose book has the most users_count — the
+  // canonical English edition has orders of magnitude more readers than its
+  // Slovenian translation. Falls back to first-encountered when users_count
+  // is missing / equal.
+  const byPosition = new Map();
+  for (const bs of series.book_series ?? []) {
+    if (bs.position == null) continue; // can't fill an integer gap without one
+    const pos = bs.position;
+    const incomingReaders = bs.book?.users_count ?? 0;
+    const current = byPosition.get(pos);
+    if (!current || incomingReaders > (current.book?.users_count ?? 0)) {
+      byPosition.set(pos, bs);
+    }
+  }
+
+  const books = [...byPosition.values()]
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((bs) => ({
+      position: bs.position ?? null,
+      title: bs.book?.title ?? null,
+      slug: bs.book?.slug ?? null,
+      authors: (bs.book?.contributions ?? [])
+        .map((c) => c.author?.name)
+        .filter((n) => typeof n === "string"),
+    }));
+
   return {
     queriedName,
     name: series.name ?? queriedName,
