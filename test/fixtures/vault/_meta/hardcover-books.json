@@ -1,0 +1,17 @@
+{
+  "records": {
+    "TestBook": {
+      "goodreadsId": "12345",
+      "hardcoverId": 99,
+      "hardcoverSlug": "test-book",
+      "title": "Test Book",
+      "pages": 320,
+      "rating": 4.07,
+      "ratings_count": 1234,
+      "reviews_count": 56,
+      "users_count": 7000,
+      "users_read_count": 4500,
+      "release_year": 2020
+    }
+  }
+}

@@ -3,6 +3,7 @@ import { Cover } from "@/components/Cover";
 import { foxingFor } from "@/lib/foxing";
 import {
   bookStuck,
+  estimateReadingDaysRemaining,
   getAllBooks,
   getBingo,
   getCurrentBingoYear,
@@ -12,6 +13,7 @@ import {
   getRecentlyFinished,
   getSerendipity,
   getTbr,
+  loadHardcoverBooks,
 } from "@/lib/books";
 import { bingoAt, finishedAt, makeTimeMachine, readingAt } from "@/lib/time-machine";
 import type { BingoCard, BingoSquare, Book, LogEntry, Tbr } from "@/lib/types";
@@ -39,8 +41,12 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   let rotatingQuote: { book: Book; pullquote: NonNullable<Book["pullquote"]> } | null;
   let serendipity: { book: Book; yearsAgo: number } | null;
 
+  // The home page needs the full corpus + Hardcover cache to compute
+  // a reading-pace ETA on Currently-Reading cards. The lens path also
+  // needs the corpus, so load both unconditionally and reuse below.
+  const [all, hardcover] = await Promise.all([getAllBooks(), loadHardcoverBooks()]);
+
   if (lens) {
-    const all = await getAllBooks();
     reading = readingAt(all, lens.at);
     finished = finishedAt(all, lens.at, 6);
     const liveBingo = bingoYear !== null ? await getBingo(bingoYear) : null;
@@ -89,6 +95,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
               book={b}
               bingoYear={bingo?.year ?? null}
               daysIn={daysInForBook(b.started, todayMs)}
+              etaDays={lens ? null : estimateReadingDaysRemaining(b, hardcover, all, today)}
             />
           ))
         )}
@@ -399,10 +406,12 @@ function CurrentCard({
   book,
   bingoYear,
   daysIn,
+  etaDays,
 }: {
   book: Book;
   bingoYear: number | null;
   daysIn: number | null;
+  etaDays: number | null;
 }) {
   return (
     <Link
@@ -433,6 +442,11 @@ function CurrentCard({
               {book.started && (
                 <span className="text-ink-dim ml-2 normal-case">· since {book.started}</span>
               )}
+            </div>
+          )}
+          {etaDays !== null && (
+            <div className="text-ink-soft mt-1.5 font-serif text-[12px] italic">
+              ≈ {etaDays} day{etaDays === 1 ? "" : "s"} at your pace
             </div>
           )}
           {book.lastEdited && (

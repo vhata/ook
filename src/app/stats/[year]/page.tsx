@@ -46,6 +46,9 @@ export default async function StatsYearPage({ params }: { params: Params }) {
           {totalEvents > 0 && <Heatmap activity={activity} totalEvents={totalEvents} />}
           {totalEvents > 0 && <LongestStreak activity={activity} />}
           {totalEvents > 0 && <WeekendSplit activity={activity} />}
+          {stats.pagesByMonth.some((p) => p > 0) && (
+            <PagesPerMonth pagesByMonth={stats.pagesByMonth} />
+          )}
           {stats.rated > 0 && <RatingHistogram stats={stats} />}
           <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-2">
             <TopList
@@ -143,6 +146,14 @@ function Topline({ stats }: { stats: YearStats }) {
       hint: `of ${stats.finished}`,
     });
   }
+  if (stats.longestBook) {
+    const lb = stats.longestBook;
+    items.push({
+      label: "Longest",
+      value: lb.pages.toLocaleString("en-US"),
+      hint: lb.authors.length > 0 ? `${lb.title} · ${lb.authors.join(", ")}` : lb.title,
+    });
+  }
   return (
     <section className="bg-surface border-rule grid grid-cols-2 rounded border sm:grid-cols-3 md:grid-cols-5">
       {items.map((item, i) => (
@@ -160,9 +171,75 @@ function Topline({ stats }: { stats: YearStats }) {
           <div className="font-serif text-ink mb-0.5 text-[22px] leading-none font-medium tracking-[-0.015em] md:text-[28px]">
             {item.value}
           </div>
-          {item.hint && <div className="text-ink-soft text-[11px] md:text-xs">{item.hint}</div>}
+          {item.hint && (
+            <div className="text-ink-soft truncate text-[11px] md:text-xs" title={item.hint}>
+              {item.hint}
+            </div>
+          )}
         </div>
       ))}
+    </section>
+  );
+}
+
+function PagesPerMonth({ pagesByMonth }: { pagesByMonth: number[] }) {
+  // Bar chart of total Hardcover-`pages` finished per calendar month.
+  // Skipped at the call site when the year has zero pages — here we
+  // assume there's at least one non-zero month.
+  const totalPages = pagesByMonth.reduce((s, n) => s + n, 0);
+  const max = Math.max(1, ...pagesByMonth);
+  const monthLabels = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  return (
+    <section className="mt-12">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
+        <h2 className="font-serif text-ink m-0 text-[22px] leading-tight font-medium tracking-[-0.012em]">
+          Pages per month
+        </h2>
+        <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
+          {totalPages.toLocaleString("en-US")} pages total
+        </span>
+      </div>
+      <div className="bg-surface border-rule rounded border p-5">
+        <div className="grid grid-cols-12 items-end gap-2" style={{ height: 120 }}>
+          {pagesByMonth.map((p, i) => {
+            const heightPct = (p / max) * 100;
+            return (
+              <div
+                key={i}
+                className="flex h-full flex-col items-center justify-end"
+                title={`${monthLabels[i]} — ${p.toLocaleString("en-US")} pages`}
+              >
+                <div
+                  className="bg-accent w-full rounded-sm"
+                  style={{
+                    height: p > 0 ? `${Math.max(2, heightPct)}%` : "0",
+                    opacity: p > 0 ? 1 : 0.15,
+                    background: p > 0 ? "var(--accent)" : "var(--surface-mute)",
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+        <div className="text-ink-dim mt-2 grid grid-cols-12 gap-2 text-center text-[10px] tracking-[0.12em] uppercase">
+          {monthLabels.map((m) => (
+            <span key={m}>{m}</span>
+          ))}
+        </div>
+      </div>
     </section>
   );
 }

@@ -15,6 +15,7 @@ import type {
   ExternalLink,
   HardcoverBook,
   LogEntry,
+  LongestBook,
   Pullquote,
   RosterMissing,
   SeriesGroup,
@@ -973,7 +974,7 @@ type HardcoverBookFile = {
   records?: Record<string, Partial<HardcoverBook>>;
 };
 
-const loadHardcoverBooks = cache(async (): Promise<Map<string, HardcoverBook>> => {
+export const loadHardcoverBooks = cache(async (): Promise<Map<string, HardcoverBook>> => {
   const file = path.join(booksDir(), META_DIR, "hardcover-books.json");
   let raw: string;
   try {
@@ -1581,11 +1582,13 @@ export async function getYearActivity(year: number): Promise<DayActivity[]> {
 }
 
 // Aggregate every available stat for one calendar year. Pure derivation
-// from frontmatter — pages-read / longest-book are intentionally absent
-// (no `pages` field in the schema yet, and we don't pull from external
-// APIs without an explicit token).
+// from frontmatter plus the Hardcover-pages cache (`_meta/hardcover-books.json`).
+// Books missing a Hardcover record contribute nothing to the page-derived
+// fields — `longestBook` is null and `pagesByMonth` entries stay at 0
+// when coverage is thin, so the renderer can degrade silently rather
+// than fabricate.
 export async function getYearStats(year: number): Promise<YearStats> {
-  const books = await getAllBooks();
+  const [books, hardcover] = await Promise.all([getAllBooks(), loadHardcoverBooks()]);
   const inYear = (date: string | null) => date?.startsWith(`${year}-`);
 
   const finishedThisYear = books.filter((b) => inYear(b.finished) && b.status === "finished");
@@ -1626,6 +1629,29 @@ export async function getYearStats(year: number): Promise<YearStats> {
     .sort((a, b) => b.count - a.count || a.author.localeCompare(b.author))
     .slice(0, 8);
 
+  // Pages-derived stats. Hardcover cache is keyed by vault slug; books
+  // without a record (or without a `pages` value on it) skip both the
+  // longest-book calculation and the pages-per-month chart.
+  let longestBook: LongestBook | null = null;
+  const pagesByMonth = new Array<number>(12).fill(0);
+  for (const b of finishedThisYear) {
+    const hc = hardcover.get(b.slug);
+    if (!hc || typeof hc.pages !== "number" || hc.pages <= 0) continue;
+    if (longestBook === null || hc.pages > longestBook.pages) {
+      longestBook = {
+        slug: b.slug,
+        title: b.title,
+        authors: b.authors,
+        pages: hc.pages,
+      };
+    }
+    if (b.finished) {
+      // `finished` is `YYYY-MM-DD`; month index = parseInt(MM) - 1.
+      const month = Number(b.finished.slice(5, 7)) - 1;
+      if (month >= 0 && month < 12) pagesByMonth[month] += hc.pages;
+    }
+  }
+
   return {
     year,
     finished: finishedThisYear.length,
@@ -1637,5 +1663,69 @@ export async function getYearStats(year: number): Promise<YearStats> {
     topTags,
     topAuthors,
     wouldReread: finishedThisYear.filter((b) => b.wouldReread === true).length,
+    longestBook,
+    pagesByMonth,
   };
+}
+
+// Reading-velocity pace, in pages-per-finish-day, derived from finished
+// books inside a window. Only books that (a) have a finish date in the
+// window and (b) have a Hardcover `pages` value count. The rate is
+// `total pages / number of distinct days that had a finish`, NOT
+// `total pages / days elapsed in window` — the latter under-counts
+// streaks where multiple finishes happen on the same day or where the
+// reader has weeks without a finish but big bursts when they do. The
+// rule matches how someone actually reads: count the days you actually
+// finished something, not the days that ticked by.
+//
+// Returns null when the window has zero qualifying finishes (no signal).
+export function computeReadingPace(
+  books: Book[],
+  hardcover: Map<string, HardcoverBook>,
+  windowStartMs: number,
+  windowEndMs: number,
+): { pagesPerDay: number; finishedCount: number } | null {
+  let totalPages = 0;
+  const finishDays = new Set<string>();
+  let finishedCount = 0;
+  for (const b of books) {
+    if (b.status !== "finished" || !b.finished) continue;
+    const finishedMs = Date.parse(`${b.finished}T12:00:00Z`);
+    if (!Number.isFinite(finishedMs)) continue;
+    if (finishedMs < windowStartMs || finishedMs > windowEndMs) continue;
+    const hc = hardcover.get(b.slug);
+    if (!hc || typeof hc.pages !== "number" || hc.pages <= 0) continue;
+    totalPages += hc.pages;
+    finishDays.add(b.finished);
+    finishedCount++;
+  }
+  if (finishDays.size === 0 || totalPages === 0) return null;
+  return { pagesPerDay: totalPages / finishDays.size, finishedCount };
+}
+
+// Reading-pace ETA for a currently-reading book. Walks two windows —
+// 3 months first, falling back to 12 months when the 3-month window has
+// zero qualifying finishes — and returns the days-to-finish estimate
+// based on full book length (the public `progress` field is descriptive
+// prose, not a percentage we can subtract from). Null when neither
+// window yields data, or when the book has no Hardcover `pages`.
+//
+// `today` is taken as a parameter so tests don't need to stub Date.now.
+export function estimateReadingDaysRemaining(
+  book: Book,
+  hardcover: Map<string, HardcoverBook>,
+  allBooks: Book[],
+  today: Date = new Date(),
+): number | null {
+  const hc = hardcover.get(book.slug);
+  if (!hc || typeof hc.pages !== "number" || hc.pages <= 0) return null;
+  const todayMs = today.getTime();
+  // Try 3-month window first; fall back to 12-month if empty.
+  const ninetyDaysMs = 90 * 86400000;
+  const threeSixtyFiveMs = 365 * 86400000;
+  const tryWindow = (spanMs: number) =>
+    computeReadingPace(allBooks, hardcover, todayMs - spanMs, todayMs);
+  const pace = tryWindow(ninetyDaysMs) ?? tryWindow(threeSixtyFiveMs);
+  if (!pace || pace.pagesPerDay <= 0) return null;
+  return Math.max(1, Math.round(hc.pages / pace.pagesPerDay));
 }

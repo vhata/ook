@@ -117,6 +117,21 @@ export type YearStats = {
   topTags: TagCount[];
   topAuthors: AuthorCount[];
   wouldReread: number;
+  // Longest finished book in the year by Hardcover-`pages`. Null when no
+  // finished book in the year has a paged record in the Hardcover cache.
+  longestBook: LongestBook | null;
+  // Total pages finished per calendar month of the year, January (index 0)
+  // through December (index 11). Always 12 entries; months with no paged
+  // finishes are 0. Books missing a Hardcover `pages` value contribute
+  // nothing — the chart silently degrades for incomplete cache coverage.
+  pagesByMonth: number[];
+};
+
+export type LongestBook = {
+  slug: string;
+  title: string;
+  authors: string[];
+  pages: number;
 };
 
 export type SeriesMember = {

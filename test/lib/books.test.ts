@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import path from "node:path";
 import {
   bookStuck,
+  computeReadingPace,
+  estimateReadingDaysRemaining,
   externalLinks,
   findBingoYearForBook,
   getBooksByTag,
@@ -28,7 +30,7 @@ import {
   parseSeriesField,
   parseSeriesMemberships,
 } from "../../src/lib/books";
-import type { Book } from "../../src/lib/types";
+import type { Book, HardcoverBook } from "../../src/lib/types";
 
 const FIXTURE_VAULT = path.resolve(__dirname, "..", "fixtures", "vault");
 
@@ -691,5 +693,228 @@ describe("YAML date frontmatter", () => {
     const test = books.find((b) => b.slug === "TestBook");
     expect(test?.started).toBe("2026-01-15");
     expect(test?.finished).toBe("2026-02-20");
+  });
+});
+
+describe("getYearStats — pages-derived fields", () => {
+  it("populates longestBook from the Hardcover cache for paged finishes", async () => {
+    const stats = await getYearStats(2026);
+    // Fixture cache has TestBook: 320 pages. TestBook is the only paged
+    // finish in 2026 → it's the longest.
+    expect(stats.longestBook).toEqual({
+      slug: "TestBook",
+      title: "Test Book",
+      authors: ["Author One", "Author Two"],
+      pages: 320,
+    });
+  });
+
+  it("buckets pages into the finish month", async () => {
+    const stats = await getYearStats(2026);
+    // TestBook finished 2026-02-20 → month index 1 (Feb).
+    expect(stats.pagesByMonth).toHaveLength(12);
+    expect(stats.pagesByMonth[1]).toBe(320);
+    // Every other month is zero.
+    expect(stats.pagesByMonth.filter((p) => p > 0)).toEqual([320]);
+  });
+
+  it("returns null/zero when the year has no finished books", async () => {
+    const stats = await getYearStats(1999);
+    expect(stats.longestBook).toBeNull();
+    expect(stats.pagesByMonth).toEqual(new Array(12).fill(0));
+  });
+});
+
+describe("computeReadingPace", () => {
+  function makeBook(overrides: Partial<Book> = {}): Book {
+    return {
+      slug: "x",
+      title: "x",
+      authors: [],
+      series: null,
+      status: "finished",
+      progress: "",
+      started: null,
+      finished: null,
+      rating: null,
+      wouldReread: null,
+      bingoSquares: [],
+      tags: [],
+      cover: null,
+      pullquote: null,
+      seeAlso: [],
+      lastEdited: null,
+      hasReview: false,
+      hasQuotes: false,
+      hasSummary: false,
+      goodreadsId: null,
+      hardcoverSlug: null,
+      storygraphSlug: null,
+      bookwyrmUrl: null,
+      source: null,
+      ...overrides,
+    };
+  }
+  function makeHc(slug: string, pages: number | null): HardcoverBook {
+    return {
+      goodreadsId: "0",
+      hardcoverId: null,
+      hardcoverSlug: null,
+      title: null,
+      pages,
+      rating: null,
+      ratings_count: 0,
+      reviews_count: 0,
+      users_count: 0,
+      users_read_count: 0,
+      release_year: null,
+    } as HardcoverBook & { _slug?: string } & { slug?: typeof slug };
+  }
+
+  const windowEnd = Date.parse("2026-06-01T12:00:00Z");
+  const windowStart = windowEnd - 90 * 86400000;
+
+  it("returns null when no finishes have paged Hardcover records in the window", () => {
+    const books = [makeBook({ slug: "a", finished: "2026-04-01" })];
+    const hc = new Map<string, HardcoverBook>(); // empty
+    expect(computeReadingPace(books, hc, windowStart, windowEnd)).toBeNull();
+  });
+
+  it("ignores books outside the window", () => {
+    // Finish well outside the 90-day window.
+    const books = [makeBook({ slug: "a", finished: "2025-01-01" })];
+    const hc = new Map<string, HardcoverBook>([["a", makeHc("a", 300)]]);
+    expect(computeReadingPace(books, hc, windowStart, windowEnd)).toBeNull();
+  });
+
+  it("returns total pages divided by distinct finish days, not days elapsed", () => {
+    // Three books, finished on two distinct days inside the window.
+    // Total pages = 300 + 400 + 500 = 1200. Distinct days = 2.
+    // Pace = 1200 / 2 = 600.
+    const books = [
+      makeBook({ slug: "a", finished: "2026-04-10" }),
+      makeBook({ slug: "b", finished: "2026-04-10" }),
+      makeBook({ slug: "c", finished: "2026-05-01" }),
+    ];
+    const hc = new Map<string, HardcoverBook>([
+      ["a", makeHc("a", 300)],
+      ["b", makeHc("b", 400)],
+      ["c", makeHc("c", 500)],
+    ]);
+    const pace = computeReadingPace(books, hc, windowStart, windowEnd);
+    expect(pace).not.toBeNull();
+    expect(pace?.pagesPerDay).toBe(600);
+    expect(pace?.finishedCount).toBe(3);
+  });
+
+  it("skips books with null or zero pages", () => {
+    const books = [
+      makeBook({ slug: "a", finished: "2026-04-10" }),
+      makeBook({ slug: "b", finished: "2026-04-15" }),
+    ];
+    const hc = new Map<string, HardcoverBook>([
+      ["a", makeHc("a", null)],
+      ["b", makeHc("b", 250)],
+    ]);
+    const pace = computeReadingPace(books, hc, windowStart, windowEnd);
+    expect(pace?.pagesPerDay).toBe(250);
+    expect(pace?.finishedCount).toBe(1);
+  });
+});
+
+describe("estimateReadingDaysRemaining", () => {
+  function makeBook(overrides: Partial<Book> = {}): Book {
+    return {
+      slug: "current",
+      title: "x",
+      authors: [],
+      series: null,
+      status: "reading",
+      progress: "",
+      started: null,
+      finished: null,
+      rating: null,
+      wouldReread: null,
+      bingoSquares: [],
+      tags: [],
+      cover: null,
+      pullquote: null,
+      seeAlso: [],
+      lastEdited: null,
+      hasReview: false,
+      hasQuotes: false,
+      hasSummary: false,
+      goodreadsId: null,
+      hardcoverSlug: null,
+      storygraphSlug: null,
+      bookwyrmUrl: null,
+      source: null,
+      ...overrides,
+    };
+  }
+  function makeHc(pages: number | null): HardcoverBook {
+    return {
+      goodreadsId: "0",
+      hardcoverId: null,
+      hardcoverSlug: null,
+      title: null,
+      pages,
+      rating: null,
+      ratings_count: 0,
+      reviews_count: 0,
+      users_count: 0,
+      users_read_count: 0,
+      release_year: null,
+    };
+  }
+
+  it("returns null when the current book has no Hardcover pages", () => {
+    const today = new Date("2026-06-01T12:00:00Z");
+    const current = makeBook({ slug: "current" });
+    const hc = new Map<string, HardcoverBook>([["other", makeHc(300)]]);
+    expect(estimateReadingDaysRemaining(current, hc, [], today)).toBeNull();
+  });
+
+  it("falls back to the 12-month window when the 3-month window is empty", () => {
+    const today = new Date("2026-06-01T12:00:00Z");
+    const current = makeBook({ slug: "current" });
+    // One finish 6 months ago — outside the 90-day window, inside the 365-day.
+    const finishedSixMonthsAgo = makeBook({
+      slug: "long-finish",
+      status: "finished",
+      finished: "2026-01-05",
+    });
+    const hc = new Map<string, HardcoverBook>([
+      ["current", makeHc(300)],
+      ["long-finish", makeHc(300)],
+    ]);
+    const eta = estimateReadingDaysRemaining(current, hc, [finishedSixMonthsAgo], today);
+    // 300 pages remaining / 300 pages-per-day pace (one finish on one day) = 1 day.
+    expect(eta).toBe(1);
+  });
+
+  it("rounds the ETA to the nearest whole day with a 1-day floor", () => {
+    const today = new Date("2026-06-01T12:00:00Z");
+    const current = makeBook({ slug: "current" });
+    // Pace = 60 pages/day (one 60-page finish on one day inside the 3-month window).
+    const recent = makeBook({
+      slug: "recent",
+      status: "finished",
+      finished: "2026-05-20",
+    });
+    const hc = new Map<string, HardcoverBook>([
+      ["current", makeHc(300)],
+      ["recent", makeHc(60)],
+    ]);
+    const eta = estimateReadingDaysRemaining(current, hc, [recent], today);
+    // 300 / 60 = 5 days exactly.
+    expect(eta).toBe(5);
+  });
+
+  it("returns null when no finished books with pages exist in either window", () => {
+    const today = new Date("2026-06-01T12:00:00Z");
+    const current = makeBook({ slug: "current" });
+    const hc = new Map<string, HardcoverBook>([["current", makeHc(300)]]);
+    expect(estimateReadingDaysRemaining(current, hc, [], today)).toBeNull();
   });
 });
