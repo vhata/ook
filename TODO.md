@@ -175,10 +175,6 @@ The unfiltered drawer. Strike most. Keep one.
 - **ePub export of your reviews**: your own book, of you, by you, about you reading. `#wild #epub #archive`
 - **Bookcrossing log**: track physical lending — "this copy is currently with Sarah." `#wild #lending`
 
-### Write surface — fidelity and polish (post-MCP-merge)
-
-- **`commitPatch` should tag its commits** so `/admin/audit` (and any future audit consumer) can distinguish "via the admin agent" from "direct push to vhata/books". Today every vault commit looks the same on the wire — `commitPatch` passes the agent-supplied `commit_message` straight to `client.commitFile({ message })` with no structural marker. Cleanest add: a stable suffix or trailer the renderer can match on, e.g. append `\n\nvia ook-admin/<short-sha-of-session>` to every `commit_message` in `src/lib/mcp/patch.ts` (and the sister tools in `bingo-tools.ts`, `extra-tools.ts`). `/admin/audit` then tags those rows with a small "via /admin" chip. Keep the user-supplied body intact — the trailer rides at the end. `#admin #mcp #audit-log`
-
 ### Tooling & vault hygiene (brainstormed 2026-05-03)
 
 - **Open Library tags backfill stays operator-initiated.** The webhook-driven vault-hygiene workflow (`.github/workflows/vault-hygiene.yml`, shipped) deliberately skips `scripts/backfill-tags.mjs` because Open Library is rate-limited and the script can take minutes per run. Tags-from-peers (corpus-only, fast) IS in the auto-applied set. The user still has to remember to `make vault-backfill-apply` periodically (or run `node scripts/backfill-tags.mjs --apply`) to refresh Open Library tag suggestions. Could be revisited if Open Library latency improves or if a separate workflow with a longer timeout is wanted. `#tooling #vault #tags #operator-initiated`

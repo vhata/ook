@@ -10,6 +10,7 @@ import {
   type SectionChange,
 } from "./patch";
 import { bookPaths, FILE_BACKED_SECTIONS, fileBackedPath, isFileBackedSection } from "./book-paths";
+import { withTrailer } from "./trailer";
 
 // get_book + commit_patch — the read-then-write pair that does the
 // actual vault mutation. Read goes through the store for speed;
@@ -163,11 +164,15 @@ export async function commitPatch(input: CommitPatchInput): Promise<CommitPatchO
   // is forwards-safe: a partial failure leaves the user in a state
   // where they can retry.
   const commits: CommitPatchOutput["commits"] = [];
+  // Stamp the trailer once per commit_patch call so all files written
+  // for the same patch share a session id (and the surrogate-message
+  // value matches across the split commits).
+  const message = withTrailer(input.commit_message);
   if (patched.changedFrontmatter.length > 0 || patched.changedSections.length > 0) {
     const r = await client.commitFile({
       filePath: paths.reference,
       content: patched.after,
-      message: input.commit_message,
+      message,
       sha: refFile.sha,
     });
     commits.push({ path: paths.reference, sha: r.sha, url: r.url });
@@ -176,7 +181,7 @@ export async function commitPatch(input: CommitPatchInput): Promise<CommitPatchO
     const r = await client.commitFile({
       filePath: w.path,
       content: w.content,
-      message: input.commit_message,
+      message,
       sha: w.sha,
     });
     commits.push({ path: w.path, sha: r.sha, url: r.url });

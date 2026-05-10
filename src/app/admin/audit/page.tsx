@@ -76,9 +76,19 @@ export default async function AdminAuditPage() {
                       {relativeTime(c.isoDate)}
                     </span>
                   </div>
-                  <span className="border-rule text-ink-soft rounded border px-2 py-0.5 text-[10px] tracking-[0.08em] uppercase">
-                    {c.filesChanged} {c.filesChanged === 1 ? "file" : "files"}
-                  </span>
+                  <div className="flex items-baseline gap-2">
+                    {c.viaAdmin ? (
+                      <span
+                        className="border-rule text-ink-soft rounded-full border px-2 py-0.5 text-[10px] tracking-[0.16em] uppercase"
+                        title={`MCP session ${c.viaAdmin.sessionId}`}
+                      >
+                        via MCP
+                      </span>
+                    ) : null}
+                    <span className="border-rule text-ink-soft rounded border px-2 py-0.5 text-[10px] tracking-[0.08em] uppercase">
+                      {c.filesChanged} {c.filesChanged === 1 ? "file" : "files"}
+                    </span>
+                  </div>
                 </div>
                 <div className="font-serif mt-2 text-[17px] leading-[1.4]">
                   {url ? (

@@ -3,6 +3,7 @@ import yaml from "js-yaml";
 import { getVaultClient } from "../github";
 import { getStore, keys } from "../store";
 import { bookPaths } from "./book-paths";
+import { withTrailer } from "./trailer";
 
 // Optional v1 tools — the deferred-but-likely surfaces from the spec.
 // Added as separate tool functions so the agent can adopt them
@@ -76,7 +77,7 @@ export async function createBook(input: CreateBookInput): Promise<CreateBookResu
   const result = await client.commitFile({
     filePath: paths.reference,
     content,
-    message: validated.commit_message,
+    message: withTrailer(validated.commit_message),
     sha: null,
   });
 
@@ -167,7 +168,7 @@ export async function appendLogEntry(input: AppendLogEntryInput): Promise<Append
   const result = await client.commitFile({
     filePath,
     content: newContent,
-    message: validated.commit_message,
+    message: withTrailer(validated.commit_message),
     sha: existing?.sha ?? null,
   });
 

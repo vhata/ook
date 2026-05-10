@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getVaultClient } from "../github";
 import { getStore, keys } from "../store";
 import type { BingoCard } from "../types";
+import { withTrailer } from "./trailer";
 
 // bind_book_to_bingo_square — set or clear the `book:` field for a
 // named square in `_meta/bingo-<year>.md`. The renderer derives
@@ -82,7 +83,7 @@ export async function bindBookToBingoSquare(input: {
   const result = await client.commitFile({
     filePath,
     content: newContent,
-    message: input.commit_message,
+    message: withTrailer(input.commit_message),
     sha: file.sha,
   });
 
