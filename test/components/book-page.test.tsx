@@ -45,6 +45,7 @@ const baseBook: Book = {
   storygraphSlug: null,
   bookwyrmUrl: null,
   source: "manual",
+  hideExternalReviews: false,
 };
 
 vi.mock("../../src/lib/books", async () => {
@@ -60,6 +61,7 @@ vi.mock("../../src/lib/books", async () => {
             review: "## Notes\n\nA wonderful book.",
             quotes: "> A quote.",
             hardcover: null,
+            hardcoverReviews: null,
           }
         : null,
     findBingoYearForBook: async () => null,
@@ -124,7 +126,14 @@ describe("BookPage server component", { timeout: 15000 }, () => {
     const original = lib.getBookBySlug;
     (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
       slug === "piranesi"
-        ? { book: multiSeriesBook, body: "", review: null, quotes: null, hardcover: null }
+        ? {
+            book: multiSeriesBook,
+            body: "",
+            review: null,
+            quotes: null,
+            hardcover: null,
+            hardcoverReviews: null,
+          }
         : null;
 
     try {
@@ -138,6 +147,74 @@ describe("BookPage server component", { timeout: 15000 }, () => {
       expect(text).toContain("Discworld #32");
       expect(text).toContain("Tiffany Aching #2");
       expect(text).not.toContain("Discworld, #32; Tiffany Aching #2");
+    } finally {
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
+    }
+  });
+
+  it("renders the 'What others said' disclosure when hardcoverReviews is non-empty", async () => {
+    const lib = await import("../../src/lib/books");
+    const original = lib.getBookBySlug;
+    (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
+      slug === "piranesi"
+        ? {
+            book: baseBook,
+            body: "",
+            review: null,
+            quotes: null,
+            hardcover: null,
+            hardcoverReviews: [
+              {
+                id: "abc",
+                body: "Quote-worthy and short, a clean snippet to surface under the disclosure.",
+                rating: 4,
+                username: "alice",
+                likes: 7,
+                createdAt: "2024-01-01T00:00:00",
+              },
+            ],
+          }
+        : null;
+
+    try {
+      const BookPage = await importPage();
+      const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      render(tree);
+      expect(screen.getByRole("button", { name: /what others said/i })).toBeTruthy();
+    } finally {
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
+    }
+  });
+
+  it("hides 'What others said' when book.hideExternalReviews is true", async () => {
+    const lib = await import("../../src/lib/books");
+    const original = lib.getBookBySlug;
+    (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
+      slug === "piranesi"
+        ? {
+            book: { ...baseBook, hideExternalReviews: true },
+            body: "",
+            review: null,
+            quotes: null,
+            hardcover: null,
+            hardcoverReviews: [
+              {
+                id: "abc",
+                body: "A review long enough to clear the body filter on length.",
+                rating: 4,
+                username: "alice",
+                likes: 7,
+                createdAt: "2024-01-01T00:00:00",
+              },
+            ],
+          }
+        : null;
+
+    try {
+      const BookPage = await importPage();
+      const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      render(tree);
+      expect(screen.queryByRole("button", { name: /what others said/i })).toBeNull();
     } finally {
       (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
     }

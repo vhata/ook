@@ -100,6 +100,7 @@ async function main() {
         data.source === "goodreads" || data.source === "media-list" || data.source === "manual"
           ? data.source
           : null,
+      hideExternalReviews: data.hide_external_reviews === true,
     });
   }
 

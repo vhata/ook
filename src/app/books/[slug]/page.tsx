@@ -20,7 +20,13 @@ import {
   parseSeriesMemberships,
 } from "@/lib/books";
 import { remarkSpoilerDirective, slugify } from "@/lib/markdown";
-import type { Book, Connection, ConnectionReason, HardcoverBook } from "@/lib/types";
+import type {
+  Book,
+  Connection,
+  ConnectionReason,
+  HardcoverBook,
+  HardcoverReview,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +50,7 @@ export default async function BookPage({ params }: { params: Params }) {
 
   if (!page) notFound();
 
-  const { book, review, quotes, hardcover } = page;
+  const { book, review, quotes, hardcover, hardcoverReviews } = page;
 
   const [allBooks, bingoYear, similar] = await Promise.all([
     getAllBooks(),
@@ -90,6 +96,16 @@ export default async function BookPage({ params }: { params: Params }) {
               expandedTitle="Quotes"
             >
               <Markdown source={quotes} marginalia />
+            </RevealSection>
+          )}
+
+          {hardcoverReviews && hardcoverReviews.length > 0 && !book.hideExternalReviews && (
+            <RevealSection
+              storageKey={`hardcover-reviews-revealed:${book.slug}`}
+              buttonLabel="What others said"
+              expandedTitle="What others said"
+            >
+              <ExternalReviews reviews={hardcoverReviews} />
             </RevealSection>
           )}
 
@@ -405,6 +421,38 @@ function Pullquote({ text, source }: { text: string; source: string | null }) {
         </figcaption>
       )}
     </figure>
+  );
+}
+
+function ExternalReviews({ reviews }: { reviews: HardcoverReview[] }) {
+  return (
+    <div className="font-serif text-ink max-w-[680px] text-[16px] leading-[1.65]">
+      <ul className="m-0 list-none space-y-6 p-0">
+        {reviews.map((r) => (
+          <li key={r.id} className="border-rule border-l-2 pl-4">
+            <blockquote className="m-0 italic">&ldquo;{r.body}&rdquo;</blockquote>
+            <div className="text-ink-soft mt-2 flex flex-wrap items-center gap-2 text-[12px] not-italic">
+              {r.rating !== null && (
+                <span className="text-star" aria-label={`${r.rating} of 5 stars`}>
+                  {"★".repeat(Math.floor(r.rating))}
+                  {r.rating % 1 >= 0.5 ? "½" : ""}
+                </span>
+              )}
+              {r.username && <span>@{r.username}</span>}
+              {r.likes > 0 && (
+                <>
+                  <span className="text-ink-dim">·</span>
+                  <span>{r.likes} helpful</span>
+                </>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <p className="text-ink-soft mt-6 text-[11px] tracking-[0.08em] uppercase italic">
+        From Hardcover
+      </p>
+    </div>
   );
 }
 

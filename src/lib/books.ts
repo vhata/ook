@@ -14,6 +14,7 @@ import type {
   DayActivity,
   ExternalLink,
   HardcoverBook,
+  HardcoverReview,
   LogEntry,
   LongestBook,
   Pullquote,
@@ -185,6 +186,7 @@ async function readBookDir(slug: string): Promise<Book | null> {
     storygraphSlug: parseNullableString(data.storygraph_slug),
     bookwyrmUrl: parseNullableString(data.bookwyrm_url),
     source: parseSource(data.source),
+    hideExternalReviews: data.hide_external_reviews === true,
   };
 }
 
@@ -387,6 +389,7 @@ export type BookPage = {
   review: string | null;
   quotes: string | null;
   hardcover: HardcoverBook | null;
+  hardcoverReviews: HardcoverReview[] | null;
 };
 
 export async function getBookBySlug(slug: string): Promise<BookPage | null> {
@@ -403,10 +406,11 @@ export async function getBookBySlug(slug: string): Promise<BookPage | null> {
   const raw = await fs.readFile(refFile, "utf8");
   const { content } = matter(raw);
 
-  const [review, quotes, hardcoverBooks] = await Promise.all([
+  const [review, quotes, hardcoverBooks, hardcoverReviews] = await Promise.all([
     readOptionalFile(path.join(dir, "review.md")),
     readOptionalFile(path.join(dir, "quotes.md")),
     loadHardcoverBooks(),
+    loadHardcoverReviews(),
   ]);
 
   return {
@@ -415,6 +419,7 @@ export async function getBookBySlug(slug: string): Promise<BookPage | null> {
     review,
     quotes,
     hardcover: hardcoverBooks.get(slug) ?? null,
+    hardcoverReviews: hardcoverReviews.get(slug) ?? null,
   };
 }
 
@@ -973,6 +978,54 @@ const loadSeriesRosters = cache(
 type HardcoverBookFile = {
   records?: Record<string, Partial<HardcoverBook>>;
 };
+
+// Per-book Hardcover reviews cached at `<vault>/_meta/hardcover-reviews.json`.
+// Populated by `scripts/backfill-hardcover-reviews.mjs`. Map keyed by vault
+// slug; the entry value is the array of cached `HardcoverReview` records
+// (already quality-filtered at fetch time). React `cache()` so the read
+// happens once per request.
+type HardcoverReviewsFile = {
+  records?: Record<
+    string,
+    {
+      hardcoverId?: number | null;
+      reviews?: Array<Partial<HardcoverReview>>;
+    }
+  >;
+};
+
+export const loadHardcoverReviews = cache(async (): Promise<Map<string, HardcoverReview[]>> => {
+  const file = path.join(booksDir(), META_DIR, "hardcover-reviews.json");
+  let raw: string;
+  try {
+    raw = await fs.readFile(file, "utf8");
+  } catch {
+    return new Map();
+  }
+  let parsed: HardcoverReviewsFile;
+  try {
+    parsed = JSON.parse(raw) as HardcoverReviewsFile;
+  } catch {
+    return new Map();
+  }
+  const out = new Map<string, HardcoverReview[]>();
+  for (const [slug, entry] of Object.entries(parsed.records ?? {})) {
+    if (!entry || typeof entry !== "object") continue;
+    const reviews = (entry.reviews ?? [])
+      .filter((r): r is Partial<HardcoverReview> => !!r && typeof r === "object")
+      .map((r) => ({
+        id: typeof r.id === "string" ? r.id : "",
+        body: typeof r.body === "string" ? r.body : "",
+        rating: typeof r.rating === "number" ? r.rating : null,
+        username: typeof r.username === "string" ? r.username : null,
+        likes: typeof r.likes === "number" ? r.likes : 0,
+        createdAt: typeof r.createdAt === "string" ? r.createdAt : null,
+      }))
+      .filter((r) => r.body.length > 0);
+    if (reviews.length > 0) out.set(slug, reviews);
+  }
+  return out;
+});
 
 export const loadHardcoverBooks = cache(async (): Promise<Map<string, HardcoverBook>> => {
   const file = path.join(booksDir(), META_DIR, "hardcover-books.json");

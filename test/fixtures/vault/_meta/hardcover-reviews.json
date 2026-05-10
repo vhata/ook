@@ -1,0 +1,27 @@
+{
+  "updated": "2026-05-09T00:00:00Z",
+  "generator": "scripts/backfill-hardcover-reviews.mjs",
+  "records": {
+    "TestBook": {
+      "hardcoverId": 99,
+      "reviews": [
+        {
+          "id": "r1",
+          "body": "A short, quote-worthy review of the test book that comfortably clears the eighty-character minimum.",
+          "rating": 4,
+          "username": "alice",
+          "likes": 12,
+          "createdAt": "2024-06-01T00:00:00"
+        },
+        {
+          "id": "r2",
+          "body": "A second-string review, also quote-worthy, with enough body text to pass the length floor we apply.",
+          "rating": 5,
+          "username": "bob",
+          "likes": 4,
+          "createdAt": "2024-08-15T00:00:00"
+        }
+      ]
+    }
+  }
+}

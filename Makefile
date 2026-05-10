@@ -9,6 +9,7 @@
 .PHONY: help install dev build check format lint typecheck test e2e clean \
 	vault-lint vault-backfill vault-backfill-apply vault-series-rosters \
 	vault-series-rosters-apply vault-hardcover-books vault-hardcover-books-apply \
+	vault-hardcover-reviews vault-hardcover-reviews-apply \
 	vault-import-kindle vault-import-kindle-apply \
 	vault-hardcover-sync vault-hardcover-sync-apply \
 	deploy-status deploy-logs
@@ -91,6 +92,12 @@ vault-hardcover-books: ## Dry-run: look up every vault book on Hardcover by good
 
 vault-hardcover-books-apply: ## Apply: write _meta/hardcover-books.json (rating, ratings_count, pages)
 	@node scripts/backfill-hardcover-books.mjs --apply
+
+vault-hardcover-reviews: ## Dry-run: fetch top short Hardcover reviews per book
+	@node scripts/backfill-hardcover-reviews.mjs
+
+vault-hardcover-reviews-apply: ## Apply: write _meta/hardcover-reviews.json (top 3 reviews per book)
+	@node scripts/backfill-hardcover-reviews.mjs --apply
 
 vault-import-kindle: ## Dry-run: parse a Kindle My Clippings.txt and append matched highlights into per-book quotes.md (FILE=path)
 	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)")

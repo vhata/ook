@@ -27,6 +27,7 @@ import {
   getYearActivity,
   getYearStats,
   computeIndexGaps,
+  loadHardcoverReviews,
   parseSeriesField,
   parseSeriesMemberships,
 } from "../../src/lib/books";
@@ -117,6 +118,30 @@ describe("getBookBySlug", () => {
   it("returns null for unknown slugs", async () => {
     const page = await getBookBySlug("DoesNotExist");
     expect(page).toBeNull();
+  });
+
+  it("populates hardcoverReviews from the cached _meta/hardcover-reviews.json", async () => {
+    const page = await getBookBySlug("TestBook");
+    expect(page?.hardcoverReviews).not.toBeNull();
+    expect(page?.hardcoverReviews?.length).toBe(2);
+    expect(page?.hardcoverReviews?.[0].username).toBe("alice");
+    expect(page?.hardcoverReviews?.[0].rating).toBe(4);
+    expect(page?.hardcoverReviews?.[0].likes).toBe(12);
+  });
+
+  it("returns null hardcoverReviews when the cache has no entry for the slug", async () => {
+    const page = await getBookBySlug("PrivateBook");
+    expect(page?.hardcoverReviews).toBeNull();
+  });
+});
+
+describe("loadHardcoverReviews", () => {
+  it("reads and types the cache, dropping empty-bodied entries", async () => {
+    const map = await loadHardcoverReviews();
+    const reviews = map.get("TestBook");
+    expect(reviews).toBeDefined();
+    expect(reviews?.length).toBe(2);
+    expect(reviews?.every((r) => r.body.length > 0)).toBe(true);
   });
 });
 
@@ -298,6 +323,7 @@ describe("externalLinks", () => {
       storygraphSlug: null,
       bookwyrmUrl: null,
       source: null,
+      hideExternalReviews: false,
       ...overrides,
     };
   }
@@ -359,6 +385,7 @@ describe("bookStuck", () => {
       storygraphSlug: null,
       bookwyrmUrl: null,
       source: null,
+      hideExternalReviews: false,
       ...overrides,
     };
   }
@@ -752,6 +779,7 @@ describe("computeReadingPace", () => {
       storygraphSlug: null,
       bookwyrmUrl: null,
       source: null,
+      hideExternalReviews: false,
       ...overrides,
     };
   }
@@ -849,6 +877,7 @@ describe("estimateReadingDaysRemaining", () => {
       storygraphSlug: null,
       bookwyrmUrl: null,
       source: null,
+      hideExternalReviews: false,
       ...overrides,
     };
   }

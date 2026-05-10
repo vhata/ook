@@ -268,6 +268,7 @@ function defaultBook(slug: string): Book {
     storygraphSlug: null,
     bookwyrmUrl: null,
     source: null,
+    hideExternalReviews: false,
   };
 }
 

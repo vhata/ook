@@ -34,6 +34,11 @@ export type Book = {
   // attached). "media-list" — word-of-mouth recommendation. "manual"
   // — hand-built. Null means the field hasn't been backfilled yet.
   source: BookSource | null;
+  // Per-book opt-out for the "What others said" Hardcover-reviews
+  // disclosure on the per-book page. Set `hide_external_reviews: true`
+  // in the book's YAML frontmatter to suppress the section even when
+  // the cache has qualifying reviews. Defaults to false.
+  hideExternalReviews: boolean;
 };
 
 export type BookSource = "goodreads" | "media-list" | "manual";
@@ -198,6 +203,20 @@ export type HardcoverBook = {
   users_count: number;
   users_read_count: number;
   release_year: number | null;
+};
+
+// One short, public Hardcover review surfaced on a per-book page under
+// the "What others said" disclosure. Cached by
+// `scripts/backfill-hardcover-reviews.mjs` at `_meta/hardcover-reviews.json`.
+// Quality-filtered at fetch time (rating ≥ 3, body 80..600 chars,
+// non-spoiler) and capped at the top 3 by likes_count.
+export type HardcoverReview = {
+  id: string;
+  body: string;
+  rating: number | null;
+  username: string | null;
+  likes: number;
+  createdAt: string | null;
 };
 
 // One book may belong to multiple series — Discworld is the canonical

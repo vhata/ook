@@ -28,6 +28,7 @@ function book(overrides: Partial<Book> = {}): Book {
     storygraphSlug: null,
     bookwyrmUrl: null,
     source: null,
+    hideExternalReviews: false,
     ...overrides,
   };
 }
