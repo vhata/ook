@@ -14,15 +14,24 @@ name: vault-hygiene
 # additionally short-circuits when the head commit message starts with
 # `Auto-hygiene:`, so the cheapest path is to never re-enter at all.
 #
-# Required secret: `GH_BOOKS_PAT` — a fine-grained PAT with
-# `contents: read+write` on `vhata/books`. The existing
-# `GITHUB_BOOKS_PAT` used by the `/admin` write surface has the same
-# permissions; the operator can either provision a separate secret of
-# the same shape or reuse the existing PAT under a new repo-secret name.
+# Required secrets:
+#   - `GH_BOOKS_PAT` — fine-grained PAT with `contents: read+write` on
+#     `vhata/books`. The existing `GITHUB_BOOKS_PAT` used by the
+#     `/admin` write surface has the same permissions; the operator
+#     can either provision a separate secret of the same shape or
+#     reuse the existing PAT under a new repo-secret name.
+#   - `HARDCOVER_TOKEN` (optional) — Hardcover GraphQL JWT, same value
+#     the operator uses locally in `.env.local`. When set, the sync
+#     step pushes vault status/rating/dates up to Hardcover after the
+#     other backfills land. Unset = the sync step is skipped silently
+#     (the rest of the workflow still runs).
 #
 # Skipped intentionally: `scripts/backfill-tags.mjs` (Open Library) is
 # rate-limited and minutes-slow; it stays operator-initiated via
-# `make vault-backfill-apply`. Everything else is pure derivation.
+# `make vault-backfill-apply`. The Hardcover *fetch* scripts
+# (`backfill-series-rosters`, `backfill-hardcover-books`) also stay
+# operator-initiated — they're cache-warming, not status-syncing, and
+# we don't want every push burning Hardcover's 60/min budget.
 
 on:
   repository_dispatch:
@@ -38,6 +47,11 @@ jobs:
   hygiene:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Job-level env so the step-level `if:` can read HARDCOVER_TOKEN.
+    # `if: secrets.X != ''` is rejected by Actions; the conventional
+    # workaround is to copy the secret into env, then test env.
+    env:
+      HARDCOVER_TOKEN: ${{ secrets.HARDCOVER_TOKEN }}
     steps:
       # ook checkout — gives us the scripts and the lockfile.
       - name: Checkout ook
@@ -115,4 +129,37 @@ jobs:
           git add -A
           REF="${{ github.event.client_payload.ref || github.sha }}"
           git commit -m "Auto-hygiene: backfills on top of ${REF}"
+          git push
+
+      # Hardcover sync — push the vault's status / rating / dates up
+      # to the operator's Hardcover account. Idempotent (cache file at
+      # _meta/hardcover-sync-state.json short-circuits no-ops; remote
+      # diff check before every mutation). Skipped silently when the
+      # HARDCOVER_TOKEN secret is unset, so the workflow still works
+      # for forks / contributors without that surface.
+      #
+      # Runs AFTER the auto-hygiene commit so a backfill that flipped
+      # frontmatter doesn't race against the sync. The cache file lives
+      # under _meta/ in the books checkout; we commit it back in the
+      # follow-up step below so re-runs benefit.
+      - name: Sync vault status to Hardcover
+        if: ${{ env.HARDCOVER_TOKEN != '' }}
+        working-directory: ook
+        env:
+          BOOKS_DIR: ${{ github.workspace }}/books
+        run: node scripts/sync-hardcover-status.mjs --apply
+
+      - name: Commit + push hardcover-sync-state if dirty
+        if: ${{ env.HARDCOVER_TOKEN != '' }}
+        working-directory: books
+        run: |
+          set -e
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No sync-state changes."
+            exit 0
+          fi
+          git config user.name "ook-vault-hygiene[bot]"
+          git config user.email "ook-vault-hygiene@users.noreply.github.com"
+          git add -A
+          git commit -m "Auto-hygiene: hardcover-sync-state refresh"
           git push

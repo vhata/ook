@@ -10,6 +10,7 @@
 	vault-lint vault-backfill vault-backfill-apply vault-series-rosters \
 	vault-series-rosters-apply vault-hardcover-books vault-hardcover-books-apply \
 	vault-import-kindle vault-import-kindle-apply \
+	vault-hardcover-sync vault-hardcover-sync-apply \
 	deploy-status deploy-logs
 
 help: ## Show this help
@@ -96,6 +97,12 @@ vault-import-kindle: ## Dry-run: parse a Kindle My Clippings.txt and append matc
 
 vault-import-kindle-apply: ## Apply: write quotes.md updates from a Kindle My Clippings.txt (FILE=path)
 	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)") --apply
+
+vault-hardcover-sync: ## Dry-run: push vault status/rating/dates to Hardcover
+	@node scripts/sync-hardcover-status.mjs
+
+vault-hardcover-sync-apply: ## Apply: mutate Hardcover (status, rating, started, finished)
+	@node scripts/sync-hardcover-status.mjs --apply
 
 deploy-status: ## Recent Vercel deploys for this project (status, env, age)
 	@npx -y vercel@latest ls 2>&1 | head -16
