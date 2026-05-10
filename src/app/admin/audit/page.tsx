@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SESSION_COOKIE_NAME, verifySession } from "@/lib/auth/session";
 import { commitUrl, getRecentCommits } from "@/lib/admin/audit";
+import type { LastReindex } from "@/lib/store/index-vault";
 import { relativeTime } from "@/lib/relative-time";
 
 // /admin/audit — recent commits to the cloned vault. Closes the loop
@@ -13,6 +14,12 @@ import { relativeTime } from "@/lib/relative-time";
 // bounce to /admin so the user can sign in there. The unauthed states
 // (claim / sign-in) only make sense at /admin — duplicating them here
 // would just be noise.
+//
+// Footer carries the store's `lastReindex` stamp so a stale-looking
+// commit list can be disambiguated from a stale reindex at a glance.
+// Reads from the same `store:last-reindex` key the /admin console reads
+// via GET /api/admin/reindex; silent degrade when the key is absent
+// (dev without a store, fresh deploy before the first reindex).
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +42,18 @@ export default async function AdminAuditPage() {
   }
 
   const commits = await getRecentCommits(MAX_COMMITS);
+
+  // Same `store:last-reindex` key the /admin console reads via the
+  // GET side of /api/admin/reindex. Dynamic import so a test-installed
+  // adapter (`setStore`) takes effect; defensive catch so a store
+  // outage degrades to silent-omit rather than 500ing the audit page.
+  let lastReindex: LastReindex | null = null;
+  try {
+    const { getStore, keys } = await import("@/lib/store");
+    lastReindex = await getStore().get<LastReindex>(keys.lastReindex());
+  } catch {
+    lastReindex = null;
+  }
 
   return (
     <main className="mx-auto box-border w-full max-w-[700px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
@@ -114,6 +133,12 @@ export default async function AdminAuditPage() {
             );
           })}
         </ol>
+      )}
+
+      {lastReindex && (
+        <div className="border-rule text-ink-soft mt-8 border-t pt-4 text-[11px] italic">
+          Last reindex: {relativeTime(lastReindex.at)}
+        </div>
       )}
     </main>
   );
