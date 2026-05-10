@@ -30,13 +30,13 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import yaml from "js-yaml";
 
-// ----- constants -------------------------------------------------------------
+import { cleanTitleAndSeries } from "./lib/promote-goodreads.mjs";
 
-// Title cleanup: detect a trailing "(Series Name, #N)" or "(Series #N)"
-// parenthetical and split it off. Declared up here so the module-level
-// `await main()` doesn't hit a temporal-dead-zone error when it
-// reaches into helper functions that read this regex.
-const SERIES_RE = /^(.+?)\s*\((.+?)\)\s*$/;
+// Title cleanup: the pure helper lives in `scripts/lib/promote-goodreads.mjs`
+// so it can be unit-tested without filesystem IO. Re-export here so any
+// caller that historically imported the function from this script still
+// gets it.
+export { cleanTitleAndSeries };
 
 // ----- argv ------------------------------------------------------------------
 
@@ -212,33 +212,6 @@ async function listVaultDirectories(vault) {
     set.add(e.name);
   }
   return set;
-}
-
-// Title cleanup: detect a trailing "(Series Name, #N)" or "(Series #N)"
-// parenthetical and split it off. Also handles "(Series Name)" (no
-// number) and "(Series Name, Vol. 2)" loosely. The regex itself lives
-// near the top of the file (above `await main()`).
-
-export function cleanTitleAndSeries(rawTitle) {
-  // YAML coerces values like "1984" to numbers — re-stringify
-  // defensively.
-  const title = String(rawTitle ?? "").trim();
-  const match = SERIES_RE.exec(title);
-  if (!match) return { title, series: null };
-
-  const [, before, inside] = match;
-  // Heuristic: only treat the parenthetical as a series suffix if it
-  // contains a number (e.g. "#3", "Vol. 2", "Book 1"). Otherwise
-  // it's probably part of the title (e.g. "Sapiens (A Brief History)").
-  const hasNumber = /[#\d]/.test(inside);
-  if (!hasNumber) return { title, series: null };
-
-  // Normalise to "Series Name #N" form when the inside is "Series, #N".
-  const seriesNorm = inside
-    .replace(/,\s*(#[\d.]+)$/, " $1")
-    .replace(/\s+/g, " ")
-    .trim();
-  return { title: before.trim(), series: seriesNorm };
 }
 
 // Filesystem-safe slug — keep human-readable (matches the existing
