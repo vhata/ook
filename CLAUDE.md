@@ -57,7 +57,7 @@ When a new feature, polish item, or design idea surfaces in conversation — whe
 3. **Automation** — webhooks, cron, auto-hygiene workflows. Save time, but each is a moving part to maintain.
 4. **Polish** — visual or developer-experience improvements. Last because they don't change the substance.
 
-**Watch for the failure mode of feature accumulation**: a stretch where each individual addition feels small and obvious in the moment, but the cumulative drift moves the site away from "personal reading record" toward "Hardcover aggregator with a personal tab." If you find yourself proposing a fifth integration-driven feature in one session, stop and ask the user whether the axis is right — that conversation happened on 2026-05-10 and the recalibration was load-bearing.
+**Watch for the failure mode of feature accumulation**: a stretch where each individual addition feels small and obvious in the moment, but the cumulative drift moves the site away from "personal reading record" toward "Hardcover aggregator with a personal tab." If you find yourself proposing a fifth integration-driven feature in one session, stop and ask the user whether the axis is right.
 
 The TODO entries in the "Agent prompts at state-change moments" section codify the next moves on the voice axis (start-prompt, 5-star-unreviewed, streak milestones, quiet-return, series-completion) — these are deliberately deferred until the first one (finish-flow gate) has lived through real use.
 

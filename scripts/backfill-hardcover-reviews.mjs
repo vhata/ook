@@ -187,9 +187,9 @@ async function readVaultBooks(vault) {
     const { data } = matter(raw);
 
     // Frontmatter wins when present; otherwise look in the books cache by
-    // vault slug. The books cache is the most reliable source today since
-    // most books haven't had their hardcover_id stamped into frontmatter
-    // yet (Thread L addresses that).
+    // vault slug. The books cache covers every book whose Hardcover
+    // lookup has already run, including those without an
+    // `hardcover_id` in their frontmatter yet.
     let hcId = null;
     if (typeof data.hardcover_id === "number" && Number.isFinite(data.hardcover_id)) {
       hcId = data.hardcover_id;
