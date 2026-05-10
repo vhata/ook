@@ -11,4 +11,10 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "src"),
     },
   },
+  test: {
+    // Don't pick up duplicate test files from agent worktrees that the
+    // Claude Code harness creates under `.claude/worktrees/`. Vitest's
+    // default include glob is repo-wide and doesn't honour `.gitignore`.
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.next/**", ".claude/**"],
+  },
 });
