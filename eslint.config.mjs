@@ -72,6 +72,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Agent worktrees from the Claude Code harness — gitignored, but
+    // ESLint's globs are repo-wide and would re-lint duplicate copies
+    // of every TS file. Mirror of the vitest exclude in vitest.config.ts.
+    ".claude/**",
   ]),
 ]);
 
