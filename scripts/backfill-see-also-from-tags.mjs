@@ -31,6 +31,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const VAULT = path.resolve(
@@ -54,6 +55,9 @@ async function main() {
 
   let touched = 0;
   let totalAdded = 0;
+  // Pending writes from the dry-run pass; fired after the summary by
+  // maybePromptApply so a confirmed apply doesn't redo the Jaccard work.
+  const pending = [];
   for (const book of books) {
     if (book.seeAlso.length >= MAX_SEE_ALSO) continue;
     if (book.tags.length < MIN_SHARED) continue;
@@ -117,13 +121,21 @@ async function main() {
       `${book.slug.padEnd(50)} +${newAdds}: ${merged.slice(book.seeAlso.length).join(", ")}\n`,
     );
 
-    if (APPLY) {
-      await writeUpdatedSeeAlso(book.path, merged);
-    }
+    const bookPath = book.path;
+    pending.push(() => writeUpdatedSeeAlso(bookPath, merged));
   }
 
   process.stderr.write(`\n${touched} books would gain see_also entries (${totalAdded} total)\n`);
-  if (!APPLY) process.stderr.write("(dry-run; rerun with --apply to write)\n");
+
+  await maybePromptApply({
+    apply: APPLY,
+    changeCount: pending.length,
+    changeNoun: "see_also additions",
+    doApply: async () => {
+      for (const write of pending) await write();
+      process.stderr.write(`wrote ${pending.length} books\n`);
+    },
+  });
 }
 
 async function readVault(vaultDir) {

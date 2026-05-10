@@ -11,7 +11,11 @@
 // known tag are dropped.
 //
 // Defaults to **dry-run** (prints proposed tags). Pass `--apply` to
-// rewrite the vault files.
+// rewrite the vault files. When stdin is a TTY and the dry-run has
+// pending changes, prompts to apply them — and applies from the
+// in-memory tag mappings the API responses already produced, so a
+// confirmed apply does not re-call Open Library. Non-TTY stdin (CI)
+// never prompts.
 //
 // Usage:
 //   node scripts/backfill-tags.mjs --vault PATH [--apply] [--max N]
@@ -20,6 +24,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const VAULT = path.resolve(
@@ -117,6 +122,10 @@ async function main() {
 
   let touched = 0;
   let totalTags = 0;
+  // Computed tag mappings held in memory; the file writes happen after
+  // the dry-run summary (and, in interactive mode, after the prompt) so
+  // a confirmed apply re-uses these instead of re-calling Open Library.
+  const pending = [];
   for (const [i, book] of candidates.entries()) {
     process.stderr.write(`[${i + 1}/${candidates.length}] ${book.slug}…`);
 
@@ -145,16 +154,22 @@ async function main() {
     touched++;
     totalTags += tags.length;
 
-    if (APPLY) {
-      await writeUpdatedTags(book.path, tags);
-    }
+    const bookPath = book.path;
+    pending.push(() => writeUpdatedTags(bookPath, tags));
     await sleep(RATE_MS);
   }
 
-  process.stderr.write(
-    `\n${touched} books would gain tags (${totalTags} total)\n` +
-      (APPLY ? "" : "(dry-run; rerun with --apply to write)\n"),
-  );
+  process.stderr.write(`\n${touched} books would gain tags (${totalTags} total)\n`);
+
+  await maybePromptApply({
+    apply: APPLY,
+    changeCount: pending.length,
+    changeNoun: "tag updates",
+    doApply: async () => {
+      for (const write of pending) await write();
+      process.stderr.write(`wrote ${pending.length} books\n`);
+    },
+  });
 }
 
 // Open Library has two relevant endpoints:

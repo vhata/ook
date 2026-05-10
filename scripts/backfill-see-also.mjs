@@ -12,7 +12,9 @@
 //
 // Defaults to **dry-run** (prints a diff summary). Pass `--apply` to
 // write back to the vault. Each file is rewritten with the new
-// frontmatter; the body is preserved verbatim.
+// frontmatter; the body is preserved verbatim. When stdin is a TTY
+// and the dry-run has pending changes, prompts to apply them so the
+// computed changeset isn't thrown away. Non-TTY stdin never prompts.
 //
 // Usage:
 //   node scripts/backfill-see-also.mjs --vault PATH [--apply] [--max N]
@@ -20,6 +22,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const VAULT = path.resolve(
@@ -58,6 +61,9 @@ async function main() {
   // Per-book additions.
   let touched = 0;
   let totalAdded = 0;
+  // Pending writes collected during the dry-run; fired by maybePromptApply
+  // at the end so the computed changeset isn't redone after a yes.
+  const pending = [];
   for (const book of books) {
     const additions = computeAdditions(book, { bySeriesName, byAuthor });
     if (additions.length === 0) continue;
@@ -79,14 +85,21 @@ async function main() {
     process.stdout.write(
       `${book.slug.padEnd(40)} +${newAdditions}: ${merged.slice(book.seeAlso.length).join(", ")}\n`,
     );
-
-    if (APPLY) {
-      await writeUpdatedSeeAlso(book.path, merged);
-    }
+    const bookPath = book.path;
+    pending.push(() => writeUpdatedSeeAlso(bookPath, merged));
   }
 
   process.stderr.write(`\n${touched} books would gain see_also entries (${totalAdded} total)\n`);
-  if (!APPLY) process.stderr.write("(dry-run; rerun with --apply to write)\n");
+
+  await maybePromptApply({
+    apply: APPLY,
+    changeCount: pending.length,
+    changeNoun: "see_also additions",
+    doApply: async () => {
+      for (const write of pending) await write();
+      process.stderr.write(`wrote ${pending.length} books\n`);
+    },
+  });
 }
 
 function computeAdditions(book, { bySeriesName, byAuthor }) {

@@ -22,6 +22,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const VAULT = path.resolve(
@@ -57,6 +58,10 @@ async function main() {
 
   let touched = 0;
   let totalAdded = 0;
+  // Pending writes collected during the dry-run pass; fired after the
+  // summary by maybePromptApply so a confirmed apply doesn't redo the
+  // reciprocity sweep.
+  const pending = [];
   // Sort for deterministic output.
   const targets = [...reciprocalsToAdd.keys()].sort();
   for (const targetSlug of targets) {
@@ -83,15 +88,23 @@ async function main() {
       `${target.slug.padEnd(50)} +${newAdds}: ${merged.slice(target.seeAlso.length).join(", ")}\n`,
     );
 
-    if (APPLY) {
-      await writeUpdatedSeeAlso(target.path, merged);
-    }
+    const targetPath = target.path;
+    pending.push(() => writeUpdatedSeeAlso(targetPath, merged));
   }
 
   process.stderr.write(
     `\n${touched} books would gain reciprocal see_also entries (${totalAdded} total)\n`,
   );
-  if (!APPLY) process.stderr.write("(dry-run; rerun with --apply to write)\n");
+
+  await maybePromptApply({
+    apply: APPLY,
+    changeCount: pending.length,
+    changeNoun: "reciprocal see_also additions",
+    doApply: async () => {
+      for (const write of pending) await write();
+      process.stderr.write(`wrote ${pending.length} books\n`);
+    },
+  });
 }
 
 async function readVault(vaultDir) {

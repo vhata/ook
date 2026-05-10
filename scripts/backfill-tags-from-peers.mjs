@@ -34,6 +34,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const VAULT = path.resolve(
@@ -79,6 +80,9 @@ async function main() {
 
   let touched = 0;
   let totalAdded = 0;
+  // Pending writes from the dry-run pass; fired after the summary
+  // by maybePromptApply so the work isn't redone on confirmation.
+  const pending = [];
   for (const book of books) {
     if (book.tags.length >= LIMIT_TAGS) continue;
 
@@ -170,13 +174,21 @@ async function main() {
     const summary = additions.map((a) => `${a.tag} (${a.reason})`).join(", ");
     process.stdout.write(`${book.slug.padEnd(50)} +${additions.length}: ${summary}\n`);
 
-    if (APPLY) {
-      await writeUpdatedTags(book.path, merged);
-    }
+    const bookPath = book.path;
+    pending.push(() => writeUpdatedTags(bookPath, merged));
   }
 
   process.stderr.write(`\n${touched} books would gain tags (${totalAdded} total)\n`);
-  if (!APPLY) process.stderr.write("(dry-run; rerun with --apply to write)\n");
+
+  await maybePromptApply({
+    apply: APPLY,
+    changeCount: pending.length,
+    changeNoun: "tag updates",
+    doApply: async () => {
+      for (const write of pending) await write();
+      process.stderr.write(`wrote ${pending.length} books\n`);
+    },
+  });
 }
 
 // Mirrors src/lib/books.ts:parseSeriesMemberships — handles the

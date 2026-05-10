@@ -15,11 +15,15 @@
 // finished date — when did you read it?"
 //
 // Idempotent: skips books that already have a `source` line. Default
-// dry-run; --apply rewrites the frontmatter.
+// dry-run; --apply rewrites the frontmatter. When stdin is a TTY and
+// there are pending changes, the script prompts at the end of the
+// dry-run summary asking whether to apply — so the work the dry-run
+// just did isn't thrown away. Non-TTY stdin (CI, pipes) never prompts.
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const VAULT = path.resolve(
@@ -42,6 +46,9 @@ async function main() {
   process.stderr.write(`mode: ${APPLY ? "APPLY" : "dry-run"}\n\n`);
 
   const counts = { goodreads: 0, "media-list": 0, manual: 0, skipped: 0 };
+  // Pending writes collected during the dry-run pass — fired by
+  // `maybePromptApply` at the end so the work isn't thrown away.
+  const pending = [];
   for (const slug of slugs) {
     const refPath = path.join(VAULT, slug, `${slug}.md`);
     let raw;
@@ -61,17 +68,23 @@ async function main() {
     const source = inferSource(data, content);
     counts[source]++;
     process.stdout.write(`${slug.padEnd(48)} → ${source}\n`);
-
-    if (APPLY) {
-      await writeUpdatedSource(refPath, source);
-    }
+    pending.push(() => writeUpdatedSource(refPath, source));
   }
 
   process.stderr.write(
     `\ngoodreads: ${counts.goodreads} · media-list: ${counts["media-list"]} · ` +
       `manual: ${counts.manual} · already-set: ${counts.skipped}\n`,
   );
-  if (!APPLY) process.stderr.write("(dry-run; rerun with --apply to write)\n");
+
+  await maybePromptApply({
+    apply: APPLY,
+    changeCount: pending.length,
+    changeNoun: "source updates",
+    doApply: async () => {
+      for (const write of pending) await write();
+      process.stderr.write(`wrote ${pending.length} books\n`);
+    },
+  });
 }
 
 function inferSource(data, content) {

@@ -18,7 +18,7 @@ Set `BOOKS_DIR` in `.env.local` to the absolute path of your books vault (see `.
 
 ## Scripts
 
-Vault-side helpers in `scripts/`. All default to dry-run; pass `--apply` to write. The Makefile umbrella runs the routine ones in dependency order: `make vault-lint` (read-only audit), `make vault-backfill` (dry-run all), `make vault-backfill-apply` (write all).
+Vault-side helpers in `scripts/`. All default to dry-run; pass `--apply` to write. When stdin is a TTY and a dry-run produced pending changes, the script prints the dry-run summary and then asks whether to apply — so the work the dry-run just did doesn't get thrown away. Non-TTY stdin (CI, pipes, redirected input) skips the prompt entirely; the dry-run output is the whole behaviour. The Makefile umbrella runs the routine ones in dependency order: `make vault-lint` (read-only audit), `make vault-backfill` (dry-run all, prompts per-script when interactive), `make vault-backfill-apply` (write all without prompting).
 
 **Bulk imports.**
 

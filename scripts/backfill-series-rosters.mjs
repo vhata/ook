@@ -42,6 +42,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const VAULT = path.resolve(
@@ -113,15 +114,23 @@ async function main() {
     rosters,
   };
 
-  if (APPLY) {
-    await fs.mkdir(path.dirname(ROSTER_FILE), { recursive: true });
-    await fs.writeFile(ROSTER_FILE, JSON.stringify(next, null, 2) + "\n", "utf8");
-    process.stderr.write(`\nwrote ${ROSTER_FILE}\n`);
-  } else {
+  if (!APPLY) {
     process.stdout.write(JSON.stringify(next, null, 2) + "\n");
-    process.stderr.write(`\n(dry-run; rerun with --apply to write)\n`);
   }
-  process.stderr.write(`fetched: ${fetched}, skipped (already cached): ${skipped}\n`);
+  process.stderr.write(`\nfetched: ${fetched}, skipped (already cached): ${skipped}\n`);
+
+  // Only count newly-fetched series as "pending changes" — without that,
+  // a re-run with everything already cached would prompt to write a no-op.
+  await maybePromptApply({
+    apply: APPLY,
+    changeCount: fetched,
+    changeNoun: `series rosters → ${ROSTER_FILE}`,
+    doApply: async () => {
+      await fs.mkdir(path.dirname(ROSTER_FILE), { recursive: true });
+      await fs.writeFile(ROSTER_FILE, JSON.stringify(next, null, 2) + "\n", "utf8");
+      process.stderr.write(`wrote ${ROSTER_FILE}\n`);
+    },
+  });
 }
 
 async function readSeriesNames(vault) {

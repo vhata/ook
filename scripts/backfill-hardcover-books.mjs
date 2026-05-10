@@ -27,6 +27,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const VAULT = path.resolve(
@@ -103,17 +104,25 @@ async function main() {
     records,
   };
 
-  if (APPLY) {
-    await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
-    await fs.writeFile(CACHE_FILE, JSON.stringify(next, null, 2) + "\n", "utf8");
-    process.stderr.write(`\nwrote ${CACHE_FILE}\n`);
-  } else {
+  if (!APPLY) {
     process.stdout.write(JSON.stringify(next, null, 2) + "\n");
-    process.stderr.write(`\n(dry-run; rerun with --apply to write)\n`);
   }
   process.stderr.write(
-    `fetched: ${fetched}, skipped (already cached): ${skipped}, no-match: ${missed}\n`,
+    `\nfetched: ${fetched}, skipped (already cached): ${skipped}, no-match: ${missed}\n`,
   );
+
+  // Only newly-fetched records count as pending changes; a fully-cached
+  // re-run shouldn't prompt to write a no-op.
+  await maybePromptApply({
+    apply: APPLY,
+    changeCount: fetched,
+    changeNoun: `Hardcover records → ${CACHE_FILE}`,
+    doApply: async () => {
+      await fs.mkdir(path.dirname(CACHE_FILE), { recursive: true });
+      await fs.writeFile(CACHE_FILE, JSON.stringify(next, null, 2) + "\n", "utf8");
+      process.stderr.write(`wrote ${CACHE_FILE}\n`);
+    },
+  });
 }
 
 async function readVaultBooks(vault) {
