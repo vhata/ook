@@ -10,6 +10,7 @@
 	vault-lint vault-backfill vault-backfill-apply vault-series-rosters \
 	vault-series-rosters-apply vault-hardcover-books vault-hardcover-books-apply \
 	vault-hardcover-reviews vault-hardcover-reviews-apply \
+	vault-hardcover-ids vault-hardcover-ids-apply \
 	vault-import-kindle vault-import-kindle-apply \
 	vault-hardcover-sync vault-hardcover-sync-apply \
 	deploy-status deploy-logs
@@ -98,6 +99,12 @@ vault-hardcover-reviews: ## Dry-run: fetch top short Hardcover reviews per book
 
 vault-hardcover-reviews-apply: ## Apply: write _meta/hardcover-reviews.json (top 3 reviews per book)
 	@node scripts/backfill-hardcover-reviews.mjs --apply
+
+vault-hardcover-ids: ## Dry-run: copy hardcover_slug + hardcover_id from the cache into per-book frontmatter
+	@node scripts/backfill-hardcover-ids.mjs
+
+vault-hardcover-ids-apply: ## Apply: write hardcover_slug + hardcover_id frontmatter from _meta/hardcover-books.json
+	@node scripts/backfill-hardcover-ids.mjs --apply
 
 vault-import-kindle: ## Dry-run: parse a Kindle My Clippings.txt and append matched highlights into per-book quotes.md (FILE=path)
 	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)")
