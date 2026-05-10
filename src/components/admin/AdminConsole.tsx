@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { relativeTime } from "@/lib/relative-time";
 
 type CommitPatchInput = {
@@ -168,6 +169,13 @@ export default function AdminConsole() {
             {busy ? "..." : "Stage a patch"}
           </button>
           <div className="flex items-center gap-4">
+            <Link
+              href="/admin/audit"
+              className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase"
+              title="Recent commits to the books vault"
+            >
+              Recent activity →
+            </Link>
             <button
               type="button"
               onClick={triggerReindex}
