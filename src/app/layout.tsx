@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Source_Serif_4, Inter_Tight, IBM_Plex_Mono } from "next/font/google";
-import { Suspense } from "react";
-import Controls from "@/components/Controls";
+import { SiteChrome } from "@/components/SiteChrome";
 import { seasonalCss, seasonalPalette } from "@/lib/seasonal";
 import "./globals.css";
 
@@ -66,21 +65,7 @@ export default function RootLayout({
         <style dangerouslySetInnerHTML={{ __html: seasonalCss(palette) }} />
       </head>
       <body className="bg-bg text-ink font-sans flex min-h-full flex-col">
-        <Suspense fallback={null}>
-          <Controls />
-        </Suspense>
-        <div className="flex-1">{children}</div>
-        <footer className="border-rule text-ink-soft border-t py-6 text-center text-xs">
-          <p>
-            <a
-              href="https://github.com/vhata/ook"
-              className="hover:text-ink underline underline-offset-2"
-            >
-              ook
-            </a>
-            {" · "}built from a markdown vault
-          </p>
-        </footer>
+        <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
   );

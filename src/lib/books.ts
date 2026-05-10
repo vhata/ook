@@ -291,6 +291,44 @@ export async function getRecentlyFinished(limit = 5): Promise<Book[]> {
     .slice(0, limit);
 }
 
+// Current ongoing reading streak — the count of consecutive recent calendar
+// days (in UTC) that have at least one reading event (started, finished,
+// or a manual log entry). The streak includes `today` if today has any
+// event; otherwise it begins counting back from yesterday so a streak isn't
+// killed simply because the user hasn't read yet today. Returns 0 when the
+// most recent event is older than yesterday. Distinct from the longest-
+// in-year streak rendered on `/stats/[year]` — that one looks back across
+// a single calendar year, this one looks back from now.
+export async function getCurrentReadingStreak(today: Date = new Date()): Promise<number> {
+  const [books, manual] = await Promise.all([getAllBooks(), getManualLogEntries()]);
+  const dates = new Set<string>();
+  for (const b of books) {
+    if (b.started) dates.add(b.started);
+    if (b.finished) dates.add(b.finished);
+  }
+  for (const m of manual) dates.add(m.date);
+  if (dates.size === 0) return 0;
+
+  const dayMs = 86400000;
+  // Anchor on UTC midnight of `today` so the iteration is timezone-stable.
+  const todayUtc = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const isoOf = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+
+  // If today has no event, allow the streak to start from yesterday — but
+  // not earlier. A two-day-old finish does not constitute an active streak.
+  let cursor = todayUtc;
+  if (!dates.has(isoOf(cursor))) {
+    cursor -= dayMs;
+    if (!dates.has(isoOf(cursor))) return 0;
+  }
+  let streak = 0;
+  while (dates.has(isoOf(cursor))) {
+    streak++;
+    cursor -= dayMs;
+  }
+  return streak;
+}
+
 // List the years for which a bingo file exists, descending. Source of truth
 // for "what cards are there" — pages call this (or `getCurrentBingoYear`)
 // rather than hardcoding a year.

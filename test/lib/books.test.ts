@@ -17,6 +17,7 @@ import {
   getBookBySlug,
   getCurrentBingoYear,
   getCurrentlyReading,
+  getCurrentReadingStreak,
   getManualLogEntries,
   getOnThisDay,
   getReadingLog,
@@ -94,6 +95,27 @@ describe("getRecentlyFinished", () => {
   it("returns finished books sorted by finished date desc", async () => {
     const finished = await getRecentlyFinished(5);
     expect(finished.map((b) => b.slug)).toEqual(["TestBook"]);
+  });
+});
+
+describe("getCurrentReadingStreak", () => {
+  // Fixture vault has events on 2026-01-15 (TestBook started),
+  // 2026-02-20 (TestBook finished), 2026-04-01 (PrivateBook started).
+  // None of those are adjacent — the streak from any of them is 1.
+  it("counts today when today has at least one event", async () => {
+    const streak = await getCurrentReadingStreak(new Date("2026-04-01T12:00:00Z"));
+    expect(streak).toBe(1);
+  });
+
+  it("falls back to yesterday so a today-without-reading doesn't kill a live streak", async () => {
+    // Yesterday relative to 2026-04-02 is 2026-04-01, which has an event.
+    const streak = await getCurrentReadingStreak(new Date("2026-04-02T12:00:00Z"));
+    expect(streak).toBe(1);
+  });
+
+  it("returns 0 when the most recent event is older than yesterday", async () => {
+    const streak = await getCurrentReadingStreak(new Date("2026-05-09T12:00:00Z"));
+    expect(streak).toBe(0);
   });
 });
 
