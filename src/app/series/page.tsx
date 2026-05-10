@@ -231,9 +231,20 @@ function SeriesSection({
   const defaultOpen = renderedRows <= COLLAPSE_THRESHOLD;
   const open = forceExpandAll ? true : forceCollapseAll ? false : defaultOpen;
   const anchorId = `series-${slugifySeriesName(group.name)}`;
+  // Native <details> owns its `open` state in the DOM. When a user
+  // manually toggles a section, that mutation isn't visible to React's
+  // reconciler — so a subsequent re-render with a different `open` prop
+  // (Expand-all / Collapse-all) skips the DOM update if React thinks
+  // the prop hasn't changed from its last set value. Result: toggle-all
+  // appears to do "random things" — sections the user manually toggled
+  // in between don't follow the global command. The key here forces a
+  // remount whenever the forced-state changes, resetting the DOM to
+  // match the prop. Individual user toggles don't change the key, so
+  // they don't trigger remounts.
+  const detailsKey = `${anchorId}-${forceExpandAll ? "e" : forceCollapseAll ? "c" : "d"}`;
 
   return (
-    <details id={anchorId} open={open} className="scroll-mt-6 group">
+    <details key={detailsKey} id={anchorId} open={open} className="scroll-mt-6 group">
       <summary className="border-rule -mx-2 cursor-pointer rounded border border-transparent px-2 py-1 list-none transition-colors hover:border-rule [&::-webkit-details-marker]:hidden">
         <header className="flex items-baseline justify-between gap-3">
           <div className="min-w-0">
