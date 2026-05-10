@@ -10,14 +10,30 @@ export const metadata = {
   title: "Series",
 };
 
-export default async function SeriesPage() {
+// Series with more rendered rows than this collapse by default.
+// "Rendered rows" = vault members + roster-missing placeholders, since
+// the latter inflate the section height the same way the former do. A
+// short series stays inline; only the bulky ones fold up.
+const COLLAPSE_THRESHOLD = 4;
+
+type SearchParams = Promise<{ expand?: string; collapse?: string }>;
+
+export default async function SeriesPage({ searchParams }: { searchParams: SearchParams }) {
+  const sp = await searchParams;
+  const forceExpandAll = sp.expand === "all";
+  const forceCollapseAll = sp.collapse === "all";
   const series = await getAllSeries();
 
+  // Build TOC entries. Top-level series only; sub-series indent under
+  // their parent (so Tiffany Aching nests under Discworld) without
+  // doubling the TOC's height.
+  const tocItems = buildTocItems(series);
+
   return (
-    <main className="mx-auto box-border w-full max-w-[900px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
+    <main className="mx-auto box-border w-full max-w-[1140px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
       <HomeMark />
 
-      <header className="border-rule mb-11 border-b pb-6">
+      <header className="border-rule mb-9 border-b pb-6">
         <div className="text-ink-soft mb-3 text-[11px] tracking-[0.18em] uppercase">Series</div>
         <h1 className="font-serif m-0 text-[44px] leading-none font-medium tracking-[-0.025em] sm:text-[56px]">
           Where I am in each.
@@ -26,6 +42,9 @@ export default async function SeriesPage() {
           Books grouped by their <code className="font-mono text-[14px]">series</code> frontmatter,
           ordered by <code className="font-mono text-[14px]">#N</code> when present.
         </p>
+        {series.length > 0 && (
+          <ExpandCollapseToggle isExpandAll={forceExpandAll} isCollapseAll={forceCollapseAll} />
+        )}
       </header>
 
       {series.length === 0 ? (
@@ -33,48 +52,220 @@ export default async function SeriesPage() {
           No series in the vault yet.
         </div>
       ) : (
-        <div className="space-y-12">
-          {series.map((group) => (
-            <SeriesSection key={group.name} group={group} />
-          ))}
+        <div className="grid grid-cols-1 gap-9 md:grid-cols-[200px_1fr]">
+          <SeriesNav items={tocItems} />
+
+          <div className="min-w-0 space-y-10">
+            {series.map((group) => (
+              <SeriesSection
+                key={group.name}
+                group={group}
+                forceExpandAll={forceExpandAll}
+                forceCollapseAll={forceCollapseAll}
+              />
+            ))}
+          </div>
         </div>
       )}
     </main>
   );
 }
 
-function SeriesSection({ group }: { group: SeriesGroup }) {
+// Two-button toggle. Server-only — toggles a query param the page reads
+// to override the per-section default. Plain anchors so the URL state
+// is shareable and back/forward-traversable.
+function ExpandCollapseToggle({
+  isExpandAll,
+  isCollapseAll,
+}: {
+  isExpandAll: boolean;
+  isCollapseAll: boolean;
+}) {
+  const baseClasses =
+    "rounded-sm border px-2.5 py-1 text-[10px] tracking-[0.14em] uppercase transition-colors";
+  return (
+    <div className="mt-5 flex items-center gap-2">
+      <Link
+        href={isExpandAll ? "/series" : "/series?expand=all"}
+        scroll={false}
+        className={`${baseClasses} ${
+          isExpandAll
+            ? "border-accent bg-accent-soft text-accent"
+            : "border-rule text-ink-soft hover:border-ink hover:text-ink"
+        }`}
+      >
+        Expand all
+      </Link>
+      <Link
+        href={isCollapseAll ? "/series" : "/series?collapse=all"}
+        scroll={false}
+        className={`${baseClasses} ${
+          isCollapseAll
+            ? "border-accent bg-accent-soft text-accent"
+            : "border-rule text-ink-soft hover:border-ink hover:text-ink"
+        }`}
+      >
+        Collapse all
+      </Link>
+    </div>
+  );
+}
+
+type TocItem = {
+  name: string;
+  anchor: string;
+  count: number;
+  isSub: boolean;
+};
+
+// Top-level series first (alphabetical, matching the page's order),
+// each followed immediately by its sub-series. We don't elide
+// sub-series from the TOC because Tiffany Aching IS a thing the user
+// wants to jump to — but indent them so the visual scan reads "the
+// big ones first, the nested ones below."
+function buildTocItems(series: SeriesGroup[]): TocItem[] {
+  const childrenByParent = new Map<string, SeriesGroup[]>();
+  const topLevel: SeriesGroup[] = [];
+  for (const group of series) {
+    if (group.subseriesOf) {
+      const list = childrenByParent.get(group.subseriesOf) ?? [];
+      list.push(group);
+      childrenByParent.set(group.subseriesOf, list);
+    } else {
+      topLevel.push(group);
+    }
+  }
+  const items: TocItem[] = [];
+  for (const parent of topLevel) {
+    items.push({
+      name: parent.name,
+      anchor: `series-${slugifySeriesName(parent.name)}`,
+      count: parent.members.length,
+      isSub: false,
+    });
+    const subs = childrenByParent.get(parent.name) ?? [];
+    subs.sort((a, b) => a.name.localeCompare(b.name));
+    for (const sub of subs) {
+      items.push({
+        name: sub.name,
+        anchor: `series-${slugifySeriesName(sub.name)}`,
+        count: sub.members.length,
+        isSub: true,
+      });
+    }
+  }
+  return items;
+}
+
+// Sticky on desktop (left rail). On mobile, becomes a horizontal
+// scroll-strip across the top — same shape used by the bingo grid.
+// Real anchor links so back/forward and copy-link sharing work.
+function SeriesNav({ items }: { items: TocItem[] }) {
+  return (
+    <>
+      {/* Mobile: horizontal scroll-strip */}
+      <nav className="-mx-6 md:hidden" aria-label="Series navigation (mobile)">
+        <div className="flex gap-1.5 overflow-x-auto px-6 pb-2">
+          {items.map((item) => (
+            <a
+              key={item.anchor}
+              href={`#${item.anchor}`}
+              className={`border-rule bg-surface text-ink-soft hover:border-accent hover:text-ink shrink-0 rounded-full border px-3 py-1 text-[11px] whitespace-nowrap ${
+                item.isSub ? "italic" : ""
+              }`}
+            >
+              {item.name}
+              <span className="text-ink-dim font-mono ml-1.5 text-[10px]">{item.count}</span>
+            </a>
+          ))}
+        </div>
+      </nav>
+
+      {/* Desktop: sticky left rail */}
+      <aside
+        className="hidden self-start md:sticky md:top-6 md:block"
+        aria-label="Series navigation"
+      >
+        <div className="text-ink-soft mb-3 text-[10px] tracking-[0.18em] uppercase">
+          In this list
+        </div>
+        <ul className="m-0 list-none p-0">
+          {items.map((item) => (
+            <li key={item.anchor} className={item.isSub ? "ml-3 mb-1" : "mb-2"}>
+              <a
+                href={`#${item.anchor}`}
+                className={`font-serif hover:text-accent flex items-baseline justify-between gap-2 leading-[1.3] ${
+                  item.isSub
+                    ? "text-ink-soft text-[12px] italic"
+                    : "text-ink text-[13px] font-medium"
+                }`}
+              >
+                <span className="truncate">{item.name}</span>
+                <span className="text-ink-dim font-mono shrink-0 text-[10px]">{item.count}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </aside>
+    </>
+  );
+}
+
+function SeriesSection({
+  group,
+  forceExpandAll,
+  forceCollapseAll,
+}: {
+  group: SeriesGroup;
+  forceExpandAll: boolean;
+  forceCollapseAll: boolean;
+}) {
   const finished = group.members.filter((m) => m.status === "finished").length;
   // When a roster is available, the denominator is the canonical
   // total. Otherwise it's just what the vault has — same as before.
   const total = group.rosterCount ?? group.members.length;
+  // Total rows the section will render. Used for the collapse-by-
+  // default rule — a series with one member but ten roster-missing
+  // entries is still bulky.
+  const renderedRows = group.members.length + group.rosterMissing.length;
+  const defaultOpen = renderedRows <= COLLAPSE_THRESHOLD;
+  const open = forceExpandAll ? true : forceCollapseAll ? false : defaultOpen;
+  const anchorId = `series-${slugifySeriesName(group.name)}`;
+
   return (
-    <section id={`series-${slugifySeriesName(group.name)}`}>
-      <header className="mb-4 flex items-baseline justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="font-serif text-ink m-0 text-[24px] leading-tight font-medium tracking-[-0.012em]">
-            {group.name}
-          </h2>
-          {group.subseriesOf && (
-            <div className="text-ink-dim mt-1 text-[11px] tracking-[0.14em] uppercase italic">
-              sub-series of{" "}
-              <a
-                href={`#series-${slugifySeriesName(group.subseriesOf)}`}
-                className="hover:text-accent not-italic underline underline-offset-[3px]"
+    <details id={anchorId} open={open} className="scroll-mt-6 group">
+      <summary className="border-rule -mx-2 cursor-pointer rounded border border-transparent px-2 py-1 list-none transition-colors hover:border-rule [&::-webkit-details-marker]:hidden">
+        <header className="flex items-baseline justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="font-serif text-ink m-0 inline text-[24px] leading-tight font-medium tracking-[-0.012em]">
+              <span
+                aria-hidden="true"
+                className="text-ink-dim mr-2 inline-block w-3 text-[14px] transition-transform group-open:rotate-90"
               >
-                {group.subseriesOf}
-              </a>
-            </div>
-          )}
-        </div>
-        <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
-          {finished} of {total}
-          {total === 1 ? " read" : " read"}
-          {group.rosterCount === undefined ? " in vault" : ""}
-        </span>
-      </header>
-      <ol className="m-0 list-none space-y-3 p-0">{renderEntries(group)}</ol>
-    </section>
+                ▶
+              </span>
+              {group.name}
+            </h2>
+            {group.subseriesOf && (
+              <div className="text-ink-dim mt-1 ml-5 text-[11px] tracking-[0.14em] uppercase italic">
+                sub-series of{" "}
+                <a
+                  href={`#series-${slugifySeriesName(group.subseriesOf)}`}
+                  className="hover:text-accent not-italic underline underline-offset-[3px]"
+                >
+                  {group.subseriesOf}
+                </a>
+              </div>
+            )}
+          </div>
+          <span className="text-ink-soft shrink-0 text-[11px] tracking-[0.14em] uppercase">
+            {finished} of {total} read
+            {group.rosterCount === undefined ? " in vault" : ""}
+          </span>
+        </header>
+      </summary>
+      <ol className="mt-4 mb-0 ml-0 list-none space-y-3 p-0">{renderEntries(group)}</ol>
+    </details>
   );
 }
 
