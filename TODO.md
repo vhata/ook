@@ -6,15 +6,6 @@ Flat backlog. Each entry tagged with `#area`. Done items deleted, not struck thr
 
 ## Backlog
 
-### Hi-pri (do tomorrow)
-
-- **Light up the Hardcover series-roster pipeline.** The script + renderer + Make targets all shipped (commit `b32eaaf`); the renderer falls back to gap detection until a roster file exists, so this is feature-flag-style — nothing breaks while it's deferred. To turn it on:
-  1. Sign up at hardcover.app, create an API token at https://hardcover.app/account/api.
-  2. Stash the token in 1Password and export locally: `export HARDCOVER_TOKEN='hc_…'`.
-  3. **Probe the GraphQL shape first** — the query in `scripts/backfill-series-rosters.mjs` was not live-tested at write time. Run `node scripts/backfill-series-rosters.mjs --series "Discworld" --debug`. If the raw response prints with `data.series[0].series_books[].book.{title, slug, contributions[].author.name}`, you're good. If it differs, the two functions to adjust are `fetchRoster` (the query) and `transformRoster` (the response mapping), both clearly marked in the file.
-  4. Apply for real: `make vault-series-rosters-apply`. Writes `_meta/series-rosters.json` to the vault.
-  5. Commit + push the books repo. The existing webhook → `/api/webhooks/books/reindex` fires; `/series` starts rendering missing entries with their canonical title + author from Hardcover; the header denominator becomes the canonical total ("X of 41 read"). `#hi-pri #hardcover #series #setup`
-
 ### Site / render
 
 - Strip instructional agent-prose from `_meta/tbr.md` (vault-side). The home renderer now hides the TBR section entirely when no pile has entries, so the prose isn't user-visible — but the file still reads oddly. Either populate the `## Wanted` / `## Re-Read Aspirations` piles with real entries or move the agent instructions out of the body. `#polish #vault`
@@ -31,14 +22,12 @@ Source notes for everything below (don't re-research — surfaced from a feral r
 - **Hardcover** (`api.hardcover.app/v1/graphql`, free, 60 req/min) is the practical Goodreads-API replacement for ratings, reviews, recommendations, social graph, and status mutations.
 - **Open Library** is the right answer for cover URLs (already wired) and ISBN lookup; review/rating corpus too thin for social signal.
 
-- **Display Goodreads-style avg rating + review count on per-book pages** ("4.12 from 38,221 ratings"). **Source:** Hardcover GraphQL (`books.rating`, `books.ratings_count`) — clean and legitimate; label honestly as "Hardcover" not "Goodreads." **Sketch:** at build, query Hardcover by `goodreads_id` or ISBN, cache in `.cache/hardcover.json` with 7-day TTL. **Homework:** none. `#feature #ratings #hardcover`
 - **One-tap "add Goodreads / Hardcover ID" enrichment**: Conversational agent prompt: "I matched this to Goodreads ID 12345 (link) — confirm?" then writes both IDs to frontmatter. Unlocks every downstream linking feature. **Sketch:** during in-vault capture, search Hardcover for top match; one-tap confirm writes `goodreads_id` and `hardcover_id`. **Homework:** one-tap. `#feature #capture #ids`
 - **Friend reviews on per-book pages — BLOCKED**: would be the most valuable social-graph feature, but Goodreads' friend graph is API-gone and scraping a logged-in friends-feed breaches ToS. Pivot path: Bookwyrm if user joins an instance; Hardcover follows otherwise (separate entry). **Source:** none viable for Goodreads. `#blocked #goodreads #social`
 - **"Readers who liked X also liked Y" recommendations** on a `/discover` route. **Source:** Hardcover `book.recommendations` and curated `lists`; Goodreads' similar-books endpoint is dead. **Sketch:** at build, take last N finished books with rating ≥4, query Hardcover, surface top 5 with one-tap "add to TBR". **Homework:** one-tap accept/dismiss. `#feature #recs #hardcover`
 - **Goodreads-shelf RSS as a "currently reading" mirror** for fallback / mobile-app captures. **Source:** `goodreads.com/review/list_rss/<USER_ID>?shelf=currently-reading` (last 100, undocumented but 15+ years stable). **Sketch:** build-time fetch, diff against vault, surface "on Goodreads but not in vault" in `/log` sidebar with one-tap "import to vault". **Homework:** one-tap. `#feature #rss #goodreads`
 - **"Discover via friends" via Hardcover follow graph** — replaces dead Goodreads-friends-feed. Recent ratings/reviews from Hardcover users the reader follows. **Source:** Hardcover GraphQL `me.following` + their public `user_books`. **Sketch:** `/discover/friends` strip; gracefully degrades when no follows. **Homework:** none beyond following on Hardcover. `#feature #social #hardcover`
 - **Auto-detect IDs from a pasted URL**: Capture flow accepts a Goodreads/Storygraph/Hardcover/Amazon URL, back-fills `goodreads_id`, `hardcover_slug`, ISBN, title, author, cover. **Sketch:** URL regex + Hardcover/Open Library lookup; ASIN→ISBN10. **Homework:** one paste, one confirm. `#feature #capture #ids`
-- **Annual stats page enrichment**: the `/stats/[year]` route renders finished-count, average rating, rating histogram, top tags, top authors, longest-book (NEW — Hardcover pages), and a pages-per-month chart (NEW). Still wanted: reading streak (consecutive days with a started/finished/progress event). Note: longest-book and pages-per-month read from `_meta/hardcover-books.json`, not from a `pages` frontmatter field — the cache is the data the renderer sees. `#feature #stats`
 - **Bingo-square recommendations from finished+TBR cross-reference**: For each unfilled square, suggest one TBR book + one Hardcover-list book that fits the theme. **Sketch:** at build, score TBR books by tag overlap; fall back to curated Hardcover lists. **Homework:** none — passive surfacing. `#feature #bingo #recs`
 - **Storygraph / Bookwyrm import parity** behind `--source` flag on the importer. Low priority unless the user actively migrates. `#feature #import #portability`
 - **Rejected: Goodreads "Add to Shelf" embed widget** — phones Amazon trackers, looks dated, adds reader work. The link-row entry above already covers outbound. `#rejected #goodreads`
@@ -89,7 +78,6 @@ Vault-only stats; no external API needed. All extend the existing `/stats/[year]
 - **Tag overlap Sankey across years**: flows between top tags year-on-year. Reveals genre migrations. `#feature #stats #visual`
 - **Last book before personal milestone**: overlay log on a manually-maintained `_meta/milestones.md` (birthdays, moves, losses). Sentimental. `#feature #stats #personal`
 - **"Books I rated 5 but never re-read"**: introspection axis; needs `reread_count` schema. `#feature #stats #introspection`
-- **Series progress bars on `/series`**: total-count denominator from Open Library / Hardcover ("3 of 16 read") rather than the current "N read in vault" — the route already groups by series, just needs the external lookup. `#feature #series #hardcover`
 - **Author depth chart**: per author, books-read / books-written. Denominator from Hardcover or Open Library. `#feature #stats #authors #hardcover`
 
 ### Discovery & wandering (brainstormed 2026-05-03)
@@ -106,7 +94,6 @@ Let the site reach beyond the page-view.
 - **Email digest, monthly self-mail**: cron + Resend, summary of "what you read, what you said." `#feature #email #digest`
 - **Reply-by-email comments**: `mailto:` link on per-book pages with subject pre-filled, lands in vault inbox. `#feature #per-book #comments`
 - **ActivityPub federation of finishes to Bookwyrm/Mastodon**: heavy lift; if you join a Bookwyrm instance, ook becomes the front-end of your entry. `#feature #activitypub #bookwyrm`
-- **Embeddable "now reading" widget**: a `<script>`-includable tile for personal homepages. `#feature #embed #widget`
 
 ### Capture / input (brainstormed 2026-05-03)
 
