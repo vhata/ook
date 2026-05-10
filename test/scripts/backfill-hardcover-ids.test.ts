@@ -137,11 +137,12 @@ afterEach(() => {
   rmSync(vault, { recursive: true, force: true });
 });
 
-function runScript(args: string[]) {
+function runScript(args: string[], envOverrides?: Record<string, string>) {
   // `process.execPath` is the running node binary; safer than relying
   // on whatever `node` is on PATH inside the test runner.
   const r = spawnSync(process.execPath, [SCRIPT, "--vault", vault, ...args], {
     encoding: "utf8",
+    env: { ...process.env, ...(envOverrides ?? {}) },
   });
   return { stdout: r.stdout ?? "", stderr: r.stderr ?? "", status: r.status ?? -1 };
 }
@@ -156,10 +157,25 @@ describe("backfill-hardcover-ids", { timeout: 20_000 }, () => {
     expect(r.status).toBe(0);
     const after = await fs.readFile(path.join(vault, "BookOne", "BookOne.md"), "utf8");
     expect(after).toBe(before);
-    // Summary line goes to stderr; per-book plan goes to stdout.
-    expect(r.stdout).toContain("BookOne");
-    expect(r.stdout).toContain("hardcover_slug=book-one-hc");
-    expect(r.stdout).toContain("hardcover_id=4242");
+    // Summary line goes to stderr; per-book diff plan goes to stdout
+    // in the unified-diff shape: `→ <slug>` header, then `+ key: value`
+    // for each inserted field. Plain output (no ANSI) because the test
+    // harness pipes stdout, so isTTY is undefined.
+    expect(r.stdout).toContain("→ BookOne");
+    expect(r.stdout).toContain("+ hardcover_slug: book-one-hc");
+    expect(r.stdout).toContain("+ hardcover_id: 4242");
+    expect(r.stdout).not.toContain("\x1b[");
+  });
+
+  it("renders ANSI red/green when FORCE_COLOR=1 (TTY-style output)", () => {
+    const r = runScript([], { FORCE_COLOR: "1" });
+    expect(r.status).toBe(0);
+    // The diff-format helper writes additions as `\x1b[32m+ … \x1b[0m`.
+    // We don't pin the exact escape sequence here (the helper might
+    // grow more attributes later) — just confirm the green-prefix
+    // pattern wraps the inserted line.
+    expect(r.stdout).toMatch(/\x1b\[32m\+ hardcover_slug: book-one-hc\x1b\[0m/);
+    expect(r.stdout).toMatch(/\x1b\[32m\+ hardcover_id: 4242\x1b\[0m/);
   });
 
   it("--apply writes the missing fields and preserves existing values", async () => {

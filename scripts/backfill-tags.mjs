@@ -17,6 +17,12 @@
 // confirmed apply does not re-call Open Library. Non-TTY stdin (CI)
 // never prompts.
 //
+// Dry-run output is shaped as a unified diff — `→ <slug>` per book,
+// then a green `+ tags: [...]` line showing the field that would be
+// inserted into the frontmatter. ANSI colour only when stdout is a
+// TTY; piped/redirected output stays plain. Pager users: `less -R` to
+// render the codes.
+//
 // Usage:
 //   node scripts/backfill-tags.mjs --vault PATH [--apply] [--max N]
 //                                  [--limit-tags N] [--rate-ms MS]
@@ -24,6 +30,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { formatBookHeader, formatLineInsertion } from "./lib/diff-format.mjs";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
@@ -153,6 +160,11 @@ async function main() {
     process.stderr.write(` → [${tags.join(", ")}]\n`);
     touched++;
     totalTags += tags.length;
+
+    // Diff-shaped summary line on stdout — pipeable, colourised in a
+    // TTY. The fetch progress above stays on stderr.
+    process.stdout.write(`${formatBookHeader(book.slug)}\n`);
+    process.stdout.write(`${formatLineInsertion(`tags: [${tags.join(", ")}]`)}\n`);
 
     const bookPath = book.path;
     pending.push(() => writeUpdatedTags(bookPath, tags));

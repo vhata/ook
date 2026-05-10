@@ -24,6 +24,14 @@
 //
 // Defaults to **dry-run**. Pass `--apply` to write the vault.
 //
+// Dry-run output is shaped as a unified diff — `→ <slug>` per book,
+// then a red `- tags: [...]` / green `+ tags: [..., extra]` pair when
+// the book already had tags, or a single green `+` when the book had
+// none. ANSI colour only when stdout is a TTY; piped output stays
+// plain. The peer-reason hints ("series 3/4", "author 3/4") still
+// render on stderr above each block so the operator can see why each
+// new tag was proposed.
+//
 // Usage:
 //   node scripts/backfill-tags-from-peers.mjs [--vault PATH] [--apply]
 //                                             [--limit-tags N]
@@ -34,6 +42,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { formatBookHeader, formatLineChange, formatLineInsertion } from "./lib/diff-format.mjs";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
@@ -171,8 +180,20 @@ async function main() {
 
     touched++;
     totalAdded += additions.length;
-    const summary = additions.map((a) => `${a.tag} (${a.reason})`).join(", ");
-    process.stdout.write(`${book.slug.padEnd(50)} +${additions.length}: ${summary}\n`);
+    // Per-book block: header + diff line(s). The peer-reason hints
+    // ("series 3/4", "author 3/4") that previously rode at the end of
+    // the single-line summary are now a stderr context line so the
+    // diff itself stays clean and pipeable.
+    const reasonHint = additions.map((a) => `${a.tag} (${a.reason})`).join(", ");
+    process.stderr.write(`  ${book.slug}: ${reasonHint}\n`);
+    process.stdout.write(`${formatBookHeader(book.slug)}\n`);
+    const newLine = `tags: [${merged.join(", ")}]`;
+    if (book.tags.length === 0) {
+      process.stdout.write(`${formatLineInsertion(newLine)}\n`);
+    } else {
+      const oldLine = `tags: [${book.tags.join(", ")}]`;
+      process.stdout.write(`${formatLineChange(oldLine, newLine)}\n`);
+    }
 
     const bookPath = book.path;
     pending.push(() => writeUpdatedTags(bookPath, merged));

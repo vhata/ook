@@ -19,10 +19,17 @@
 // there are pending changes, the script prompts at the end of the
 // dry-run summary asking whether to apply — so the work the dry-run
 // just did isn't thrown away. Non-TTY stdin (CI, pipes) never prompts.
+//
+// Dry-run output is shaped as a unified diff — `→ <slug>` per book,
+// then a green `+ source: …` line showing the field that would be
+// inserted into the frontmatter. ANSI colour only when stdout is a
+// TTY; piped/redirected output stays plain. Pager users: `less -R` to
+// render the codes.
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { formatBookHeader, formatLineInsertion } from "./lib/diff-format.mjs";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
@@ -67,7 +74,8 @@ async function main() {
 
     const source = inferSource(data, content);
     counts[source]++;
-    process.stdout.write(`${slug.padEnd(48)} → ${source}\n`);
+    process.stdout.write(`${formatBookHeader(slug)}\n`);
+    process.stdout.write(`${formatLineInsertion(`source: ${source}`)}\n`);
     pending.push(() => writeUpdatedSource(refPath, source));
   }
 

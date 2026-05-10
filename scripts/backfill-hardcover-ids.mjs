@@ -20,12 +20,18 @@
 // summary asking whether to apply — so the work the dry-run just did
 // isn't thrown away. Non-TTY stdin (CI, pipes) never prompts.
 //
+// Dry-run output is shaped as a unified diff — `→ <slug>` per book,
+// then green `+ hardcover_slug: …` and/or `+ hardcover_id: …` lines
+// showing the field(s) that would be inserted. ANSI colour only when
+// stdout is a TTY; piped output stays plain.
+//
 // Usage:
 //   node scripts/backfill-hardcover-ids.mjs [--vault PATH] [--apply]
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { formatBookHeader, formatLineInsertion } from "./lib/diff-format.mjs";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
@@ -119,9 +125,10 @@ async function main() {
     if (newSlug !== null) writes.push(["hardcover_slug", newSlug]);
     if (newId !== null) writes.push(["hardcover_id", newId]);
 
-    process.stdout.write(
-      `${slug.padEnd(48)} → ${writes.map(([k, v]) => `${k}=${v}`).join(", ")}\n`,
-    );
+    process.stdout.write(`${formatBookHeader(slug)}\n`);
+    for (const [k, v] of writes) {
+      process.stdout.write(`${formatLineInsertion(`${k}: ${v}`)}\n`);
+    }
     pending.push(() => writeFields(refPath, writes));
   }
 

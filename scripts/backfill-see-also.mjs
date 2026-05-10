@@ -16,12 +16,19 @@
 // and the dry-run has pending changes, prompts to apply them so the
 // computed changeset isn't thrown away. Non-TTY stdin never prompts.
 //
+// Dry-run output is shaped as a unified diff — `→ <slug>` per book,
+// then a red `- see_also: [...]` / green `+ see_also: [..., new]`
+// pair when the book already had entries, or a single green `+` when
+// the field is being introduced. ANSI colour only when stdout is a
+// TTY; piped output stays plain. Pager users: `less -R`.
+//
 // Usage:
 //   node scripts/backfill-see-also.mjs --vault PATH [--apply] [--max N]
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { formatBookHeader, formatLineChange, formatLineInsertion } from "./lib/diff-format.mjs";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
@@ -82,9 +89,14 @@ async function main() {
 
     touched++;
     totalAdded += newAdditions;
-    process.stdout.write(
-      `${book.slug.padEnd(40)} +${newAdditions}: ${merged.slice(book.seeAlso.length).join(", ")}\n`,
-    );
+    process.stdout.write(`${formatBookHeader(book.slug)}\n`);
+    const newLine = `see_also: [${merged.map(quoteIfNeeded).join(", ")}]`;
+    if (book.seeAlso.length === 0) {
+      process.stdout.write(`${formatLineInsertion(newLine)}\n`);
+    } else {
+      const oldLine = `see_also: [${book.seeAlso.map(quoteIfNeeded).join(", ")}]`;
+      process.stdout.write(`${formatLineChange(oldLine, newLine)}\n`);
+    }
     const bookPath = book.path;
     pending.push(() => writeUpdatedSeeAlso(bookPath, merged));
   }
