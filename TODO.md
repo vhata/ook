@@ -22,6 +22,7 @@ Flat backlog. Each entry tagged with `#area`. Done items deleted, not struck thr
 - Bingo cover dedup at promote time. When `bin/book` auto-promotes a bingo entry to a vault directory, the bingo file's `cover:` line for that square becomes redundant (the renderer prefers the new directory's frontmatter). Strip it during promotion to keep the dedup automatic. Currently the duplicate sits there until the user runs the cleanup script by hand. `#polish #vault`
 - Bingo `done:` YAML cleanup (vault-side). Render now derives done-ness from the bound book's status, so the per-square `done:` field is dead weight. Either strip it from `_meta/bingo-YYYY.md` or have `bin/book` keep it stripped going forward. `#polish #vault #bingo`
 - `summary.md` tier reconsideration. Per the existing convention `summary.md` is a "full-spoiler plot summary," but the tiered model puts it at tier 1 (one click). For books like Ra where the summary really is a full plot dump, that's too eager a reveal. Options: move the full-spoiler content into the body (tier 2) and reserve `summary.md` for synopses; OR add a per-section `:::spoiler` wrap; OR allow a frontmatter `summary_tier: 2` override (we said no overrides — revisit). `#design #spoilers`
+- Per-book Toc → collapsed `/series` section. The per-book sticky Toc links to `#series-<slug>` anchors on `/series`. Since `/series` now defaults to collapsed-by-default for any series with more than four rendered rows, clicking a Toc link from a per-book page may scroll to a closed `<details>` header instead of the intended row. Fix: tiny client island that reads `window.location.hash` on mount and toggles the matching `<details>` open. Server-rendered HTML stays unchanged — the island is a hash-handler, not a state owner. `#polish #series #toc`
 
 ### Goodreads / reading-ecosystem (researched 2026-05-03)
 
@@ -182,6 +183,8 @@ The unfiltered drawer. Strike most. Keep one.
 - **Bookcrossing log**: track physical lending — "this copy is currently with Sarah." `#wild #lending`
 
 ### Write surface — fidelity and polish (post-MCP-merge)
+
+- **`commitPatch` should tag its commits** so `/admin/audit` (and any future audit consumer) can distinguish "via the admin agent" from "direct push to vhata/books". Today every vault commit looks the same on the wire — `commitPatch` passes the agent-supplied `commit_message` straight to `client.commitFile({ message })` with no structural marker. Cleanest add: a stable suffix or trailer the renderer can match on, e.g. append `\n\nvia ook-admin/<short-sha-of-session>` to every `commit_message` in `src/lib/mcp/patch.ts` (and the sister tools in `bingo-tools.ts`, `extra-tools.ts`). `/admin/audit` then tags those rows with a small "via /admin" chip. Keep the user-supplied body intact — the trailer rides at the end. `#admin #mcp #audit-log`
 
 ### Tooling & vault hygiene (brainstormed 2026-05-03)
 
