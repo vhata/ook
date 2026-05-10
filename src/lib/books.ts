@@ -1743,6 +1743,8 @@ export async function getYearStats(year: number): Promise<YearStats> {
     }
   }
 
+  const { totalPages, pagesCoverage } = computeYearPagesTotal(finishedThisYear, hardcover);
+
   return {
     year,
     finished: finishedThisYear.length,
@@ -1756,6 +1758,36 @@ export async function getYearStats(year: number): Promise<YearStats> {
     wouldReread: finishedThisYear.filter((b) => b.wouldReread === true).length,
     longestBook,
     pagesByMonth,
+    totalPages,
+    pagesCoverage,
+  };
+}
+
+// Sum of Hardcover `pages` across the supplied finished books, plus
+// coverage metadata (how many of the supplied books had a paged record).
+// Pure derivation: caller passes the already-filtered set of finished
+// books for the year and the loaded Hardcover cache. Mirrors
+// `computeReadingPace` for testability — feed in constructed inputs and
+// assert without touching the filesystem.
+//
+// totalPages is null only when zero books have a paged record; the
+// Topline tile uses that signal to drop the metric entirely (silent
+// degrade, same shape as `longestBook`).
+export function computeYearPagesTotal(
+  finishedBooks: Book[],
+  hardcover: Map<string, HardcoverBook>,
+): { totalPages: number | null; pagesCoverage: { withPages: number; total: number } } {
+  let sum = 0;
+  let withPages = 0;
+  for (const b of finishedBooks) {
+    const hc = hardcover.get(b.slug);
+    if (!hc || typeof hc.pages !== "number" || hc.pages <= 0) continue;
+    sum += hc.pages;
+    withPages++;
+  }
+  return {
+    totalPages: withPages === 0 ? null : sum,
+    pagesCoverage: { withPages, total: finishedBooks.length },
   };
 }
 

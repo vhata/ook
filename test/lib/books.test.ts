@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   bookStuck,
   computeReadingPace,
+  computeYearPagesTotal,
   estimateReadingDaysRemaining,
   externalLinks,
   findBingoYearForBook,
@@ -771,6 +772,115 @@ describe("getYearStats — pages-derived fields", () => {
     const stats = await getYearStats(1999);
     expect(stats.longestBook).toBeNull();
     expect(stats.pagesByMonth).toEqual(new Array(12).fill(0));
+  });
+
+  it("totals pages across the year with full Hardcover coverage", async () => {
+    // 2026 fixture: TestBook is the only finished book and it has a paged
+    // record (320 pages) — full coverage, sum equals 320.
+    const stats = await getYearStats(2026);
+    expect(stats.totalPages).toBe(320);
+    expect(stats.pagesCoverage).toEqual({ withPages: 1, total: 1 });
+  });
+
+  it("returns totalPages: null when no finished book in the year has page data", async () => {
+    const stats = await getYearStats(1999);
+    expect(stats.totalPages).toBeNull();
+    expect(stats.pagesCoverage).toEqual({ withPages: 0, total: 0 });
+  });
+});
+
+describe("computeYearPagesTotal", () => {
+  function makeBook(overrides: Partial<Book> = {}): Book {
+    return {
+      slug: "x",
+      title: "x",
+      authors: [],
+      series: null,
+      status: "finished",
+      progress: "",
+      started: null,
+      finished: null,
+      rating: null,
+      wouldReread: null,
+      bingoSquares: [],
+      tags: [],
+      cover: null,
+      pullquote: null,
+      seeAlso: [],
+      lastEdited: null,
+      hasReview: false,
+      hasQuotes: false,
+      hasSummary: false,
+      goodreadsId: null,
+      hardcoverSlug: null,
+      storygraphSlug: null,
+      bookwyrmUrl: null,
+      source: null,
+      hideExternalReviews: false,
+      ...overrides,
+    };
+  }
+  function makeHc(pages: number | null): HardcoverBook {
+    return {
+      goodreadsId: "0",
+      hardcoverId: null,
+      hardcoverSlug: null,
+      title: null,
+      pages,
+      rating: null,
+      ratings_count: 0,
+      reviews_count: 0,
+      users_count: 0,
+      users_read_count: 0,
+      release_year: null,
+    } as HardcoverBook;
+  }
+
+  it("returns null total and zero/zero coverage for an empty year", () => {
+    expect(computeYearPagesTotal([], new Map())).toEqual({
+      totalPages: null,
+      pagesCoverage: { withPages: 0, total: 0 },
+    });
+  });
+
+  it("sums pages and reports partial coverage when only some books have records", () => {
+    // Three finished books, two with paged records (300 + 400 = 700),
+    // one without — sum is 700, coverage is 2 of 3.
+    const books = [makeBook({ slug: "a" }), makeBook({ slug: "b" }), makeBook({ slug: "c" })];
+    const hc = new Map<string, HardcoverBook>([
+      ["a", makeHc(300)],
+      ["b", makeHc(400)],
+      // c missing from the cache
+    ]);
+    expect(computeYearPagesTotal(books, hc)).toEqual({
+      totalPages: 700,
+      pagesCoverage: { withPages: 2, total: 3 },
+    });
+  });
+
+  it("treats null or zero pages as missing coverage", () => {
+    // Both books present in the cache, but neither has a usable `pages`.
+    const books = [makeBook({ slug: "a" }), makeBook({ slug: "b" })];
+    const hc = new Map<string, HardcoverBook>([
+      ["a", makeHc(null)],
+      ["b", makeHc(0)],
+    ]);
+    expect(computeYearPagesTotal(books, hc)).toEqual({
+      totalPages: null,
+      pagesCoverage: { withPages: 0, total: 2 },
+    });
+  });
+
+  it("returns sum with full coverage when every book has a paged record", () => {
+    const books = [makeBook({ slug: "a" }), makeBook({ slug: "b" })];
+    const hc = new Map<string, HardcoverBook>([
+      ["a", makeHc(250)],
+      ["b", makeHc(175)],
+    ]);
+    expect(computeYearPagesTotal(books, hc)).toEqual({
+      totalPages: 425,
+      pagesCoverage: { withPages: 2, total: 2 },
+    });
   });
 });
 

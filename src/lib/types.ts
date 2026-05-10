@@ -130,6 +130,17 @@ export type YearStats = {
   // finishes are 0. Books missing a Hardcover `pages` value contribute
   // nothing — the chart silently degrades for incomplete cache coverage.
   pagesByMonth: number[];
+  // Sum of Hardcover `pages` across every finished book in the year that
+  // has a paged Hardcover record. Null when zero finished books in the
+  // year have such a record — the Topline tile degrades silently in that
+  // case, mirroring `longestBook`.
+  totalPages: number | null;
+  // Coverage of the totalPages number: how many finished books in the
+  // year had a paged Hardcover record, out of the total number of
+  // finished books in the year. Lets the Topline tile show
+  // "from N of M books with page data" so the user knows when the sum
+  // under-counts.
+  pagesCoverage: { withPages: number; total: number };
 };
 
 export type LongestBook = {

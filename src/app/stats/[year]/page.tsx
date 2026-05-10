@@ -134,8 +134,16 @@ function Topline({ stats }: { stats: YearStats }) {
       value: stats.averageRating !== null ? stats.averageRating.toFixed(2) : "—",
       hint: stats.rated > 0 ? `over ${stats.rated} rated` : undefined,
     },
-    { label: "Started", value: String(stats.startedInYear) },
   ];
+  if (stats.totalPages !== null) {
+    const { withPages, total } = stats.pagesCoverage;
+    items.push({
+      label: "Pages",
+      value: stats.totalPages.toLocaleString("en-US"),
+      hint: `from ${withPages} of ${total} books with page data`,
+    });
+  }
+  items.push({ label: "Started", value: String(stats.startedInYear) });
   if (stats.abandoned > 0) {
     items.push({ label: "Abandoned", value: String(stats.abandoned) });
   }
