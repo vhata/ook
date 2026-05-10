@@ -9,6 +9,7 @@
 .PHONY: help install dev build check format lint typecheck test e2e clean \
 	vault-lint vault-backfill vault-backfill-apply vault-series-rosters \
 	vault-series-rosters-apply vault-hardcover-books vault-hardcover-books-apply \
+	vault-import-kindle vault-import-kindle-apply \
 	deploy-status deploy-logs
 
 help: ## Show this help
@@ -89,6 +90,12 @@ vault-hardcover-books: ## Dry-run: look up every vault book on Hardcover by good
 
 vault-hardcover-books-apply: ## Apply: write _meta/hardcover-books.json (rating, ratings_count, pages)
 	@node scripts/backfill-hardcover-books.mjs --apply
+
+vault-import-kindle: ## Dry-run: parse a Kindle My Clippings.txt and append matched highlights into per-book quotes.md (FILE=path)
+	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)")
+
+vault-import-kindle-apply: ## Apply: write quotes.md updates from a Kindle My Clippings.txt (FILE=path)
+	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)") --apply
 
 deploy-status: ## Recent Vercel deploys for this project (status, env, age)
 	@npx -y vercel@latest ls 2>&1 | head -16
