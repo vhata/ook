@@ -44,6 +44,19 @@ export function SiteChrome({ children }: { children: ReactNode }) {
             </a>
             {" · "}built from a markdown vault
           </p>
+          <p className="mt-2">
+            <a href="/shelf" className="hover:text-ink underline underline-offset-2">
+              shelf
+            </a>
+            {" · "}
+            <a href="/now" className="hover:text-ink underline underline-offset-2">
+              now
+            </a>
+            {" · "}
+            <a href="/feed.xml" className="hover:text-ink underline underline-offset-2">
+              feed
+            </a>
+          </p>
         </footer>
       )}
     </>

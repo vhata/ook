@@ -16,7 +16,7 @@ Legend: ✓ shipped · ⋯ in progress
 - ✓ Per-book pages render the book's tags as small badges.
 - ✓ Per-book document title is `<Title> — <Author> · ook`; layout title template "%s · ook".
 - ✓ Custom 404 page consistent with site styling (root + `/books/[slug]` segment variants).
-- ✓ Global footer with link back to the GitHub repo.
+- ✓ Global footer with link back to the GitHub repo, plus understated dot-separated links to `/shelf`, `/now`, and `/feed.xml` for chrome-level discoverability of the secondary public surfaces. Footer continues to suppress on `/now` via `SiteChrome`.
 - ✓ Open Graph metadata for the site title, description, and type.
 - ✓ Stats line under the home-page H1 (`N reading · M recently finished · X / Y bingo`).
 - ✓ Visual overhaul to Claude Design's D3 prototype: paper-and-ink + charcoal palette, Source Serif 4 + Inter Tight + IBM Plex Mono, rust accent, bordered stats strip, large hero "Reading now" card, finished grid with covers, bingo with id chips and per-square cover slots, TBR with sub-pile filter pills, sticky-TOC book pages with pullquote and cross-links.
