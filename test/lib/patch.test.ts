@@ -62,6 +62,32 @@ describe("applyPatch — frontmatter changes", () => {
     const parsed = parseMarkdownFile(result.after);
     expect(parsed.frontmatter.tags).toEqual(["scifi", "horror"]);
   });
+
+  it("bundles a finish flip with pullquote + rating in a single patch", () => {
+    // The finish-flow gate (admin agent) requires the agent to ask the
+    // user for a pullquote and rating before allowing status to flip to
+    // finished, then bundle all three changes into ONE propose_patch
+    // call. Pins that applyPatch handles that bundle as a single
+    // changeset and the resulting frontmatter carries every field.
+    const result = applyPatch(SAMPLE, {
+      frontmatter_changes: {
+        status: "finished",
+        rating: 5,
+        pullquote: "A man lives in a house of statues.",
+        finished: "2026-05-09",
+      },
+    });
+    const parsed = parseMarkdownFile(result.after);
+    expect(parsed.frontmatter.status).toBe("finished");
+    expect(parsed.frontmatter.rating).toBe(5);
+    expect(parsed.frontmatter.pullquote).toBe("A man lives in a house of statues.");
+    expect(parsed.frontmatter.finished).toBe("2026-05-09");
+    // Every key shows up in the changedFrontmatter audit so the diff
+    // preview can render them. status moved from reading → finished;
+    // rating was null and is now 5; pullquote + finished are brand-new.
+    const changedKeys = result.changedFrontmatter.map((c) => c.key).sort();
+    expect(changedKeys).toEqual(["finished", "pullquote", "rating", "status"]);
+  });
 });
 
 describe("applyPatch — frontmatter fidelity (surgical edits)", () => {

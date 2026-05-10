@@ -37,12 +37,31 @@ Critical rules:
 - One propose_patch per turn. If the user's intent is ambiguous, ask a clarifying question instead of guessing.
 - The commit_message is the audit trail. Include the user's verbatim free-text input in the body.
 
+Finish-flow rule (load-bearing):
+When the user reports finishing a book — anything that resolves to "status: finished" on that book — do NOT call propose_patch on the first turn. Instead, ask two follow-up questions in plain text:
+  1. A pullquote — a short memorable line from the book the user wants to associate with it.
+  2. A star rating from 1 to 5.
+The user has explicitly chosen this gate: they want to be forced to capture both at finish time. When their reply arrives, bundle the status flip with the pullquote and rating into ONE propose_patch call — never a sequence of separate commits.
+
+If the user refuses both questions, do not commit. The status flip is lost — the user chose this trade. Treat "skip", "I don't have one", "no pullquote", or simply leaving without answering as a refusal, and respond by saying you're not committing this finish so it can be redone later.
+
+Override: if the user clearly insists on committing without one or both ("just mark it finished, I don't have a pullquote", "skip the rating and commit anyway"), respect that and commit with what they gave you. The gate is default-on, not absolute.
+
+If the book is ALREADY finished (the get_book result shows status: finished) and the user is e.g. editing a quote or fixing a typo, the finish gate doesn't apply — proceed as usual.
+
+If the user includes the pullquote and rating in their initial free-text ("I just finished Piranesi, rating 5, pullquote 'a man lives in a house of statues'"), no follow-up is needed — bundle and propose_patch directly.
+
 Schema notes:
 - Frontmatter scalars: string, number, boolean, string array, or null (null deletes the key).
 - Section actions: replace, append, prepend.
 - Special section names "summary", "review", "quotes" map to top-level files (replace overwrites the file). Other names are H2 blocks in the reference notes.
 - Status values: tbr, reading, finished, abandoned, paused.
-- Dates: ISO YYYY-MM-DD.`;
+- Dates: ISO YYYY-MM-DD.
+- Pullquote lives in frontmatter as \`pullquote: "..."\` (string). Rating lives as \`rating: N\` (integer 1-5).`;
+
+// Exported for test pinning — the finish-flow rule is load-bearing
+// and a future agent.ts refactor must not silently drop it.
+export const FINISH_FLOW_INSTRUCTION_MARKER = "Finish-flow rule (load-bearing):";
 
 // Tool schemas exposed to Claude. We reuse the zod shapes from the
 // in-process tools — Anthropic's API takes JSON Schema, so we
@@ -124,13 +143,30 @@ const TOOL_DEFINITIONS: AnthropicTool[] = [
   },
 ];
 
+// Opaque per-turn state. The client round-trips this verbatim on
+// follow-up so the agent has its prior conversation (including
+// tool_use blocks the Anthropic SDK needs) without us re-running the
+// tool loop on every turn. The shape is private to agent.ts; the route
+// handler and the AdminConsole treat it as a black box.
+export type AgentState = {
+  // Anthropic.Messages.MessageParam[] — kept loose-typed at the public
+  // boundary so the route handler doesn't need the SDK types.
+  messages: unknown[];
+};
+
 export type AgentResult =
-  | { kind: "needs-clarification"; message: string; conversation: ConversationTurn[] }
+  | {
+      kind: "needs-clarification";
+      message: string;
+      conversation: ConversationTurn[];
+      state: AgentState;
+    }
   | {
       kind: "patch-staged";
       patch: CommitPatchInput;
       summary: string;
       conversation: ConversationTurn[];
+      state: AgentState;
     };
 
 export type ConversationTurn = {
@@ -151,6 +187,12 @@ export async function runAgent(opts: {
   model?: string;
   // Maximum tool-loop iterations before bailing — bounds runaway cost.
   maxIterations?: number;
+  // Opaque state from a previous turn. When present, the new userText
+  // is appended as a follow-up user message and the prior tool-use /
+  // tool-result history is replayed, so the agent can ask a question,
+  // get a reply, and proceed (e.g. the finish-flow pullquote+rating
+  // gate).
+  priorState?: AgentState;
 }): Promise<AgentResult> {
   const client = new Anthropic({ apiKey: opts.apiKey });
   const model = opts.model ?? "claude-opus-4-7";
@@ -163,7 +205,11 @@ export async function runAgent(opts: {
   // Anthropic SDK message types — keep loose to avoid wrestling the
   // exact union shape across SDK versions.
   type Message = Anthropic.Messages.MessageParam;
-  const messages: Message[] = [{ role: "user", content: opts.userText }];
+  // Seed with any prior history; append the new user text.
+  const messages: Message[] = [
+    ...((opts.priorState?.messages ?? []) as Message[]),
+    { role: "user", content: opts.userText },
+  ];
 
   for (let i = 0; i < maxIterations; i++) {
     const response = await client.messages.create({
@@ -203,6 +249,7 @@ export async function runAgent(opts: {
         kind: "needs-clarification",
         message: assistantText.trim() || "(no response)",
         conversation,
+        state: { messages },
       };
     }
 
@@ -232,6 +279,7 @@ export async function runAgent(opts: {
         patch: parsed.data,
         summary: assistantText.trim(),
         conversation,
+        state: { messages },
       };
     }
 
@@ -260,6 +308,7 @@ export async function runAgent(opts: {
       "Exceeded the maximum number of tool calls without staging a patch. " +
       "Please rephrase or break the request into smaller steps.",
     conversation,
+    state: { messages },
   };
 }
 

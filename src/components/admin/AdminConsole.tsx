@@ -13,13 +13,24 @@ type CommitPatchInput = {
 
 type ConversationTurn = { role: "user" | "assistant" | "tool"; text: string };
 
+// Opaque per-turn state from the server; round-tripped verbatim so
+// the agent has memory across HTTP turns. The shape is private to
+// agent.ts on the server — we just store and forward it.
+type AgentState = { messages: unknown[] };
+
 type AgentResult =
-  | { kind: "needs-clarification"; message: string; conversation: ConversationTurn[] }
+  | {
+      kind: "needs-clarification";
+      message: string;
+      conversation: ConversationTurn[];
+      state: AgentState;
+    }
   | {
       kind: "patch-staged";
       patch: CommitPatchInput;
       summary: string;
       conversation: ConversationTurn[];
+      state: AgentState;
     };
 
 type LastReindex = {
@@ -68,13 +79,17 @@ export default function AdminConsole() {
   async function submit() {
     setBusy(true);
     setError(null);
-    setAgent(null);
     setCommitted(null);
+    // Carry the prior state forward when this is a follow-up to a
+    // clarification (e.g. the finish-flow pullquote/rating gate);
+    // otherwise start fresh.
+    const priorState = agent?.kind === "needs-clarification" ? agent.state : undefined;
+    setAgent(null);
     try {
       const res = await fetch("/api/admin/agent", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ userText: text }),
+        body: JSON.stringify({ userText: text, priorState }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -82,6 +97,9 @@ export default function AdminConsole() {
       }
       const data: AgentResult = await res.json();
       setAgent(data);
+      // After a follow-up, clear the textarea so the user can answer
+      // the next question (or move on).
+      setText("");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -230,7 +248,19 @@ export default function AdminConsole() {
       {agent?.kind === "needs-clarification" && (
         <section className="border-rule rounded border border-dashed p-5">
           <h2 className="font-serif text-ink m-0 mb-2 text-[18px] font-medium">Clarification</h2>
-          <p className="text-[14px] leading-[1.5]">{agent.message}</p>
+          <p className="text-[14px] leading-[1.5] whitespace-pre-wrap">{agent.message}</p>
+          <p className="text-ink-soft mt-3 text-[12px] italic">
+            Type your answer above. The conversation is carried forward.
+          </p>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={reset}
+              className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase"
+            >
+              Start over
+            </button>
+          </div>
           <Conversation turns={agent.conversation} />
         </section>
       )}
