@@ -1,0 +1,118 @@
+name: vault-hygiene
+
+# Webhook-driven (and manually triggerable) vault hygiene. The webhook
+# handler at `src/app/api/webhooks/books/reindex/route.ts` fires a
+# `repository_dispatch` event of type `vault-hygiene` after every push
+# to `vhata/books` (subject to a short-circuit on its own auto-hygiene
+# commits). This workflow checks out both repos, runs `make vault-lint`
+# (fail-loud), runs the offline-fast backfills with `--apply` against
+# the books checkout, and pushes a single `Auto-hygiene:` commit if
+# anything changed.
+#
+# Loop avoidance: the next webhook fire after this workflow's push runs
+# the backfills again, finds no diff, no commit. The webhook handler
+# additionally short-circuits when the head commit message starts with
+# `Auto-hygiene:`, so the cheapest path is to never re-enter at all.
+#
+# Required secret: `GH_BOOKS_PAT` — a fine-grained PAT with
+# `contents: read+write` on `vhata/books`. The existing
+# `GITHUB_BOOKS_PAT` used by the `/admin` write surface has the same
+# permissions; the operator can either provision a separate secret of
+# the same shape or reuse the existing PAT under a new repo-secret name.
+#
+# Skipped intentionally: `scripts/backfill-tags.mjs` (Open Library) is
+# rate-limited and minutes-slow; it stays operator-initiated via
+# `make vault-backfill-apply`. Everything else is pure derivation.
+
+on:
+  repository_dispatch:
+    types: [vault-hygiene]
+  workflow_dispatch:
+
+# Coalesce rapid pushes — only the latest dispatch actually runs.
+concurrency:
+  group: vault-hygiene
+  cancel-in-progress: true
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # ook checkout — gives us the scripts and the lockfile.
+      - name: Checkout ook
+        uses: actions/checkout@v4
+        with:
+          path: ook
+
+      # vhata/books checkout — write-capable. Uses GH_BOOKS_PAT so the
+      # final `git push` actually has somewhere to go.
+      - name: Checkout books vault
+        uses: actions/checkout@v4
+        with:
+          repository: vhata/books
+          path: books
+          token: ${{ secrets.GH_BOOKS_PAT }}
+          fetch-depth: 1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: ook/pnpm-lock.yaml
+
+      - name: Install ook dependencies
+        working-directory: ook
+        run: pnpm install --frozen-lockfile
+
+      # Lint runs first — fail loud on a broken vault rather than
+      # commit a backfill on top of unresolved errors.
+      - name: Lint vault (fail-loud)
+        working-directory: ook
+        env:
+          BOOKS_DIR: ${{ github.workspace }}/books
+        run: make vault-lint
+
+      # Inlined safe-to-automate backfills. Mirrors `vault-backfill-apply`
+      # minus `backfill-tags.mjs` (Open Library, slow + rate-limited).
+      # Order matches the umbrella target's dependency order.
+      - name: Run idempotent backfills
+        working-directory: ook
+        env:
+          BOOKS_DIR: ${{ github.workspace }}/books
+        run: |
+          set -e
+          echo "→ source --apply"
+          node scripts/backfill-source.mjs --apply
+          echo "→ tags-from-peers --apply"
+          node scripts/backfill-tags-from-peers.mjs --apply
+          echo "→ see_also --apply (series + author)"
+          node scripts/backfill-see-also.mjs --apply
+          echo "→ see_also-from-tags --apply"
+          node scripts/backfill-see-also-from-tags.mjs --apply
+          echo "→ see_also-bidirectional --apply"
+          node scripts/backfill-see-also-bidirectional.mjs --apply
+
+      # Commit + push only if something actually changed. The bot
+      # identity matches the workflow's purpose so audit-trail readers
+      # can spot auto-commits at a glance.
+      - name: Commit + push if dirty
+        working-directory: books
+        run: |
+          set -e
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No changes — nothing to commit."
+            exit 0
+          fi
+          git config user.name "ook-vault-hygiene[bot]"
+          git config user.email "ook-vault-hygiene@users.noreply.github.com"
+          git add -A
+          REF="${{ github.event.client_payload.ref || github.sha }}"
+          git commit -m "Auto-hygiene: backfills on top of ${REF}"
+          git push
