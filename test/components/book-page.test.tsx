@@ -59,6 +59,7 @@ vi.mock("../../src/lib/books", async () => {
             body: "",
             review: "## Notes\n\nA wonderful book.",
             quotes: "> A quote.",
+            hardcover: null,
           }
         : null,
     findBingoYearForBook: async () => null,
@@ -122,7 +123,9 @@ describe("BookPage server component", { timeout: 15000 }, () => {
     const lib = await import("../../src/lib/books");
     const original = lib.getBookBySlug;
     (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
-      slug === "piranesi" ? { book: multiSeriesBook, body: "", review: null, quotes: null } : null;
+      slug === "piranesi"
+        ? { book: multiSeriesBook, body: "", review: null, quotes: null, hardcover: null }
+        : null;
 
     try {
       const BookPage = await importPage();

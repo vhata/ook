@@ -167,6 +167,24 @@ export type RosterMissing = {
   hardcoverSlug: string | null;
 };
 
+// Per-book metadata cached from Hardcover by goodreads_id. Populated by
+// `scripts/backfill-hardcover-books.mjs`; renderer reads it for the
+// "X readers · ★ Y" community signal on per-book pages. All fields nullable
+// because Hardcover may not have every book and the cache may be stale.
+export type HardcoverBook = {
+  goodreadsId: string;
+  hardcoverId: number | null;
+  hardcoverSlug: string | null;
+  title: string | null;
+  pages: number | null;
+  rating: number | null;
+  ratings_count: number;
+  reviews_count: number;
+  users_count: number;
+  users_read_count: number;
+  release_year: number | null;
+};
+
 // One book may belong to multiple series — Discworld is the canonical
 // case (every Witches/Watch/Tiffany Aching book is also a Discworld
 // book, with its own `#N` per series). Encoded in the vault as a

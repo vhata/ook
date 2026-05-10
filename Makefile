@@ -8,7 +8,7 @@
 
 .PHONY: help install dev build check format lint typecheck test e2e clean \
 	vault-lint vault-backfill vault-backfill-apply vault-series-rosters \
-	vault-series-rosters-apply
+	vault-series-rosters-apply vault-hardcover-books vault-hardcover-books-apply
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?##' $(MAKEFILE_LIST) \
@@ -82,5 +82,11 @@ vault-series-rosters: ## Dry-run: fetch full series rosters from Hardcover
 
 vault-series-rosters-apply: ## Apply: write _meta/series-rosters.json
 	@node scripts/backfill-series-rosters.mjs --apply
+
+vault-hardcover-books: ## Dry-run: look up every vault book on Hardcover by goodreads_id
+	@node scripts/backfill-hardcover-books.mjs
+
+vault-hardcover-books-apply: ## Apply: write _meta/hardcover-books.json (rating, ratings_count, pages)
+	@node scripts/backfill-hardcover-books.mjs --apply
 
 .DEFAULT_GOAL := help

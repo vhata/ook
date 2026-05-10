@@ -20,7 +20,7 @@ import {
   parseSeriesMemberships,
 } from "@/lib/books";
 import { remarkSpoilerDirective, slugify } from "@/lib/markdown";
-import type { Book, Connection, ConnectionReason } from "@/lib/types";
+import type { Book, Connection, ConnectionReason, HardcoverBook } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +44,7 @@ export default async function BookPage({ params }: { params: Params }) {
 
   if (!page) notFound();
 
-  const { book, review, quotes } = page;
+  const { book, review, quotes, hardcover } = page;
 
   const [allBooks, bingoYear, similar] = await Promise.all([
     getAllBooks(),
@@ -59,7 +59,7 @@ export default async function BookPage({ params }: { params: Params }) {
     <main className="mx-auto box-border w-full max-w-[1140px] px-6 py-12 sm:px-14 sm:pt-10 sm:pb-20">
       <HomeMark />
 
-      <BookHeader book={book} bingoYear={bingoYear} />
+      <BookHeader book={book} bingoYear={bingoYear} hardcover={hardcover} />
 
       <div className="grid grid-cols-1 gap-9 md:grid-cols-[180px_1fr]">
         <Toc
@@ -110,7 +110,15 @@ export default async function BookPage({ params }: { params: Params }) {
   );
 }
 
-function BookHeader({ book, bingoYear }: { book: Book; bingoYear: number | null }) {
+function BookHeader({
+  book,
+  bingoYear,
+  hardcover,
+}: {
+  book: Book;
+  bingoYear: number | null;
+  hardcover: HardcoverBook | null;
+}) {
   return (
     <header className="border-rule mb-12 grid grid-cols-1 gap-8 border-b pb-8 sm:grid-cols-[180px_1fr]">
       <div className="relative">
@@ -186,9 +194,42 @@ function BookHeader({ book, bingoYear }: { book: Book; bingoYear: number | null 
           </div>
         )}
         <ExternalLinkRow book={book} />
+        <HardcoverStats hardcover={hardcover} />
         <ShareRow slug={book.slug} />
       </div>
     </header>
+  );
+}
+
+function HardcoverStats({ hardcover }: { hardcover: HardcoverBook | null }) {
+  if (!hardcover || hardcover.ratings_count === 0) return null;
+  const url = hardcover.hardcoverSlug
+    ? `https://hardcover.app/books/${hardcover.hardcoverSlug}`
+    : null;
+  const ratingDisplay = hardcover.rating !== null ? hardcover.rating.toFixed(2) : null;
+  const readers = hardcover.users_count.toLocaleString("en-US");
+  const ratings = hardcover.ratings_count.toLocaleString("en-US");
+  const inner = (
+    <>
+      {ratingDisplay && <span className="text-star">★ {ratingDisplay}</span>}
+      {ratingDisplay && <span className="text-ink-dim">·</span>}
+      <span>
+        {ratings} ratings, {readers} readers
+      </span>
+      <span className="text-ink-dim">·</span>
+      <span className="text-ink-dim">on Hardcover</span>
+    </>
+  );
+  return (
+    <div className="text-ink-soft mt-3 flex flex-wrap items-center gap-2 text-[12px]">
+      {url ? (
+        <a href={url} target="_blank" rel="noreferrer" className="hover:text-accent flex gap-2">
+          {inner}
+        </a>
+      ) : (
+        <span className="flex gap-2">{inner}</span>
+      )}
+    </div>
   );
 }
 

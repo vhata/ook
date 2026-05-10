@@ -13,6 +13,7 @@ import type {
   ConnectionReason,
   DayActivity,
   ExternalLink,
+  HardcoverBook,
   LogEntry,
   Pullquote,
   RosterMissing,
@@ -384,6 +385,7 @@ export type BookPage = {
   body: string;
   review: string | null;
   quotes: string | null;
+  hardcover: HardcoverBook | null;
 };
 
 export async function getBookBySlug(slug: string): Promise<BookPage | null> {
@@ -400,12 +402,19 @@ export async function getBookBySlug(slug: string): Promise<BookPage | null> {
   const raw = await fs.readFile(refFile, "utf8");
   const { content } = matter(raw);
 
-  const [review, quotes] = await Promise.all([
+  const [review, quotes, hardcoverBooks] = await Promise.all([
     readOptionalFile(path.join(dir, "review.md")),
     readOptionalFile(path.join(dir, "quotes.md")),
+    loadHardcoverBooks(),
   ]);
 
-  return { book, body: content.trim(), review, quotes };
+  return {
+    book,
+    body: content.trim(),
+    review,
+    quotes,
+    hardcover: hardcoverBooks.get(slug) ?? null,
+  };
 }
 
 async function readOptionalFile(p: string): Promise<string | null> {
@@ -955,6 +964,48 @@ const loadSeriesRosters = cache(
     return out;
   },
 );
+
+// Per-book Hardcover metadata cached at `<vault>/_meta/hardcover-books.json`.
+// Populated by `scripts/backfill-hardcover-books.mjs`. Map keyed by vault
+// slug for O(1) lookup from `getBookBySlug`. Cached per request via
+// React `cache()`.
+type HardcoverBookFile = {
+  records?: Record<string, Partial<HardcoverBook>>;
+};
+
+const loadHardcoverBooks = cache(async (): Promise<Map<string, HardcoverBook>> => {
+  const file = path.join(booksDir(), META_DIR, "hardcover-books.json");
+  let raw: string;
+  try {
+    raw = await fs.readFile(file, "utf8");
+  } catch {
+    return new Map();
+  }
+  let parsed: HardcoverBookFile;
+  try {
+    parsed = JSON.parse(raw) as HardcoverBookFile;
+  } catch {
+    return new Map();
+  }
+  const out = new Map<string, HardcoverBook>();
+  for (const [slug, entry] of Object.entries(parsed.records ?? {})) {
+    if (!entry || typeof entry !== "object") continue;
+    out.set(slug, {
+      goodreadsId: typeof entry.goodreadsId === "string" ? entry.goodreadsId : "",
+      hardcoverId: typeof entry.hardcoverId === "number" ? entry.hardcoverId : null,
+      hardcoverSlug: typeof entry.hardcoverSlug === "string" ? entry.hardcoverSlug : null,
+      title: typeof entry.title === "string" ? entry.title : null,
+      pages: typeof entry.pages === "number" ? entry.pages : null,
+      rating: typeof entry.rating === "number" ? entry.rating : null,
+      ratings_count: typeof entry.ratings_count === "number" ? entry.ratings_count : 0,
+      reviews_count: typeof entry.reviews_count === "number" ? entry.reviews_count : 0,
+      users_count: typeof entry.users_count === "number" ? entry.users_count : 0,
+      users_read_count: typeof entry.users_read_count === "number" ? entry.users_read_count : 0,
+      release_year: typeof entry.release_year === "number" ? entry.release_year : null,
+    });
+  }
+  return out;
+});
 
 // For a given series, return the roster entries whose position isn't
 // matched by any known vault member's integer index. Roster entries
