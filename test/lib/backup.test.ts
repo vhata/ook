@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   generateBackupCode,
   hasBackupCode,
@@ -6,6 +6,11 @@ import {
   verifyBackupCode,
 } from "../../src/lib/auth/backup";
 import { MemoryStore, setStore } from "../../src/lib/store";
+
+// argon2 hashing legitimately takes 1-3s on a cold node start; under pre-commit
+// parallelism the default 5s vitest timeout has flaked intermittently. 10s gives
+// enough headroom without masking a genuine regression.
+vi.setConfig({ testTimeout: 10000 });
 
 afterEach(() => {
   setStore(null);
