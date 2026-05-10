@@ -8,7 +8,8 @@
 
 .PHONY: help install dev build check format lint typecheck test e2e clean \
 	vault-lint vault-backfill vault-backfill-apply vault-series-rosters \
-	vault-series-rosters-apply vault-hardcover-books vault-hardcover-books-apply
+	vault-series-rosters-apply vault-hardcover-books vault-hardcover-books-apply \
+	deploy-status deploy-logs
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?##' $(MAKEFILE_LIST) \
@@ -88,5 +89,14 @@ vault-hardcover-books: ## Dry-run: look up every vault book on Hardcover by good
 
 vault-hardcover-books-apply: ## Apply: write _meta/hardcover-books.json (rating, ratings_count, pages)
 	@node scripts/backfill-hardcover-books.mjs --apply
+
+deploy-status: ## Recent Vercel deploys for this project (status, env, age)
+	@npx -y vercel@latest ls 2>&1 | head -16
+
+deploy-logs: ## Tail logs from the latest production deploy
+	@LATEST=$$(npx -y vercel@latest ls --prod 2>/dev/null | awk '/https:\/\//{print $$3; exit}'); \
+		test -n "$$LATEST" || { echo "no production deploy found"; exit 1; }; \
+		echo "→ $$LATEST"; \
+		npx -y vercel@latest logs "$$LATEST"
 
 .DEFAULT_GOAL := help
