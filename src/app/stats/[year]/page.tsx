@@ -44,6 +44,7 @@ export default async function StatsYearPage({ params }: { params: Params }) {
         <>
           <Topline stats={stats} />
           {totalEvents > 0 && <Heatmap activity={activity} totalEvents={totalEvents} />}
+          {totalEvents > 0 && <LongestStreak activity={activity} />}
           {totalEvents > 0 && <WeekendSplit activity={activity} />}
           {stats.rated > 0 && <RatingHistogram stats={stats} />}
           <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-2">
@@ -243,6 +244,60 @@ function Heatmap({ activity, totalEvents }: { activity: DayActivity[]; totalEven
           <span className="text-ink-dim ml-auto hidden sm:inline">
             {monthLabels.map((m) => m.label).join(" · ")}
           </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function LongestStreak({ activity }: { activity: DayActivity[] }) {
+  // Longest run of consecutive calendar days with at least one event.
+  // `activity` is already day-by-day in date order, so a single linear
+  // scan finds it. We render only when the streak is at least 2 days —
+  // a single-day "streak" isn't a streak; it's just a day with reading.
+  let bestLen = 0;
+  let bestStart = "";
+  let bestEnd = "";
+  let curLen = 0;
+  let curStart = "";
+  for (const d of activity) {
+    if (d.count > 0) {
+      if (curLen === 0) curStart = d.date;
+      curLen++;
+      if (curLen > bestLen) {
+        bestLen = curLen;
+        bestStart = curStart;
+        bestEnd = d.date;
+      }
+    } else {
+      curLen = 0;
+    }
+  }
+  if (bestLen < 2) return null;
+
+  const fmt = (iso: string) =>
+    new Date(`${iso}T00:00:00Z`).toLocaleDateString("en", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+
+  return (
+    <section className="mt-12">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
+        <h2 className="font-serif text-ink m-0 text-[22px] leading-tight font-medium tracking-[-0.012em]">
+          Longest streak
+        </h2>
+        <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
+          consecutive reading days
+        </span>
+      </div>
+      <div className="bg-surface border-rule rounded border p-5">
+        <div className="font-serif text-ink text-[28px] leading-none font-medium tracking-[-0.015em]">
+          {bestLen} <span className="text-ink-soft text-[18px]">days</span>
+        </div>
+        <div className="text-ink-soft mt-2 text-[13px]">
+          {fmt(bestStart)} – {fmt(bestEnd)}
         </div>
       </div>
     </section>
