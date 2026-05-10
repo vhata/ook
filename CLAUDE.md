@@ -46,6 +46,21 @@ When a new feature, polish item, or design idea surfaces in conversation — whe
 
 **How to apply:** keep `outputFileTracingIncludes: { "*": ["./.vault/**/*"] }` in `next.config.ts` as a wildcard. Resist the urge to enumerate routes — every new route that reads vault data would silently break, and the symptom (works on dev, dies on Vercel) eats hours.
 
+### Voice > integrations > automation > polish
+
+**Why:** the project's organising tension surfaced clearly on 2026-05-10 after a stretch of stacking external-API integrations (four Hardcover-derived data layers in two days). The user's words: "I want more of MY voice into the site, but also one of our core tenets is 'no homework' — a few targeted questions every now and then would be very tenable and not feel like a slog." Translation: the goal isn't to render more of the world's data on the site; it's to draw out more of the user's reflections at the right moments. External data is supporting cast, not the lead.
+
+**How to apply:** when proposing new features, weight them in this order:
+
+1. **Voice** — anything that captures or surfaces the user's own reflections, opinions, marginalia, mood. Finish-flow gate (asks for pullquote + rating at finishing time), `/admin/backfill` (3-5 skippable gap-fill questions per visit) are the worked examples. Always one or two questions at a meaningful moment, never form-fill. The user navigated to the surface OR was already in the flow; the prompt piggybacks. Every prompt has a clean skip path.
+2. **Integrations** — Hardcover, Open Library, etc. Useful when they enrich what's there, suspect when they start to dominate. Test: does this feature give the site MORE of the user's voice, or more of someone else's?
+3. **Automation** — webhooks, cron, auto-hygiene workflows. Save time, but each is a moving part to maintain.
+4. **Polish** — visual or developer-experience improvements. Last because they don't change the substance.
+
+**Watch for the failure mode of feature accumulation**: a stretch where each individual addition feels small and obvious in the moment, but the cumulative drift moves the site away from "personal reading record" toward "Hardcover aggregator with a personal tab." If you find yourself proposing a fifth integration-driven feature in one session, stop and ask the user whether the axis is right — that conversation happened on 2026-05-10 and the recalibration was load-bearing.
+
+The TODO entries in the "Agent prompts at state-change moments" section codify the next moves on the voice axis (start-prompt, 5-star-unreviewed, streak milestones, quiet-return, series-completion) — these are deliberately deferred until the first one (finish-flow gate) has lived through real use.
+
 ### External-API enrichment goes through a vault-committed cache, not a build-time fetch
 
 **Why:** the build runs on Vercel, in CI on every push, and at every preview deploy. Adding a build-time API call to Hardcover / Open Library / Wikipedia would couple deploy success to the API's uptime, hit rate-limit caps when many builds run in a window, and require provisioning the API token in Vercel. Operator-initiated cache scripts (run from the laptop, output committed to the books vault) keep the build offline-clean and put the timing of the API spend under human control.

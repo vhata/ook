@@ -8,6 +8,10 @@ Live in production at https://b-ook.vercel.app. Vault (`vhata/books`) is a priva
 
 Corpus size as of May 2026 is ~230 books after a Goodreads bulk-import. To keep cold-start serverless reads fast at that scale, the vault is preprocessed at build time into a single `_index.json` (see `scripts/build-index.mjs` and the index-first read path in `src/lib/books.ts`) and Next's file-tracing is told to include the cloned vault in every route bundle.
 
+## Running locally
+
+Set `BOOKS_DIR` in `.env.local` to the absolute path of a books vault (see `.env.example` for the full set of optional env vars). `make install` for dependencies, `make dev` to start the dev server. `make` with no target lists every workflow. Dev mode walks the vault on each request rather than reading the build-time `_index.json` — slower but means changes to vault files appear without a rebuild.
+
 ## Tech stack
 
 - Language: TypeScript
@@ -97,7 +101,7 @@ Operator-only (local; never set on Vercel):
 
 The user-facing surfaces:
 
-- **`/admin`** — passkey-gated owner-only console. Renders one of three states (claim, sign-in, authed) based on session + credential count. The authed state is a single textarea: free-text input → server-side Claude API loop with MCP tools attached → diff preview → confirm → commit. Built from `src/components/admin/{RegisterForm,SignInForm,AdminConsole}.tsx`.
+- **`/admin`** — passkey-gated owner-only console. Renders one of three states (claim, sign-in, authed) based on session + credential count. The authed state is a single textarea: free-text input → server-side Claude API loop with MCP tools attached → diff preview → confirm → commit. The agent's system prompt encodes the **finish-flow gate**: when the user reports finishing a book, the agent asks for a pullquote and a star rating before staging the patch, then bundles status + finished date + pullquote + rating into one `propose_patch`. Tab-close between the question and the answer loses the status flip (by owner-stated design — see SPEC glossary). To make ask/answer/ask/answer/commit work, the `/api/admin/agent` endpoint round-trips an opaque `state` handle (the Anthropic SDK `messages` array) and the `AdminConsole` carries it forward across follow-up submits. Built from `src/components/admin/{RegisterForm,SignInForm,AdminConsole}.tsx`.
 - **`/admin/audit`** — passkey-gated audit log of recent commits to the cloned `.vault/`. Shells out to `git log` (last 50 commits with `--shortstat` for files-changed counts) via `src/lib/admin/audit.ts`; renders date, subject, author, file count, and a deep-link to the commit on `vhata/books`. Unauthenticated requests bounce to `/admin`. Closes the "did that commit go through?" loop without leaving the site.
 - **`/admin/backfill`** — passkey-gated "fill the gaps" view. Picks 3-5 small, skippable questions per visit from the corpus of finished books missing one piece of metadata each (rating, review on a top-rated finish, would-reread on a 5-star). Pure derivation via `src/lib/admin/backfill.ts` — no network. Each save posts a structured `CommitPatchInput` directly to `/api/admin/agent/commit`, so commits ride the same `via ook-admin/<id>` trailer and audit-log entry as the orchestrated `/admin` console. Skip is purely client-side state. Honours the "no homework" tenet: the user navigated here deliberately, every card is dismissable, and the visit ends with a tidy "that's all for this visit" footer.
 - **`/api/mcp/[transport]`** — MCP HTTP transport for external agents (Claude Code, Claude Desktop). Same auth gate; same tools. Stateless, JSON-mode `WebStandardStreamableHTTPServerTransport`.
@@ -116,6 +120,7 @@ Vault client: `src/lib/github.ts` exports a `VaultClient` interface with two ada
 Disciplines specific to the write surface:
 
 - **The agent never commits.** The diff preview is the structural safety net — `propose_patch` is the only write-shaped tool exposed to Claude in `/admin`, and it physically returns the staged patch to the client rather than mutating anything.
+- **Commit-trailer marks MCP-tool writes.** Every commit landed through the MCP write tools carries a `via ook-admin/<session-id>` trailer appended at module load (`src/lib/mcp/trailer.ts`; 7-char `crypto.randomUUID()` slice, stable per warm Fluid Compute instance). `/admin/audit` parses the trailer and renders a "via MCP" chip on those rows so direct pushes to `vhata/books` are distinguishable at a glance. Idempotent: re-tagging an already-tagged message is a no-op.
 - **Sections are opt-in on `get_book`.** Reduces prompt-injection surface — if the patch is to `progress`, the agent has no excuse to fetch `quotes`.
 - **Commit-patch validates after applying.** Title must remain non-empty; status must remain a valid `BookStatus`; authors must remain a string array if present.
 - **Optimistic store updates.** Every write committed via the vault client also updates the corresponding store key in-process so subsequent reads don't need to wait for the webhook reindex.
@@ -135,3 +140,4 @@ Env vars required for the write surface to operate in production:
 ## Open questions
 
 - **`summary.md` content.** The convention says it's a "full-spoiler plot summary," but tier 1 puts it one click away. For books where the summary really is full-spoiler (Ra), one option is moving that content into the reference notes (tier 2) and reserving `summary.md` for tier-1 synopses. Decide as the user populates more.
+- **Finish-flow gate** (shipped 2026-05-10) is a deliberate violation of the otherwise-strict "never gate the action" admin tenet. The bet: forcing the most evocative metadata (pullquote, rating) in at finish-time produces a fuller record than scraping it from `/admin/backfill` later. Watch in real use; if tab-close-loses-the-flip burns, revert is single-commit. The pattern-extension TODOs (`start prompt`, `5-star unreviewed`, `streak milestone`, `quiet-return`, `series completion`) are deferred until this trade has lived through a week or two.

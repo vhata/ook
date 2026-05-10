@@ -2,61 +2,44 @@
 
 What I'm reading, what I've read, and the bingo card I'm chasing.
 
-## Status
+Live at **https://b-ook.vercel.app**.
 
-Live at https://b-ook.vercel.app — vault data lives in private `vhata/books`, cloned at build time via deploy key + webhook redeploys on push. Around 230 books in the corpus as of May 2026 after a Goodreads bulk-import; the renderer relies on a build-time `_index.json` so cold-start serverless reads are fast at that scale.
+## What this is
 
-**Home page** — currently-reading, recently-finished, the year's bingo card, TBR piles, a rotating pullquote, an "on this day" strip when there are past-year matches, and a "Remember this?" serendipity card surfacing a finished book from over a year ago.
+A personal website for one reader. Not a tracker app, not for signing up — just one person's reading life, rendered from their notes.
 
-**Per-book pages** with tiered spoiler reveal (catalog always · synopsis/review/quotes one click · deep notes fetched after explicit opt-in), an outbound link row (Goodreads · Hardcover · Storygraph · Bookwyrm) for any IDs in frontmatter, a Share row exposing the per-book QR and postcard endpoints, a "Threads" sidebar of algorithmically-similar books alongside user-curated see-also links, a "Stuck" badge on books that earned full attention, marginalia-style quotes rendering, and a postal-stamp flourish for finished books. Books without a `cover:` URL get a procedural hash-coloured SVG cover.
+The home page shows what I'm reading now, what I just finished, and the year's reading bingo card. Every book gets its own page with whatever I've written about it. There's a reading log going back through the years, charts showing rating drift over time, a shelf view of every finished book as a vertical bookspine, a printable bibliography per year, and a few quieter corners — a random-book button, "remember this?" cards, an "on this day" strip when something matches today's date in a previous year.
 
-**Other routes** — `/log` (reading log grouped by month, with a drought banner for quiet stretches and manual entries from `_meta/log.md`); `/stats` (years-in-reading index, rating-over-time chart, word-frequency cloud across reviews, finishing-patterns callout) and `/stats/[year]` (annual stats with rating histogram, top tags/authors, GitHub-style heatmap, weekday-vs-weekend split, year-end cover mosaic, link to the printable bibliography); `/series` (group by series with `#N` ordering); `/shelf` (every finished book as a vertical SVG spine, sortable); `/discover` (most-connected book pairs by see-also/series/author/tag); `/tags` and `/tags/[tag]` (taxonomy + filter, with a "Strongest pairings" overview at the index); `/triage` (pool of books to decide on — recommendations from `_meta/triage.md` plus unfleshed Goodreads imports); `/changelog` (recent vault edits grouped by Monday-anchored week); `/vault-health` (frontmatter shape audit, split by source) and `/schema` (corpus-wide field-coverage view — companion to vault-health); `/print/[year]` (printable A4 bibliography); `/random` (jump to a random finished book); `/feed.xml` and `/feed.json` (subscribable feeds of finished books). Per-book share endpoints: `/books/[slug]/qr` (QR PNG) and `/books/[slug]/postcard.png` (cover-and-pullquote postcard via `next/og`). Time-machine view at `/?at=YYYY-MM-DD`. Light/dark theme toggle plus seasonal accent drift. `robots.txt` and `sitemap.xml` shipped via app-router conventions.
+If you're a reader, you might find some of the shapes interesting. If you're a developer, the technical story is in `ARCHITECTURE.md` and the per-feature history is in `FEATURES.md`.
 
-## How to run
+## What you'll see
 
-Set `BOOKS_DIR` in `.env.local` to the absolute path of your books vault (see `.env.example`). Run `make install` to set up dependencies, then `make dev` to start the dev server. Run `make` (no target) for the full list of commands.
+**Books.** Each book page leads with the basics — title, author, status, rating, when I finished it, which bingo square it claimed, what tags I gave it. Below that, the substance: a one-paragraph synopsis, my review, my favourite quotes, all tucked behind a click so the page stays clean until you ask. Spoiler-heavy notes ("deep notes") only load if you really opt in — they're never on the initial page, so search engines can't index them. Where the book exists on Goodreads, Hardcover, Storygraph, or Bookwyrm, there's an outbound link row, and a quiet line showing the Hardcover community's average rating and reader count.
 
-## Scripts
+**Bingo.** Each year has a 5×5 reading bingo card — themed squares ("a book published the year you were born", "a book by an author from a country you've never visited", etc.) that I fill in over the course of the year. The home page shows the current year; previous years are linked from there.
 
-Vault-side helpers in `scripts/`. Each computes its changeset once, prints the diff, then either writes immediately (when invoked with `--apply` directly) or asks `Apply these N changes? [y/N]` (when stdin is a TTY). Non-TTY stdin (CI, pipes, redirected input) skips the prompt and exits with the diff as the whole output. The Make targets cover the interactive path; for non-interactive apply (CI workflows), call the script directly with `--apply` — that's the path the `vault-hygiene` GitHub Actions workflow uses. `make vault-lint` is the read-only audit; `make vault-backfill` runs the routine ones in dependency order, prompting per-script.
+**The reading log.** Every book I've started, finished, or noted, grouped by month. Long quiet stretches get a gentle "X days since the last event" banner — I find it useful, you might too.
 
-**Bulk imports.**
+**Stats.** Per-year pages with the obvious things (count finished, average rating, top tags and authors) plus a few less obvious ones — a GitHub-style heatmap of reading days, longest book, reading-velocity estimate on whatever I'm currently reading, weekday-vs-weekend split, a year-end cover mosaic of everything finished. The `/stats` index has a rating-over-time chart that shows whether I've been getting harsher or kinder, and a word-frequency cloud of the things I keep saying in reviews.
 
-- **`promote-goodreads.mjs`** — bulk-mint per-book vault directories from `_meta/goodreads.md`.
-- **`import-triage.mjs`** — convert a CSV of recommendations into `_meta/triage.md`; promotes Read=truthy rows to vault directories.
+**Series, tags, shelf, discover.** `/series` groups books by series and shows how far through I am, leaning on Hardcover for the canonical roster when one exists. `/tags` is the tag taxonomy with co-occurrences. `/shelf` is every finished book as a bookspine. `/discover` is the most-connected pairs of books in the corpus, scored by shared series / author / tags / cross-references — a way to surface unexpected resonances.
 
-**Backfills (corpus-derived, idempotent).**
+**The little things.** A `/now` page suitable for embedding on a personal homepage. Subscribable feeds in Atom and JSON Feed. A printable A4 bibliography per year. Per-book QR codes and shareable postcards. A random-book button. A time-machine view that renders the home page as it would have looked on any past date. Light / dark / auto theme toggle. The accent colour drifts gently across the year — rust in winter, ochre in spring, slate-blue in summer, forest in autumn.
 
-- **`backfill-source.mjs`** — set the `source: goodreads | media-list | manual` frontmatter field on every book based on body markers.
-- **`backfill-tags.mjs`** — fetch subjects from Open Library and map them through a curated vocabulary.
-- **`backfill-tags-from-peers.mjs`** — extend tags for thinly-tagged books by tallying tags across same-series, same-author, and see-also peers under signal-source-aware thresholds.
-- **`backfill-see-also.mjs`** — derive cross-references from same-series and same-author peers.
-- **`backfill-see-also-from-tags.mjs`** — extend see-also via tag-Jaccard similarity, with diversity caps to keep heavily-tagged series from crowding out other recommendations.
-- **`backfill-see-also-bidirectional.mjs`** — close the loop: where `A → B` but `B` doesn't link back, propose adding `A` to `B`'s see-also.
+## Anti-features (deliberately not here)
 
-**External enrichment (operator-run, internet-touching).**
-
-- **`backfill-series-rosters.mjs`** — fetch the canonical full member list for each series the vault knows about from Hardcover GraphQL and write `_meta/series-rosters.json` to the vault. Run via `make vault-series-rosters` (prompts to apply when interactive). Requires `HARDCOVER_TOKEN` in env. Internet only at user-initiated `make` time; the cache is committed so the build stays offline-clean. The `/series` renderer reads it at request time to surface missing-from-vault entries with their canonical title and author, and to use the canonical total in the header ("3 of 41 read").
-- **`backfill-hardcover-books.mjs`** — look up each vault book on Hardcover by `goodreads_id` and write `_meta/hardcover-books.json` keyed by vault slug. Captures rating, ratings_count, reviews_count, users_count, pages, release_year. Run via `make vault-hardcover-books`. Requires `HARDCOVER_TOKEN`. Same offline-clean discipline as the rosters script. The per-book page renderer reads it to surface a community-signal line ("★ 4.07 · 3,508 ratings, 7,460 readers · on Hardcover").
-- **`backfill-hardcover-reviews.mjs`** — fetch the top 2-3 short, high-rating, non-spoiler reviews per book from Hardcover (`user_books` table) and write `_meta/hardcover-reviews.json` keyed by vault slug. Quality filter: rating ≥ 3, body 80..600 chars, no spoilers; sorted by `likes_count`. Run via `make vault-hardcover-reviews`. Requires `HARDCOVER_TOKEN`. The per-book page surfaces them inside a click-to-reveal "What others said" disclosure; per-book opt-out via `hide_external_reviews: true` in frontmatter.
-- **`backfill-hardcover-ids.mjs`** — copy `hardcoverSlug` and `hardcoverId` from the existing `_meta/hardcover-books.json` cache into each book's frontmatter as `hardcover_slug` and `hardcover_id`, so the renderer's outbound external-link row can produce a Hardcover link without a manual annotation. Pure cache-to-frontmatter — no network. Run via `make vault-hardcover-ids`. Surgical line-level frontmatter writes (no whole-block re-serialisation); idempotent (per-field skip on already-set values). Depends on `make vault-hardcover-books` having run first.
-- **`import-kindle-clippings.mjs`** — one-shot importer. Parses a `My Clippings.txt` from a physical Kindle (UTF-8 or UTF-16-LE; CRLF tolerated), fuzzy-matches each highlight's title to a vault directory, and appends new highlights into the matched book's `quotes.md` under a `## From Kindle` block (Notes go under `## Notes from Kindle`). Per-entry stable hashes make re-runs idempotent. Unmatched titles land in `_meta/kindle-unmatched.md` for the operator to triage. Run via `make vault-import-kindle FILE=…` (prompts to apply when interactive). With no `FILE`, defaults to `/Volumes/Kindle/documents/My Clippings.txt`.
-- **`sync-hardcover-status.mjs`** — vault → Hardcover one-way sync. Pushes the vault's `status`, `rating`, `started`, and `finished` fields up to the operator's Hardcover account via GraphQL mutations, so a durable second copy of the reading record lives outside ook. Run via `make vault-hardcover-sync`. Requires `HARDCOVER_TOKEN`. Idempotent: a sync-state cache at `_meta/hardcover-sync-state.json` short-circuits no-op re-runs, and the script does a remote diff check before every mutation. Also wired into `.github/workflows/vault-hygiene.yml` so every vault push runs it automatically when the `HARDCOVER_TOKEN` repo secret is populated.
-
-**Audit + build.**
-
-- **`vault-lint.mjs`** — local CLI that runs the same checks as `/vault-health`, including the corpus-level orphan and asymmetric-see-also detectors.
-- **`fetch-vault.mjs`** + **`build-index.mjs`** — the prebuild chain: clone the vault on Vercel, then build a single-file index for fast cold starts.
+- Anyone else's reading. This is one reader's site.
+- Sign-up, accounts, comments, ratings from others, social anything.
+- A general-purpose Goodreads alternative. This is books I've read; not a tracker for everyone.
 
 ## Documents
 
-- `SPEC.md` — what this project is.
-- `ARCHITECTURE.md` — how it's built.
-- `PROCESS.md` — how we work.
-- `FEATURES.md` — what's shipped.
-- `TODO.md` — what's planned.
-- `ACCEPTANCE.md` — release gates.
+- `SPEC.md` — what this project is, in full.
+- `ARCHITECTURE.md` — how it's built (stack, scripts, env vars, disciplines). Start here if you want to run it locally.
+- `PROCESS.md` — how the work happens.
+- `FEATURES.md` — the full shipped-feature ledger.
+- `TODO.md` — what's next.
 
 ## License
 
-MIT
+MIT.
