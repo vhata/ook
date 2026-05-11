@@ -288,6 +288,9 @@ export type DayActivity = {
 export type ConnectionReason = {
   kind: "see-also" | "series" | "author" | "tag";
   detail: string;
+  // Per-reason point contribution to the pair's score — surfaced by the
+  // discover tooltip so each row's number is explainable.
+  points: number;
 };
 
 export type TagSummary = {
@@ -304,4 +307,11 @@ export type Connection = {
   b: { slug: string; title: string; authors: string[]; cover: string | null };
   score: number;
   reasons: ConnectionReason[];
+  // True when the two books look like the same work in different
+  // markets (e.g. the UK Philosopher's Stone and the US Sorcerer's
+  // Stone): nearly identical titles, bidirectional see-also, and a
+  // shared series membership at a matching `#N` index. The discover
+  // renderer collapses these into a single "Same book, different
+  // markets" row rather than treating them as a generic connection.
+  sameBook?: boolean;
 };

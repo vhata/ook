@@ -17,11 +17,6 @@ Resolves the prior "clarify purpose" verdict in favour of keeping `/shelf` as or
 - **Bingo + currently-reading markers**: 2px accent stripe along the top edge of the spine for books on the active bingo card; a small bookmark tongue above the shelf line for currently-reading. `#feature #shelf #visual`
 - **Paused / abandoned styling**: paired with the `/now` paused state above. Paused spine is matte (no highlight); abandoned spine renders a broken-spine treatment. Both still on the shelf — `/shelf` is the archive. `#feature #shelf #visual`
 
-### `/discover` — score tooltip + regional-title dedupe (review 2026-05-11)
-
-- **Tooltip the `SCORE`**: explain the weights inline ("see-also 10 + series 5 + author 2 + 2 shared tags = 19"). Or drop the number entirely if it isn't pulling weight. Floating numbers without legends are design ballast. `#polish #discover #ux`
-- **Dedupe regional-title pairs**: rule — if title similarity > 85% AND see-also bidirectional AND series + N match → collapse into one entry, optionally surfaced as "Same book, different markets." Closes the Philosopher's-vs-Sorcerer's-Stone duplicate at the top of `/discover`. `#feature #discover #dedupe`
-
 ### `/stats` — ratings-over-time caption + heatmap fallback (review 2026-05-11)
 
 - **Ratings-over-time lean-in caption** (decided 2026-05-11): keep the existing rolling-average chart but add a self-aware caption — "a record of taste calibration" or similar. Lean into the editorial honesty that the post-2018 ~4.8 average reflects "I only log books I expect to love." The reviewer's alternative (re-frame as stacked bars per year) is **not** the chosen path. `#polish #stats #editorial`

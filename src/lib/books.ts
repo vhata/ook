@@ -4,6 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { cache } from "react";
 import matter from "gray-matter";
+import { dedupeRegionalTitles } from "./discover";
 import type {
   Book,
   BookStatus,
@@ -1129,30 +1130,35 @@ function scorePair(a: Book, b: Book): { score: number; reasons: ConnectionReason
   const aLinksB = a.seeAlso.includes(b.slug);
   const bLinksA = b.seeAlso.includes(a.slug);
   if (aLinksB && bLinksA) {
-    score += 6;
-    reasons.push({ kind: "see-also", detail: "linked both ways" });
+    const points = 6;
+    score += points;
+    reasons.push({ kind: "see-also", detail: "linked both ways", points });
   } else if (aLinksB || bLinksA) {
-    score += 4;
-    reasons.push({ kind: "see-also", detail: "linked" });
+    const points = 4;
+    score += points;
+    reasons.push({ kind: "see-also", detail: "linked", points });
   }
 
   if (a.series && a.series === b.series) {
-    score += 5;
-    reasons.push({ kind: "series", detail: a.series });
+    const points = 5;
+    score += points;
+    reasons.push({ kind: "series", detail: a.series, points });
   }
 
   const sharedAuthors = a.authors.filter((x) => b.authors.includes(x));
   if (sharedAuthors.length > 0) {
-    score += 3 * sharedAuthors.length;
-    reasons.push({ kind: "author", detail: sharedAuthors.join(", ") });
+    const points = 3 * sharedAuthors.length;
+    score += points;
+    reasons.push({ kind: "author", detail: sharedAuthors.join(", "), points });
   }
 
   const sharedTags = a.tags.filter((t) => b.tags.includes(t));
   if (sharedTags.length > 0) {
     // Cap tag contribution so a long shared-tag list doesn't dominate
     // explicit signals; render up to three tags in the reason.
-    score += Math.min(sharedTags.length, 5);
-    reasons.push({ kind: "tag", detail: sharedTags.slice(0, 3).join(", ") });
+    const points = Math.min(sharedTags.length, 5);
+    score += points;
+    reasons.push({ kind: "tag", detail: sharedTags.slice(0, 3).join(", "), points });
   }
 
   return { score, reasons };
@@ -1525,6 +1531,13 @@ export async function getSimilarBooks(
 // Considers finished + currently-reading books only — TBR entries don't
 // have tags or full schema, and abandoned books would clutter "what
 // else might I like" surfaces. Symmetric: each pair counted once.
+//
+// Before returning, regional-title pairs are flagged via
+// `dedupeRegionalTitles` — same book in two markets (the UK
+// Philosopher's Stone vs the US Sorcerer's Stone, etc.) — so the
+// renderer can collapse those rows into a single "Same book, different
+// markets" entry rather than presenting them as a strong vault
+// connection.
 export async function getConnections(limit = 20): Promise<Connection[]> {
   const books = await getAllBooks();
   const pool = books.filter((b) => b.status === "finished" || b.status === "reading");
@@ -1542,7 +1555,17 @@ export async function getConnections(limit = 20): Promise<Connection[]> {
     }
   }
   connections.sort((a, b) => b.score - a.score || a.a.title.localeCompare(b.a.title));
-  return connections.slice(0, limit);
+  const top = connections.slice(0, limit);
+
+  // Pass only the slug-keyed signal the dedupe needs — not the whole
+  // book records — so the helper stays pure and testable.
+  const bookSource = new Map(
+    pool.map((b) => [
+      b.slug,
+      { seeAlso: b.seeAlso, seriesMemberships: parseSeriesMemberships(b.series) },
+    ]),
+  );
+  return dedupeRegionalTitles(top, bookSource);
 }
 
 function lite(b: Book): Connection["a"] {

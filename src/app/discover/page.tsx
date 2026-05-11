@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Cover } from "@/components/Cover";
 import { HomeMark } from "@/components/HomeMark";
 import { getConnections } from "@/lib/books";
+import { formatScoreBreakdown } from "@/lib/discover";
 import type { Connection, ConnectionReason } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -48,14 +49,24 @@ export default async function DiscoverPage() {
 }
 
 function ConnectionCard({ connection, rank }: { connection: Connection; rank: number }) {
-  const { a, b, score, reasons } = connection;
+  const { a, b, score, reasons, sameBook } = connection;
+  const breakdown = formatScoreBreakdown(reasons, score);
   return (
     <article className="bg-surface border-rule rounded border p-4 sm:p-5">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <span className="text-ink-dim font-mono text-[11px] tracking-[0.04em]">
           #{String(rank).padStart(2, "0")}
         </span>
-        <span className="text-ink-soft text-[10px] tracking-[0.16em] uppercase">score {score}</span>
+        {sameBook ? (
+          <span className="text-ink-soft text-[10px] tracking-[0.16em] uppercase">same book</span>
+        ) : (
+          <span
+            className="text-ink-soft cursor-help text-[10px] tracking-[0.16em] uppercase underline decoration-dotted underline-offset-4"
+            title={breakdown}
+          >
+            score {score}
+          </span>
+        )}
       </div>
       <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_auto_1fr]">
         <BookSide book={a} side="left" />
@@ -63,9 +74,13 @@ function ConnectionCard({ connection, rank }: { connection: Connection; rank: nu
         <BookSide book={b} side="right" />
       </div>
       <div className="border-rule mt-4 flex flex-wrap gap-2 border-t pt-3">
-        {reasons.map((r, i) => (
-          <ReasonChip key={i} reason={r} />
-        ))}
+        {sameBook ? (
+          <span className="border-rule text-ink-soft font-serif rounded-full border px-2.5 py-0.5 text-[11px] italic">
+            Same book, different markets.
+          </span>
+        ) : (
+          reasons.map((r, i) => <ReasonChip key={i} reason={r} />)
+        )}
       </div>
     </article>
   );
