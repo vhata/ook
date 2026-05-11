@@ -120,10 +120,10 @@ vault-hardcover-sync: ## Push vault status/rating/dates to Hardcover via insert_
 deploy-status: ## Recent Vercel deploys for this project (status, env, age)
 	@npx -y vercel@latest ls 2>&1 | head -16
 
-deploy-logs: ## Tail logs from the latest production deploy
-	@LATEST=$$(npx -y vercel@latest ls --prod 2>/dev/null | awk '/https:\/\//{print $$3; exit}'); \
+deploy-logs: ## Show the last 100 runtime log entries from the latest production deploy (no follow)
+	@LATEST=$$(npx -y vercel@latest ls --prod 2>/dev/null | grep -m1 '^https://'); \
 		test -n "$$LATEST" || { echo "no production deploy found"; exit 1; }; \
 		echo "→ $$LATEST"; \
-		npx -y vercel@latest logs "$$LATEST"
+		npx -y vercel@latest logs "$$LATEST" --no-follow --limit 100 --expand
 
 .DEFAULT_GOAL := help
