@@ -43,6 +43,57 @@ describe("/api/admin/agent/commit-batch — request shape", () => {
     expect(batchMock).not.toHaveBeenCalled();
   });
 
+  it("accepts a body with only meta_patches (no book patches)", async () => {
+    batchMock.mockResolvedValueOnce({
+      ok: true,
+      batchSize: 1,
+      commits: [{ path: "_meta/tbr.md", sha: "x", url: null }],
+      previews: [],
+      metaPreviews: [],
+    });
+    const res = await POST(
+      makeRequest({
+        meta_patches: [
+          {
+            kind: "append-bullet",
+            path: "_meta/tbr.md",
+            section: "Wanted",
+            bullet: "**Foo** — Bar.",
+          },
+        ],
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(batchMock).toHaveBeenCalledWith({
+      patches: [],
+      metaPatches: [
+        {
+          kind: "append-bullet",
+          path: "_meta/tbr.md",
+          section: "Wanted",
+          bullet: "**Foo** — Bar.",
+        },
+      ],
+      message: undefined,
+    });
+  });
+
+  it("rejects a body where both patches and meta_patches are empty", async () => {
+    const res = await POST(makeRequest({ patches: [], meta_patches: [] }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid-batch");
+  });
+
+  it("rejects an unknown meta_patch kind", async () => {
+    const res = await POST(
+      makeRequest({
+        meta_patches: [{ kind: "nuke-vault", path: "x" }],
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe("invalid-batch");
+  });
+
   it("rejects when a patch is malformed", async () => {
     const res = await POST(
       makeRequest({
@@ -91,6 +142,7 @@ describe("/api/admin/agent/commit-batch — happy path", () => {
     expect(batchMock).toHaveBeenCalledTimes(1);
     expect(batchMock).toHaveBeenCalledWith({
       patches: body.patches,
+      metaPatches: [],
       message: "Two updates",
     });
   });

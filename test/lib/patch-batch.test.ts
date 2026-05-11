@@ -280,6 +280,118 @@ describe("commitPatchBatch — vault-client routing", () => {
     expect(calls[0].message).toMatch(/^Batch update: 1 patch\n\nvia ook-admin\/\w+$/);
   });
 
+  it("lands meta-patches alongside book patches as one commit", async () => {
+    const refContent = readFileSync(path.join(workingVault, "TestBook", "TestBook.md"), "utf8");
+    const triageContent = readFileSync(path.join(workingVault, "_meta", "triage.md"), "utf8");
+    const tbrContent = readFileSync(path.join(workingVault, "_meta", "tbr.md"), "utf8");
+    const multiCalls: Array<{
+      files: Array<{ filePath: string; content: string }>;
+      message: string;
+    }> = [];
+    const fakeClient = {
+      async getFile(p: string) {
+        if (p === "TestBook/TestBook.md") return { content: refContent, sha: "sha-r" };
+        if (p === "_meta/triage.md") return { content: triageContent, sha: "sha-t" };
+        if (p === "_meta/tbr.md") return { content: tbrContent, sha: "sha-b" };
+        return null;
+      },
+      async commitFile() {
+        return { sha: "x", url: null };
+      },
+      async commitMultiFile(opts: {
+        files: Array<{ filePath: string; content: string }>;
+        message: string;
+      }) {
+        multiCalls.push(opts);
+        return {
+          sha: "batch-sha",
+          url: null,
+          files: opts.files.map((f) => ({ path: f.filePath, sha: "fake" })),
+        };
+      },
+      async exists() {
+        return true;
+      },
+      async listDirectory() {
+        return [];
+      },
+    };
+
+    // Fixture triage.md has `- **The Anomaly** — Hervé Le Tellier. _…_`
+    // under `## Fiction`. Promote it: remove there, append to tbr.md.
+    const result = await commitPatchBatch(
+      {
+        patches: [{ slug: "TestBook", frontmatter_changes: { rating: 5 }, commit_message: "x" }],
+        metaPatches: [
+          {
+            kind: "remove-bullet",
+            path: "_meta/triage.md",
+            section: "Fiction",
+            bullet:
+              "**The Anomaly** — Hervé Le Tellier. _Plane lands twice (via friend recommendation)_",
+          },
+          {
+            kind: "append-bullet",
+            path: "_meta/tbr.md",
+            section: "From Triage (2026-05-10)",
+            bullet:
+              "**The Anomaly** — Hervé Le Tellier. _Plane lands twice (via friend recommendation)_",
+          },
+        ],
+        message: "Promote 1",
+      },
+      fakeClient,
+    );
+
+    expect(multiCalls).toHaveLength(1);
+    expect(result.batchSize).toBe(3); // 1 book patch + 2 meta patches
+    const written = multiCalls[0].files.map((f) => f.filePath).sort();
+    expect(written).toEqual(["TestBook/TestBook.md", "_meta/tbr.md", "_meta/triage.md"]);
+
+    const triageAfter = multiCalls[0].files.find((f) => f.filePath === "_meta/triage.md")!.content;
+    const tbrAfter = multiCalls[0].files.find((f) => f.filePath === "_meta/tbr.md")!.content;
+    expect(triageAfter).not.toContain("The Anomaly");
+    expect(tbrAfter).toContain("## From Triage (2026-05-10)");
+    expect(tbrAfter).toContain("- **The Anomaly**");
+
+    expect(result.metaPreviews).toHaveLength(2);
+  });
+
+  it("rejects a create-file meta patch when the target already exists", async () => {
+    const refContent = readFileSync(path.join(workingVault, "TestBook", "TestBook.md"), "utf8");
+    const fakeClient = {
+      async getFile(p: string) {
+        if (p === "TestBook/TestBook.md") return { content: refContent, sha: "sha" };
+        if (p === "Other/Other.md") return { content: "exists", sha: "sha2" };
+        return null;
+      },
+      async commitFile() {
+        return { sha: "x", url: null };
+      },
+      async commitMultiFile() {
+        throw new Error("should not be called");
+      },
+      async exists() {
+        return true;
+      },
+      async listDirectory() {
+        return [];
+      },
+    };
+
+    await expect(
+      commitPatchBatch(
+        {
+          patches: [],
+          metaPatches: [
+            { kind: "create-file", path: "Other/Other.md", content: "---\ntitle: X\n---\n" },
+          ],
+        },
+        fakeClient,
+      ),
+    ).rejects.toThrow(/already exists/);
+  });
+
   it("skips the commit entirely when every patch is a no-op", async () => {
     const refContent = readFileSync(path.join(workingVault, "TestBook", "TestBook.md"), "utf8");
     const calls: unknown[] = [];

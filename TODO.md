@@ -8,23 +8,11 @@ Sections are grouped by readiness: decided plans first, then open verdicts, defe
 
 ## Decided & ready to build
 
-### `/triage` — actionable inbox of unknowns (decided 2026-05-10)
+### `/triage` — bulk multi-action (deferred from 2026-05-10 redesign)
 
-Decision: `/triage` becomes the home of "things I might want to read but haven't seen before" — the user's manually-gathered recommendations only. Imported Goodreads entries leave the page entirely; they belong to whichever vault file matches what Goodreads says about them. Per-row passkey-gated buttons turn observation into action.
+Single-action bulk shipped: a checkbox selection + a single dropdown (Promote to TBR / Start reading / Mark finished) applied uniformly across the selected rows in one batched commit. The remaining `nice-to-have` is heterogeneous-bulk: per-row action selection so a single submit can promote three rows, start reading two, and finish one. The batch endpoint already accepts a heterogeneous `meta_patches` list (different `kind`s per entry); the UX change is a per-row action selector rather than a single global dropdown. Decide whether the friction is worth it after a few days of real use of the single-action bulk.
 
-Goodreads routing splits by shelf:
-
-- `to-read` → bullet appended to `_meta/tbr.md`. The user already knows about it; it just needs to land in TBR with everything else there.
-- `read` / `currently-reading` → vault directory minted with the matching status, surfaces in `/admin/backfill` for rating/review/finish-date gap-fill.
-- Stop minting unfleshed-out entries into `_meta/triage.md` from Goodreads. Triage is for unknowns.
-
-Per-row triage actions (passkey-gated, route through `/api/admin/agent/commit-batch`): **promote to TBR**, **mark as reading**, **mark as finished**. Each action mints (or appends to) the appropriate vault file and removes the entry from `_meta/triage.md` in the same commit.
-
-Bulk operations are part of the brief: select multiple rows, pick an action, apply in one commit. A multi-action submit (different actions for different rows in the same commit) is nice-to-have but not required for the first cut — single-action across the selection is acceptable v1.
-
-- **`/triage` page restructure**: drop the "From Goodreads, not yet fleshed out" section entirely. Render the manual piles only. Each row carries a checkbox + per-row action buttons (promote to TBR / start reading / mark finished) for one-at-a-time use. A sticky bottom bar shows "N selected" with a single-action dropdown and a submit. `#feature #triage #admin #write-surface`
-- **Goodreads-shelf-aware promotion**: `scripts/promote-goodreads.mjs` reads each entry's `Bookshelves` column and routes accordingly. `to-read` → bullet in `_meta/tbr.md` (probably under a `## From Goodreads` pile, dated). `read` / `currently-reading` → existing vault-directory minting path with status set from the shelf. Same dry-run-by-default discipline. `#feature #goodreads #import #routing`
-- **Bulk multi-action (nice-to-have)**: heterogeneous actions in a single submit (e.g., 3 rows → TBR + 2 rows → reading + 1 row → finished). The batch endpoint already supports a heterogeneous list of patches; the UX change is per-row action selection rather than a single global action. Decide once single-action bulk lands. `#feature #triage #ux`
+- **Bulk multi-action**: per-row action selection on `/triage`, heterogeneous actions in a single submit. `#feature #triage #ux`
 
 ### Kindle reading-session import (codified 2026-05-10) — awaiting takeout
 

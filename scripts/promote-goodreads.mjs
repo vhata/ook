@@ -1,24 +1,28 @@
 #!/usr/bin/env node
 // Promote entries from `_meta/goodreads.md` (the bin/book
-// import-goodreads target) into actual per-book vault directories,
-// fleshing out what was previously a flat reference table.
+// import-goodreads target) into the right vault destination based on
+// each entry's `Bookshelves` column.
 //
-// For each Goodreads entry that doesn't already correspond to a
-// vault directory, generates `<Title>/<Title>.md` with frontmatter
-// derived from the CSV-imported fields:
+//   - `read` / `currently-reading` → mint a `<Title>/<Title>.md`
+//     directory with `status: finished` or `status: reading`. The
+//     directory carries the standard Goodreads frontmatter (rating,
+//     series, dates, IDs) and surfaces in `/admin/backfill` for the
+//     missing-rating / missing-review / would-reread sweeps.
+//   - `to-read` → append a bullet to `_meta/tbr.md` under a
+//     `## From Goodreads (YYYY-MM-DD)` pile. The user already knows
+//     about it; the bullet just needs to land in TBR alongside
+//     manually-added rows. De-duped against any existing TBR bullet
+//     that mentions the same `goodreads_id` so re-runs are idempotent.
+//   - Anything else (custom shelves) → fall through to the vault-
+//     directory mint with `status: tbr`, same as before.
 //
-//   - status: read → finished, currently-reading → reading, else tbr
-//   - finished: from date_read for read shelf
-//   - started:  from date_read - 1d for read shelf, date_added for cr
-//   - rating:   nullable (0 in CSV ⇒ null)
-//   - series:   extracted from "(Series, #N)" parenthetical in title
-//   - authors:  array as in goodreads.md
-//   - goodreads_id: preserved
-//   - isbn / isbn13: preserved when present
+// Triage minting is gone. `/triage` is for the user's manually-curated
+// unknowns; Goodreads entries (a list the user has personally
+// curated) don't belong there.
 //
 // Defaults to **dry-run** because it touches the user's vault. To
-// actually write, pass `--apply`. The user is expected to review
-// the dry-run output before applying.
+// actually write, pass `--apply` (or run interactively and answer
+// `y` at the prompt via `maybePromptApply`).
 //
 // Usage:
 //   node scripts/promote-goodreads.mjs --vault ~/path/to/vault [--shelf read] [--max 50] [--apply]
@@ -31,6 +35,8 @@ import path from "node:path";
 import yaml from "js-yaml";
 
 import { cleanTitleAndSeries } from "./lib/promote-goodreads.mjs";
+import { routeGoodreadsEntry, renderTbrBullet, appendTbrBullet } from "./lib/goodreads-routing.mjs";
+import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 // Title cleanup: the pure helper lives in `scripts/lib/promote-goodreads.mjs`
 // so it can be unit-tested without filesystem IO. Re-export here so any
@@ -91,13 +97,44 @@ async function main() {
   log(`${existing.size} existing book directories in vault`);
   log("");
 
-  const plans = [];
+  // Two plan lanes — vault directories minted from `read` /
+  // `currently-reading` / fallback shelves, and TBR bullets appended
+  // from `to-read`. Both lanes share the skipped-existing / shelf-
+  // filter / slug-collision bookkeeping.
+  const tbrPath = path.join(VAULT, "_meta", "tbr.md");
+  let tbrContent = await readIfExists(tbrPath);
+  const tbrSeen = new Set();
+
+  const dirPlans = [];
+  const tbrPlans = [];
   let skippedExisting = 0;
   let skippedShelf = 0;
   let skippedSlugCollision = 0;
+  let skippedTbrDup = 0;
+  const today = todayIso();
+
   for (const e of entries) {
     if (SHELF_FILTER && e.shelf !== SHELF_FILTER) {
       skippedShelf++;
+      continue;
+    }
+
+    const route = routeGoodreadsEntry(e.shelf);
+
+    if (route.kind === "tbr-bullet") {
+      const gid = e.goodreads_id ?? null;
+      if (gid !== null && tbrContent.includes(`goodreads:${gid}`)) {
+        skippedTbrDup++;
+        continue;
+      }
+      if (gid !== null && tbrSeen.has(String(gid))) {
+        skippedTbrDup++;
+        continue;
+      }
+      const bullet = renderTbrBullet(e);
+      tbrPlans.push({ entry: e, bullet, goodreadsId: gid });
+      if (gid !== null) tbrSeen.add(String(gid));
+      if (dirPlans.length + tbrPlans.length >= MAX) break;
       continue;
     }
 
@@ -112,36 +149,36 @@ async function main() {
       continue;
     }
 
-    // Detect within-batch slug collisions (two Goodreads entries that
-    // would generate the same dir name).
-    const alreadyPlanned = plans.find((p) => p.slug.toLowerCase() === slug.toLowerCase());
+    const alreadyPlanned = dirPlans.find((p) => p.slug.toLowerCase() === slug.toLowerCase());
     if (alreadyPlanned) {
       skippedSlugCollision++;
       log(`skip (collision with ${alreadyPlanned.slug}): ${e.title}`);
       continue;
     }
 
-    const fm = buildFrontmatter(e, cleaned);
-    plans.push({ slug, frontmatter: fm, entry: e });
-    if (plans.length >= MAX) break;
+    const fm = buildFrontmatter(e, cleaned, route.status);
+    dirPlans.push({ slug, frontmatter: fm, entry: e });
+    if (dirPlans.length + tbrPlans.length >= MAX) break;
   }
 
   log("");
-  log(`would create: ${plans.length}`);
+  log(`would mint book dir:    ${dirPlans.length}`);
+  log(`would append TBR bullet: ${tbrPlans.length}`);
   log(`skipped (already in vault): ${skippedExisting}`);
-  if (SHELF_FILTER) log(`skipped (shelf filter): ${skippedShelf}`);
-  if (skippedSlugCollision) log(`skipped (slug collisions): ${skippedSlugCollision}`);
+  log(`skipped (TBR duplicate):    ${skippedTbrDup}`);
+  if (SHELF_FILTER) log(`skipped (shelf filter):     ${skippedShelf}`);
+  if (skippedSlugCollision) log(`skipped (slug collisions):  ${skippedSlugCollision}`);
 
   // Quick shape-of-the-import stats so the user can sanity-check
   // before running with --apply.
-  const byShelf = countBy(plans, (p) => p.entry.shelf);
+  const byShelf = countBy([...dirPlans, ...tbrPlans], (p) => p.entry.shelf);
   const byRating = countBy(
-    plans.filter((p) => p.entry.rating && p.entry.rating > 0),
+    dirPlans.filter((p) => p.entry.rating && p.entry.rating > 0),
     (p) => `★${p.entry.rating}`,
   );
-  const withSeries = plans.filter((p) => p.frontmatter.series).length;
-  const withFinished = plans.filter((p) => p.frontmatter.finished).length;
-  const withIsbn = plans.filter((p) => p.frontmatter.isbn13 || p.frontmatter.isbn).length;
+  const withSeries = dirPlans.filter((p) => p.frontmatter.series).length;
+  const withFinished = dirPlans.filter((p) => p.frontmatter.finished).length;
+  const withIsbn = dirPlans.filter((p) => p.frontmatter.isbn13 || p.frontmatter.isbn).length;
   log("");
   log(`shape:`);
   log(`  by shelf: ${formatCounts(byShelf)}`);
@@ -152,42 +189,78 @@ async function main() {
   log("");
 
   if (VERBOSE || !APPLY) {
-    for (const p of plans) {
+    for (const p of dirPlans) {
       const shelf = p.entry.shelf;
       const date = formatDateLike(p.entry.date_read) ?? "—";
       const rating = p.entry.rating ? `★${p.entry.rating}` : "  ";
-      log(`  ${shelf.padEnd(18)} ${rating} ${date.padEnd(10)} ${p.slug}`);
+      log(`  mint   ${shelf.padEnd(18)} ${rating} ${date.padEnd(10)} ${p.slug}`);
+    }
+    for (const p of tbrPlans) {
+      log(`  tbr    to-read           ${"  "} ${"—".padEnd(10)} ${p.bullet}`);
     }
     log("");
   }
 
-  if (!APPLY) {
-    log("(dry-run; rerun with --apply to write)");
-    return;
-  }
+  const totalChanges = dirPlans.length + tbrPlans.length;
+  await maybePromptApply({
+    apply: APPLY,
+    changeCount: totalChanges,
+    changeNoun: "promotions",
+    doApply: async () => {
+      let writtenDirs = 0;
+      for (const p of dirPlans) {
+        const dir = path.join(VAULT, p.slug);
+        await fs.mkdir(dir, { recursive: true });
+        const refFile = path.join(dir, `${p.slug}.md`);
+        const content = renderBookFile(p.frontmatter);
+        await fs.writeFile(refFile, content, "utf8");
+        writtenDirs++;
+      }
 
-  log("Writing book directories…");
-  let written = 0;
-  for (const p of plans) {
-    const dir = path.join(VAULT, p.slug);
-    await fs.mkdir(dir, { recursive: true });
-    const refFile = path.join(dir, `${p.slug}.md`);
-    const content = renderBookFile(p.frontmatter);
-    await fs.writeFile(refFile, content, "utf8");
-    written++;
-  }
-  log(`Wrote ${written} new book directories under ${VAULT}.`);
-  log("");
-  log("Next steps:");
-  log("  1. cd into the vault and review the new files.");
-  log("  2. Stage / commit / push them per the vault's auto-commit policy.");
-  log("  3. Promote individual entries with `bin/book` for richer notes.");
+      let writtenTbr = 0;
+      let nextTbr = tbrContent;
+      for (const p of tbrPlans) {
+        const next = appendTbrBullet(nextTbr, p.bullet, today, p.goodreadsId);
+        if (next.changed) {
+          nextTbr = next.content;
+          writtenTbr++;
+        }
+      }
+      if (writtenTbr > 0) {
+        if (nextTbr.length === 0 || !nextTbr.endsWith("\n")) nextTbr += "\n";
+        await fs.writeFile(tbrPath, nextTbr, "utf8");
+        tbrContent = nextTbr;
+      }
+
+      log(`Wrote ${writtenDirs} new book directories under ${VAULT}.`);
+      if (writtenTbr > 0)
+        log(`Appended ${writtenTbr} bullets to ${path.relative(VAULT, tbrPath)}.`);
+      log("");
+      log("Next steps:");
+      log("  1. cd into the vault and review the new files.");
+      log("  2. Stage / commit / push them per the vault's auto-commit policy.");
+      log("  3. Promote individual entries with `bin/book` for richer notes.");
+    },
+  });
 }
 
 // ----- helpers ---------------------------------------------------------------
 
 function log(msg) {
   process.stdout.write(`${msg}\n`);
+}
+
+async function readIfExists(filePath) {
+  try {
+    return await fs.readFile(filePath, "utf8");
+  } catch (err) {
+    if (err && err.code === "ENOENT") return "";
+    throw err;
+  }
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 // Parse only the YAML frontmatter portion of a markdown file, between
@@ -224,9 +297,10 @@ function sanitizeSlug(title) {
     .trim();
 }
 
-function buildFrontmatter(entry, cleaned) {
+function buildFrontmatter(entry, cleaned, statusOverride) {
   const status =
-    entry.shelf === "read" ? "finished" : entry.shelf === "currently-reading" ? "reading" : "tbr";
+    statusOverride ??
+    (entry.shelf === "read" ? "finished" : entry.shelf === "currently-reading" ? "reading" : "tbr");
 
   const rating = entry.rating && entry.rating > 0 ? entry.rating : null;
   const dateRead = formatDateLike(entry.date_read);

@@ -8,6 +8,7 @@ import {
 } from "./patch";
 import { bookPaths, fileBackedPath, isFileBackedSection } from "./book-paths";
 import { updateStoreOptimistic, validateRefAfterPatch, type FileBackedDiff } from "./book-tools";
+import { applyMetaPatch, type ApplyMetaPatchResult, type MetaPatch } from "./meta-patch";
 import { withTrailer } from "./trailer";
 
 // Batch variant of commit_patch. Accepts a list of CommitPatchInput and
@@ -16,6 +17,14 @@ import { withTrailer } from "./trailer";
 // against its current on-disk reference file before any write begins;
 // the first invalid patch rejects the whole batch with no partial
 // writes. One `via ook-admin/<id>` trailer per batch commit.
+//
+// Optional `metaPatches` lane covers vault writes that aren't book
+// reference notes — pile bullets in `_meta/triage.md` / `_meta/tbr.md`
+// and brand-new `<slug>/<slug>.md` files minted by the `/triage`
+// actions. Same all-or-nothing discipline: every meta patch is checked
+// against the current file content before any write begins, and the
+// resulting MultiFileWrite[] is unioned with the book-patch writes so
+// the whole batch lands as a single commit.
 
 export type CommitPatchBatchInput = {
   patches: CommitPatchInput[];
@@ -23,6 +32,7 @@ export type CommitPatchBatchInput = {
   // summary of the batch ("Batch update: N patches"). Either way the
   // trailer is appended once for the whole batch.
   message?: string;
+  metaPatches?: MetaPatch[];
 };
 
 export type CommitPatchBatchOutput = {
@@ -34,13 +44,17 @@ export type CommitPatchBatchOutput = {
   // Per-patch preview, in the order the patches were submitted. Lets
   // the caller surface the same diff UI the per-patch endpoint shows.
   previews: Array<ApplyPatchResult & { slug: string; fileBackedDiffs: FileBackedDiff[] }>;
+  // Per-meta-patch preview, in the order they were submitted. Empty
+  // when no meta patches were supplied.
+  metaPreviews: ApplyMetaPatchResult[];
 };
 
 export async function commitPatchBatch(
   input: CommitPatchBatchInput,
   client: VaultClient = getVaultClient(),
 ): Promise<CommitPatchBatchOutput> {
-  if (input.patches.length === 0) {
+  const metaPatches = input.metaPatches ?? [];
+  if (input.patches.length === 0 && metaPatches.length === 0) {
     throw new Error("commitPatchBatch: patches must be non-empty");
   }
 
@@ -123,6 +137,27 @@ export async function commitPatchBatch(
     });
   }
 
+  // Phase 1b — plan every meta patch. Same all-or-nothing discipline:
+  // an unresolved bullet or a clashing create-file path throws before
+  // any write hits disk. We thread the in-batch state through `pending`
+  // so several meta patches against the same file (e.g. remove a bullet
+  // from triage.md AND append one to it in the same batch) compose
+  // correctly without re-reading stale content from the vault.
+  const pending = new Map<string, string | null>();
+  const metaPreviews: ApplyMetaPatchResult[] = [];
+  for (const meta of metaPatches) {
+    let existing: string | null;
+    if (pending.has(meta.path)) {
+      existing = pending.get(meta.path) ?? null;
+    } else {
+      const file = await client.getFile(meta.path);
+      existing = file?.content ?? null;
+    }
+    const result = applyMetaPatch(existing, meta);
+    pending.set(meta.path, result.after);
+    metaPreviews.push(result);
+  }
+
   // Phase 2 — assemble the multi-file write. If two patches target the
   // same file path the last write wins; in practice the batch endpoint
   // is fed one patch per slug, so collisions only happen if the caller
@@ -137,6 +172,13 @@ export async function commitPatchBatch(
       fileMap.set(w.path, { filePath: w.path, content: w.content });
     }
   }
+  // Meta-patch writes come last so they win on path collision with a
+  // book patch — meta patches are explicit-target by design, book
+  // patches target derived `<slug>/<slug>.md` paths.
+  for (const [path, content] of pending.entries()) {
+    if (content === null) continue;
+    fileMap.set(path, { filePath: path, content });
+  }
   const files = Array.from(fileMap.values());
 
   // If no patch produced an actual write (every patch was a no-op),
@@ -145,17 +187,19 @@ export async function commitPatchBatch(
   if (files.length === 0) {
     return {
       ok: true,
-      batchSize: input.patches.length,
+      batchSize: input.patches.length + metaPatches.length,
       commits: [],
       previews: planned.map((p) => p.preview),
+      metaPreviews,
     };
   }
 
   // Phase 3 — one trailer-stamped message, one multi-file commit.
+  const totalCount = input.patches.length + metaPatches.length;
   const baseMessage =
     input.message && input.message.trim().length > 0
       ? input.message
-      : `Batch update: ${input.patches.length} patch${input.patches.length === 1 ? "" : "es"}`;
+      : `Batch update: ${totalCount} patch${totalCount === 1 ? "" : "es"}`;
   const message = withTrailer(baseMessage);
 
   const result = await client.commitMultiFile({ files, message });
@@ -172,8 +216,9 @@ export async function commitPatchBatch(
 
   return {
     ok: true,
-    batchSize: input.patches.length,
+    batchSize: totalCount,
     commits: result.files.map((f) => ({ path: f.path, sha: f.sha, url: result.url })),
     previews: planned.map((p) => p.preview),
+    metaPreviews,
   };
 }
