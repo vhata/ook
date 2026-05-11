@@ -63,6 +63,27 @@ Decision: stage answers client-side; a single "Send all" button at the bottom co
 - **Shared batch endpoint**: same `/api/admin/agent/commit-batch` as `/triage` bulk. The two surfaces share the wire format. `#feature #admin #write-surface #batch`
 - **Audit hint** (defer to first use): tag a batch commit's trailer with `batch-size=N` so `/admin/audit` can render a "5 answers" chip. Not blocking on the first cut. `#polish #audit`
 
+### Owner-aware public surfaces (decided 2026-05-10)
+
+The passkey gate is binary today: `/admin` and its sub-routes are private, everything else renders identically regardless of who's looking. Result: small corrections (a book wrongly tagged into a series, a stray see_also entry, an obviously-wrong cover URL) require navigating to `/admin`, finding the book, and editing through the agent. Friction is high enough that minor mistakes tend to sit uncorrected.
+
+Decision: when the viewer holds a valid session cookie, public pages render small admin affordances inline. Each affordance is a one-click jump to a passkey-gated route that stages a single-field patch via the agent's `propose_patch` tool. Logout is reachable from a quiet indicator in the global Controls bar so the owner can drop back to the public view without clearing cookies by hand.
+
+The passkey gate itself does not change. Inline affordances are _links_, not write endpoints — every actual mutation still goes through `/api/admin/agent` and the diff-preview gate. Server-side, the auth check is a cookie read + HMAC verify (existing `verifySession()` from `src/lib/auth/session.ts`); routes that show admin chrome become per-request rather than static, which is moot for the public surfaces already running `force-dynamic`.
+
+- **`getOwnerSession()` helper** in `src/lib/auth/session.ts` — single-call wrapper around `cookies()` + `verifySession()`. Public layouts and components call it; non-null return means "render admin chrome". Centralises the dance the four `/admin/*` pages currently duplicate. `#feature #auth #helper`
+- **`<AdminControls />` server component** rendered into the global Controls bar (or footer), conditional on `getOwnerSession()`. Holds a small "admin" indicator, a logout button (POST to `/api/auth/logout`), and a quiet link back to `/admin`. Visible only when authed; absent otherwise. `#feature #ui #auth`
+- **Inline admin affordances** across the public surfaces, each conditional on the same session check:
+  - `/series` row → "remove from series" stages a patch that drops the offending membership from the book's `series:` field.
+  - `/books/[slug]` → unobtrusive "edit →" link that deep-links to `/admin` with the book preselected.
+  - `/tags/[tag]` row → "remove tag" stages a patch that drops the tag from the book.
+  - `/log` entry → "edit entry" deep-link to `/admin` with the log entry preselected.
+  - New public surfaces inherit the pattern as they ship.
+    `#feature #ui #auth #write-surface`
+- **Deep-link contract for `/admin`**: the console accepts a `?focus=book:<slug>` (or `:tag`, `:series`, `:log`) query param and pre-fills the agent textarea with a focused prompt ("Edit Piranesi:" rather than a blank). The agent already handles the conversation; this just seeds it. `#feature #admin #ux`
+
+Explicitly **not** doing: per-book lock fields, denylist arrays, or any other mechanism for protecting manual edits against the backfills. If a backfill re-derives a value the owner removed, the working assumption is that the backfill's evidence is probably more correct than the manual removal, and the owner should fix the upstream signal instead (remove the goodreads_id that maps wrong, edit the tag in the source data, etc.). The friction of inline edits is the right pressure to keep manual corrections rare and surgical.
+
 ### Makefile coverage and organization (codified 2026-05-10)
 
 Coverage: two operator-runnable scripts (`promote-goodreads.mjs`, `import-triage.mjs`) were missing Makefile entries — landed as `vault-promote-goodreads` and `vault-import-triage` on 2026-05-10. Going forward, any new operator-runnable script in `scripts/` should land with a Makefile entry in the same commit. Prebuild scripts (`fetch-vault.mjs`, `build-index.mjs`) stay invocation-less by design — they're called from `package.json` lifecycle hooks, not by the user.
