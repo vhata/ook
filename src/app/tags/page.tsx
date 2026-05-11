@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { HomeMark } from "@/components/HomeMark";
 import { getTagIndex, getTagPairs, type TagPair } from "@/lib/books";
+import { tagCloudSizeRem } from "@/lib/tag-cloud";
 import type { TagSummary } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +12,13 @@ export const metadata = {
 
 export default async function TagsIndexPage() {
   const [tags, pairs] = await Promise.all([getTagIndex(), getTagPairs(10)]);
-  // Tag-cloud sizing: linear scale between 12px and 28px against the
-  // most-frequent tag. Single-tag corner case stays at the floor.
-  const max = Math.max(1, ...tags.map((t) => t.count));
+  // Tag-cloud sizing: log-mapped into a fixed rem range so the visual
+  // ratio between the largest and smallest tag is capped at ~2×
+  // regardless of how skewed the underlying counts are. See
+  // `src/lib/tag-cloud.ts`.
+  const counts = tags.map((t) => t.count);
+  const minCount = counts.length > 0 ? Math.min(...counts) : 1;
+  const maxCount = counts.length > 0 ? Math.max(...counts) : 1;
 
   return (
     <main className="mx-auto box-border w-full max-w-[900px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
@@ -45,7 +50,7 @@ export default async function TagsIndexPage() {
                   key={t.tag}
                   href={`/tags/${encodeURIComponent(t.tag)}`}
                   className="text-ink hover:text-accent font-serif inline-flex items-baseline gap-1"
-                  style={{ fontSize: `${12 + (t.count / max) * 16}px` }}
+                  style={{ fontSize: `${tagCloudSizeRem(t.count, minCount, maxCount)}rem` }}
                 >
                   {t.tag}
                   <span className="text-ink-dim font-mono text-[10px]">{t.count}</span>
