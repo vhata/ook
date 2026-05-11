@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 
 type Theme = "light" | "dark" | null;
@@ -28,7 +28,7 @@ function applyTheme(theme: Theme) {
   else html.removeAttribute("data-theme");
 }
 
-export default function Controls() {
+export default function Controls({ adminSlot }: { adminSlot?: ReactNode }) {
   const theme = useSyncExternalStore(subscribeStorage, getThemeSnapshot, getThemeServerSnapshot);
 
   useEffect(() => {
@@ -116,6 +116,7 @@ export default function Controls() {
         <span className="hidden sm:inline">{themeLabel}</span>
         <span className="sm:hidden">{theme === "light" ? "☀" : "☾"}</span>
       </button>
+      {adminSlot}
     </div>
   );
 }

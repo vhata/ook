@@ -4,6 +4,8 @@ import type { Metadata } from "next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkDirective from "remark-directive";
+import AdminAffordance from "@/components/AdminAffordance";
+import { getOwnerSession } from "@/lib/auth/session";
 import { Cover } from "@/components/Cover";
 import DeepNotes from "@/components/DeepNotes";
 import { HomeMark } from "@/components/HomeMark";
@@ -52,11 +54,13 @@ export default async function BookPage({ params }: { params: Params }) {
 
   const { book, review, quotes, hardcover, hardcoverReviews } = page;
 
-  const [allBooks, bingoYear, similar] = await Promise.all([
+  const [allBooks, bingoYear, similar, ownerSession] = await Promise.all([
     getAllBooks(),
     book.bingoSquares.length > 0 ? findBingoYearForBook(book.slug) : Promise.resolve(null),
     getSimilarBooks(book.slug, 3),
+    getOwnerSession(),
   ]);
+  const isOwner = ownerSession !== null;
   const seeAlso = book.seeAlso
     .map((s) => allBooks.find((b) => b.slug === s))
     .filter((b): b is Book => b !== undefined);
@@ -65,7 +69,7 @@ export default async function BookPage({ params }: { params: Params }) {
     <main className="mx-auto box-border w-full max-w-[1140px] px-6 py-12 sm:px-14 sm:pt-10 sm:pb-20">
       <HomeMark />
 
-      <BookHeader book={book} bingoYear={bingoYear} hardcover={hardcover} />
+      <BookHeader book={book} bingoYear={bingoYear} hardcover={hardcover} isOwner={isOwner} />
 
       <div className="grid grid-cols-1 gap-9 md:grid-cols-[180px_1fr]">
         <Toc
@@ -130,10 +134,12 @@ function BookHeader({
   book,
   bingoYear,
   hardcover,
+  isOwner,
 }: {
   book: Book;
   bingoYear: number | null;
   hardcover: HardcoverBook | null;
+  isOwner: boolean;
 }) {
   return (
     <header className="border-rule mb-12 grid grid-cols-1 gap-8 border-b pb-8 sm:grid-cols-[180px_1fr]">
@@ -212,6 +218,18 @@ function BookHeader({
         <ExternalLinkRow book={book} />
         <HardcoverStats hardcover={hardcover} />
         <ShareRow slug={book.slug} />
+        <div className="mt-3">
+          {/* Owner-only edit affordance — seeds /admin with the book
+              preselected so the agent's first prompt opens on the
+              right reference file. Anonymous viewers see nothing. */}
+          <AdminAffordance
+            show={isOwner}
+            href={`/admin?focus=book:${encodeURIComponent(book.slug)}`}
+            label="edit →"
+            title="Open the admin console with this book preselected"
+            className="text-ink-soft hover:text-accent text-[11px] tracking-[0.08em] uppercase"
+          />
+        </div>
       </div>
     </header>
   );

@@ -13,6 +13,19 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// The auth helper reads cookies() via next/headers, which throws
+// outside a request scope. Stub it to "anonymous viewer" by default;
+// authed-viewer tests can override per-case.
+vi.mock("../../src/lib/auth/session", async () => {
+  const actual = await vi.importActual<typeof import("../../src/lib/auth/session")>(
+    "../../src/lib/auth/session",
+  );
+  return {
+    ...actual,
+    getOwnerSession: async () => null,
+  };
+});
+
 function makeMember(slug: string, index: number | null, title?: string): SeriesMember {
   return {
     slug,

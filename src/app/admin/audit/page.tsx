@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE_NAME, verifySession } from "@/lib/auth/session";
+import { getOwnerSession } from "@/lib/auth/session";
 import { commitUrl, getRecentCommits } from "@/lib/admin/audit";
 import type { LastReindex } from "@/lib/store/index-vault";
 import { relativeTime } from "@/lib/relative-time";
@@ -28,15 +27,7 @@ export const metadata = { title: "Audit", robots: "noindex,nofollow" };
 const MAX_COMMITS = 50;
 
 export default async function AdminAuditPage() {
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-
-  let session = null;
-  try {
-    session = verifySession(sessionToken);
-  } catch {
-    session = null;
-  }
+  const session = await getOwnerSession();
   if (!session) {
     redirect("/admin");
   }

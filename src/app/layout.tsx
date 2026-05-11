@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Source_Serif_4, Inter_Tight, IBM_Plex_Mono } from "next/font/google";
+import AdminControls from "@/components/AdminControls";
 import { SiteChrome } from "@/components/SiteChrome";
 import { seasonalCss, seasonalPalette } from "@/lib/seasonal";
 import "./globals.css";
@@ -55,6 +56,11 @@ export default function RootLayout({
   // rendered per request via Next 16's default), so the palette
   // shifts on its own as the year passes.
   const palette = seasonalPalette();
+  // The AdminControls server component is rendered as a JSX element
+  // and passed through SiteChrome to Controls (a client component) via
+  // a `slot` prop. Server-only auth check stays on the server; the
+  // client bar receives a fully-resolved subtree (or null for
+  // anonymous viewers) without re-running auth on the client.
   return (
     <html
       lang="en"
@@ -65,7 +71,7 @@ export default function RootLayout({
         <style dangerouslySetInnerHTML={{ __html: seasonalCss(palette) }} />
       </head>
       <body className="bg-bg text-ink font-sans flex min-h-full flex-col">
-        <SiteChrome>{children}</SiteChrome>
+        <SiteChrome adminSlot={<AdminControls />}>{children}</SiteChrome>
       </body>
     </html>
   );

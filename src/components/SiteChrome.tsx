@@ -21,7 +21,13 @@ import Controls from "@/components/Controls";
 // (revalidate = 300) and embedders are typically same-tab navigations
 // rather than visible-above-the-fold reflows.
 
-export function SiteChrome({ children }: { children: ReactNode }) {
+export function SiteChrome({
+  children,
+  adminSlot,
+}: {
+  children: ReactNode;
+  adminSlot?: ReactNode;
+}) {
   const pathname = usePathname();
   const bare = pathname === "/now";
 
@@ -29,7 +35,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
     <>
       {!bare && (
         <Suspense fallback={null}>
-          <Controls />
+          <Controls adminSlot={adminSlot} />
         </Suspense>
       )}
       <div className="flex-1">{children}</div>

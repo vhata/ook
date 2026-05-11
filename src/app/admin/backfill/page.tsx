@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { SESSION_COOKIE_NAME, verifySession } from "@/lib/auth/session";
+import { getOwnerSession } from "@/lib/auth/session";
 import { getBackfillQuestions } from "@/lib/admin/backfill";
 import BackfillCards from "@/components/admin/BackfillCards";
 
@@ -32,15 +31,7 @@ export const metadata = { title: "Backfill", robots: "noindex,nofollow" };
 const QUESTIONS_PER_VISIT = 5;
 
 export default async function AdminBackfillPage() {
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-
-  let session = null;
-  try {
-    session = verifySession(sessionToken);
-  } catch {
-    session = null;
-  }
+  const session = await getOwnerSession();
   if (!session) {
     redirect("/admin");
   }

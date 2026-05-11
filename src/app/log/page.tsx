@@ -1,6 +1,8 @@
 import { Fragment } from "react";
 import Link from "next/link";
+import AdminAffordance from "@/components/AdminAffordance";
 import { HomeMark } from "@/components/HomeMark";
+import { getOwnerSession } from "@/lib/auth/session";
 import { getReadingLog } from "@/lib/books";
 import type { LogEntry } from "@/lib/types";
 
@@ -53,7 +55,8 @@ function daysBetween(later: string, earlier: string): number {
 type IndexedEntry = LogEntry & { _i: number };
 
 export default async function LogPage() {
-  const log = await getReadingLog();
+  const [log, ownerSession] = await Promise.all([getReadingLog(), getOwnerSession()]);
+  const isOwner = ownerSession !== null;
 
   // Walk adjacent pairs (newest first) and flag each gap that exceeds the
   // drought threshold. The marker is keyed by the older entry's index — it
@@ -112,7 +115,13 @@ export default async function LogPage() {
         </div>
       ) : (
         months.map((m) => (
-          <MonthSection key={m} month={m} entries={byMonth.get(m) ?? []} gaps={gaps} />
+          <MonthSection
+            key={m}
+            month={m}
+            entries={byMonth.get(m) ?? []}
+            gaps={gaps}
+            isOwner={isOwner}
+          />
         ))
       )}
     </main>
@@ -123,10 +132,12 @@ function MonthSection({
   month,
   entries,
   gaps,
+  isOwner,
 }: {
   month: string;
   entries: IndexedEntry[];
   gaps: Map<number, number>;
+  isOwner: boolean;
 }) {
   const [year, mm] = month.split("-");
   const label = `${MONTH_NAMES[+mm - 1]} ${year}`;
@@ -145,7 +156,7 @@ function MonthSection({
           return (
             <Fragment key={e._i}>
               {gap !== undefined && <GapMarker days={gap} />}
-              <Entry entry={e} />
+              <Entry entry={e} isOwner={isOwner} />
             </Fragment>
           );
         })}
@@ -166,7 +177,7 @@ function GapMarker({ days }: { days: number }) {
   );
 }
 
-function Entry({ entry }: { entry: LogEntry }) {
+function Entry({ entry, isOwner }: { entry: LogEntry; isOwner: boolean }) {
   const day = entry.date.slice(8, 10);
   const monthIdx = +entry.date.slice(5, 7) - 1;
   const monthShort = MONTH_SHORT[monthIdx];
@@ -190,6 +201,11 @@ function Entry({ entry }: { entry: LogEntry }) {
   // it into the title slot so non-book events read prominently rather than
   // being buried as a caption below an empty title.
   const isManual = !entry.title;
+  // Composite log-entry id for the /admin deep link. LogEntry has no
+  // primary key today; the renderable triple of date + kind + slug
+  // (with `_manual_` standing in for slug-less manual entries) is
+  // stable across renders given the same vault state.
+  const focusId = `${entry.date}:${entry.kind}:${entry.slug ?? "_manual_"}`;
   return (
     <li className="border-rule grid grid-cols-[54px_1fr] gap-5 border-t py-3.5">
       <div className="text-ink-soft pt-0.5 font-mono text-[11px] tracking-[0.04em]">
@@ -221,6 +237,17 @@ function Entry({ entry }: { entry: LogEntry }) {
               {entry.detail}
             </span>
           )}
+          <span className="ml-auto">
+            {/* Owner-only inline affordance — seeds /admin with the
+                log-entry composite id so the agent's first prompt is
+                a "fix this row" framing. Anonymous viewers see nothing. */}
+            <AdminAffordance
+              show={isOwner}
+              href={`/admin?focus=log:${encodeURIComponent(focusId)}`}
+              label="edit entry"
+              title="Open the admin console with this log entry preselected"
+            />
+          </span>
         </div>
         {!isManual && entry.detail && (
           <div className="text-ink-soft text-sm leading-[1.5]">{entry.detail}</div>

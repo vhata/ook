@@ -1,8 +1,8 @@
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { authConfig } from "@/lib/auth/config";
 import { loadCredentials } from "@/lib/auth/credentials";
-import { SESSION_COOKIE_NAME, verifySession } from "@/lib/auth/session";
+import { getOwnerSession } from "@/lib/auth/session";
+import { buildSeedPrompt } from "@/lib/admin/seed-prompt";
 import RegisterForm from "@/components/admin/RegisterForm";
 import SignInForm from "@/components/admin/SignInForm";
 import AdminConsole from "@/components/admin/AdminConsole";
@@ -16,18 +16,14 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Admin", robots: "noindex,nofollow" };
 
-export default async function AdminPage() {
+type SearchParams = Promise<{ focus?: string; intent?: string }>;
+
+export default async function AdminPage({ searchParams }: { searchParams?: SearchParams }) {
   const cfg = authConfig();
   const credentials = await loadCredentials();
-  const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-
-  let session = null;
-  try {
-    session = verifySession(sessionToken);
-  } catch {
-    session = null;
-  }
+  const session = await getOwnerSession();
+  const sp = searchParams ? await searchParams : {};
+  const seedPrompt = session ? buildSeedPrompt(sp.focus, sp.intent) : "";
 
   const isFirstTime = credentials.length === 0;
   const showAuthMisconfig = !cfg.sessionSecret;
@@ -66,7 +62,7 @@ export default async function AdminPage() {
 
       {!showAuthMisconfig && !session && isFirstTime && <RegisterForm isFirstTime={true} />}
       {!showAuthMisconfig && !session && !isFirstTime && <SignInForm />}
-      {session && <AdminConsole />}
+      {session && <AdminConsole initialText={seedPrompt} />}
     </main>
   );
 }

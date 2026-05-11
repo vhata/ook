@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { cookies } from "next/headers";
 import { authConfig } from "./config";
 import type { Session } from "./types";
 
@@ -75,4 +76,22 @@ export function newSession(username: string): { token: string; expiresAt: number
   const expiresAt = Date.now() + cfg.sessionTtlSeconds * 1000;
   const token = signSession({ username, expiresAt });
   return { token, expiresAt };
+}
+
+// Read the session cookie and verify it in one call. Returns the
+// decoded Session when a valid, unexpired cookie is present, otherwise
+// null. Centralises the cookies() + verifySession() dance every
+// auth-aware server component otherwise duplicates.
+//
+// Defensive against the verifier throwing (it should not, but the
+// existing call sites all wrap it in try/catch — preserve that
+// behaviour at the helper boundary).
+export async function getOwnerSession(): Promise<Session | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  try {
+    return verifySession(token);
+  } catch {
+    return null;
+  }
 }

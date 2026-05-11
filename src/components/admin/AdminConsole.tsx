@@ -46,8 +46,8 @@ type LastReindex = {
 // UX simple; we can grow into a multi-turn shape if it's clearly
 // missing.
 
-export default function AdminConsole() {
-  const [text, setText] = useState("");
+export default function AdminConsole({ initialText = "" }: { initialText?: string }) {
+  const [text, setText] = useState(initialText);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [agent, setAgent] = useState<AgentResult | null>(null);

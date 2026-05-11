@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AdminAffordance from "@/components/AdminAffordance";
 import { Cover } from "@/components/Cover";
 import { HomeMark } from "@/components/HomeMark";
+import { getOwnerSession } from "@/lib/auth/session";
 import { getBooksByTag } from "@/lib/books";
 import type { Book } from "@/lib/types";
 
@@ -17,8 +19,9 @@ export async function generateMetadata({ params }: { params: Params }) {
 export default async function TagPage({ params }: { params: Params }) {
   const { tag: rawTag } = await params;
   const tag = decodeURIComponent(rawTag);
-  const books = await getBooksByTag(tag);
+  const [books, ownerSession] = await Promise.all([getBooksByTag(tag), getOwnerSession()]);
   if (books.length === 0) notFound();
+  const isOwner = ownerSession !== null;
 
   return (
     <main className="mx-auto box-border w-full max-w-[900px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
@@ -37,8 +40,22 @@ export default async function TagPage({ params }: { params: Params }) {
 
       <ol className="m-0 grid list-none grid-cols-1 gap-4 p-0 sm:grid-cols-2">
         {books.map((b) => (
-          <li key={b.slug}>
+          <li key={b.slug} className="relative">
             <BookCard book={b} />
+            <div className="absolute right-2 top-2">
+              {/* Owner-only inline affordance — seeds /admin with the
+                  remove-tag intent so the agent stages a drop of this
+                  tag from this book. Anonymous viewers render nothing. */}
+              <AdminAffordance
+                show={isOwner}
+                href={
+                  `/admin?focus=book:${encodeURIComponent(b.slug)}` +
+                  `&intent=remove-tag:${encodeURIComponent(tag)}`
+                }
+                label="remove tag"
+                title={`Stage a patch that drops '${tag}' from this book`}
+              />
+            </div>
           </li>
         ))}
       </ol>

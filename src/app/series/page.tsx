@@ -1,7 +1,9 @@
 import Link from "next/link";
+import AdminAffordance from "@/components/AdminAffordance";
 import { Cover } from "@/components/Cover";
 import { HomeMark } from "@/components/HomeMark";
 import SeriesHashOpener from "@/components/SeriesHashOpener";
+import { getOwnerSession } from "@/lib/auth/session";
 import { getAllSeries } from "@/lib/books";
 import type { RosterMissing, SeriesGroup, SeriesMember } from "@/lib/types";
 
@@ -17,7 +19,8 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
   const sp = await searchParams;
   const forceExpandAll = sp.expand === "all";
   const forceCollapseAll = sp.collapse === "all";
-  const series = await getAllSeries();
+  const [series, ownerSession] = await Promise.all([getAllSeries(), getOwnerSession()]);
+  const isOwner = ownerSession !== null;
 
   // Build TOC entries. Top-level series only; sub-series indent under
   // their parent (so Tiffany Aching nests under Discworld) without
@@ -58,6 +61,7 @@ export default async function SeriesPage({ searchParams }: { searchParams: Searc
                 group={group}
                 forceExpandAll={forceExpandAll}
                 forceCollapseAll={forceCollapseAll}
+                isOwner={isOwner}
               />
             ))}
           </div>
@@ -213,10 +217,12 @@ function SeriesSection({
   group,
   forceExpandAll,
   forceCollapseAll,
+  isOwner,
 }: {
   group: SeriesGroup;
   forceExpandAll: boolean;
   forceCollapseAll: boolean;
+  isOwner: boolean;
 }) {
   const finished = group.members.filter((m) => m.status === "finished").length;
   // When a roster is available, the denominator is the canonical
@@ -268,7 +274,7 @@ function SeriesSection({
           </span>
         </header>
       </summary>
-      <ol className="mt-4 mb-0 ml-0 list-none space-y-3 p-0">{renderEntries(group)}</ol>
+      <ol className="mt-4 mb-0 ml-0 list-none space-y-3 p-0">{renderEntries(group, isOwner)}</ol>
     </details>
   );
 }
@@ -281,7 +287,7 @@ function SeriesSection({
 // vault indexes — placeholders read "(not in the vault)" with no
 // title. Members without an integer index (null, decimals) are
 // appended at the end either way.
-function renderEntries(group: SeriesGroup): React.ReactNode[] {
+function renderEntries(group: SeriesGroup, isOwner: boolean): React.ReactNode[] {
   const integerMembers = group.members.filter((m) => m.index !== null && Number.isInteger(m.index));
   const otherMembers = group.members.filter((m) => m.index === null || !Number.isInteger(m.index));
   const memberByIndex = new Map<number, SeriesMember>();
@@ -305,7 +311,14 @@ function renderEntries(group: SeriesGroup): React.ReactNode[] {
     for (const pos of ordered) {
       const member = memberByIndex.get(pos);
       if (member) {
-        out.push(<SeriesEntry key={member.slug} member={member} />);
+        out.push(
+          <SeriesEntry
+            key={member.slug}
+            member={member}
+            seriesName={group.name}
+            isOwner={isOwner}
+          />,
+        );
       } else {
         const r = rosterByPos.get(pos)!;
         out.push(<RosterMissingEntry key={`roster-${pos}`} entry={r} />);
@@ -322,17 +335,19 @@ function renderEntries(group: SeriesGroup): React.ReactNode[] {
         out.push(<MissingEntry key={`gap-${i}`} index={i} seriesName={group.name} />);
       } else if (cursor < integerMembers.length && integerMembers[cursor].index === i) {
         const m = integerMembers[cursor];
-        out.push(<SeriesEntry key={m.slug} member={m} />);
+        out.push(<SeriesEntry key={m.slug} member={m} seriesName={group.name} isOwner={isOwner} />);
         cursor++;
       }
     }
   } else {
     // No integer indexes at all — just dump the members.
-    return group.members.map((m) => <SeriesEntry key={m.slug} member={m} />);
+    return group.members.map((m) => (
+      <SeriesEntry key={m.slug} member={m} seriesName={group.name} isOwner={isOwner} />
+    ));
   }
 
   for (const m of otherMembers) {
-    out.push(<SeriesEntry key={m.slug} member={m} />);
+    out.push(<SeriesEntry key={m.slug} member={m} seriesName={group.name} isOwner={isOwner} />);
   }
   return out;
 }
@@ -398,7 +413,15 @@ function slugifySeriesName(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function SeriesEntry({ member }: { member: SeriesMember }) {
+function SeriesEntry({
+  member,
+  seriesName,
+  isOwner,
+}: {
+  member: SeriesMember;
+  seriesName: string;
+  isOwner: boolean;
+}) {
   const stars =
     member.rating !== null
       ? "★".repeat(Math.floor(member.rating)) + (member.rating % 1 >= 0.5 ? "½" : "")
@@ -409,8 +432,15 @@ function SeriesEntry({ member }: { member: SeriesMember }) {
       : member.status === "finished"
         ? "text-star"
         : "text-ink-soft";
+  // Owner-only inline affordance — seeds /admin with a focused prompt
+  // to drop this book's membership in `seriesName` from the `series`
+  // frontmatter field. Anonymous viewers render nothing here; the
+  // outer <Link> is unaffected.
+  const adminHref =
+    `/admin?focus=book:${encodeURIComponent(member.slug)}` +
+    `&intent=remove-from-series:${encodeURIComponent(seriesName)}`;
   return (
-    <li>
+    <li className="relative">
       <Link
         href={`/books/${encodeURIComponent(member.slug)}`}
         className="bg-surface border-rule hover:border-accent flex items-center gap-4 rounded border p-3 transition-colors"
@@ -435,6 +465,14 @@ function SeriesEntry({ member }: { member: SeriesMember }) {
           )}
         </div>
       </Link>
+      <div className="absolute right-2 top-1/2 -translate-y-1/2">
+        <AdminAffordance
+          show={isOwner}
+          href={adminHref}
+          label="remove from series"
+          title={`Stage a patch that drops '${seriesName}' from this book's series field`}
+        />
+      </div>
     </li>
   );
 }
