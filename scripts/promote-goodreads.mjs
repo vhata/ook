@@ -37,6 +37,7 @@ import yaml from "js-yaml";
 import { cleanTitleAndSeries } from "./lib/promote-goodreads.mjs";
 import { routeGoodreadsEntry, renderTbrBullet, appendTbrBullet } from "./lib/goodreads-routing.mjs";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
+import { formatAddition, formatBookHeader } from "./lib/diff-format.mjs";
 
 // Title cleanup: the pure helper lives in `scripts/lib/promote-goodreads.mjs`
 // so it can be unit-tested without filesystem IO. Re-export here so any
@@ -197,6 +198,29 @@ async function main() {
     }
     for (const p of tbrPlans) {
       log(`  tbr    to-read           ${"  "} ${"—".padEnd(10)} ${p.bullet}`);
+    }
+    log("");
+  }
+
+  // Unified-diff-style dry-run output for the operator's eyeball. Each
+  // would-mint book gets a header + green `+` lines for every line of
+  // the proposed file. Each would-append TBR bullet gets a header
+  // naming `_meta/tbr.md` and a single green `+` line for the bullet.
+  // Matches the shape of the backfill scripts' colored output.
+  if (!APPLY && (dirPlans.length > 0 || tbrPlans.length > 0)) {
+    for (const p of dirPlans) {
+      const refPath = `${p.slug}/${p.slug}.md`;
+      const content = renderBookFile(p.frontmatter);
+      log(formatBookHeader(refPath));
+      for (const line of content.split("\n")) {
+        log(formatAddition(line));
+      }
+    }
+    if (tbrPlans.length > 0) {
+      log(formatBookHeader("_meta/tbr.md"));
+      for (const p of tbrPlans) {
+        log(formatAddition(p.bullet));
+      }
     }
     log("");
   }

@@ -28,6 +28,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
+import { formatAddition, formatBookHeader } from "./lib/diff-format.mjs";
 import {
   appendEntries,
   decodeClippings,
@@ -97,9 +98,18 @@ async function main() {
     const { next, written } = appendEntries(existing, slugEntries);
     if (written.length === 0) continue;
     totalWrittenEntries += written.length;
-    process.stdout.write(
-      `${slug.padEnd(48)} +${written.length} new (existing ${slugEntries.length - written.length} skipped)\n`,
-    );
+    // Unified-diff-style block per book: header + one green `+` line
+    // per highlight being appended. Matches the rest of the vault-
+    // touching scripts so the operator scans the same shape everywhere.
+    process.stdout.write(`${formatBookHeader(`${slug}/quotes.md`)}\n`);
+    for (const entry of written) {
+      const oneLine = entry.text.replace(/\s+/g, " ").trim();
+      process.stdout.write(`${formatAddition(oneLine)}\n`);
+    }
+    const skipped = slugEntries.length - written.length;
+    if (skipped > 0) {
+      process.stdout.write(`  (${skipped} already present, skipped)\n`);
+    }
     pending.push(async () => {
       await fs.writeFile(quotesPath, next.endsWith("\n") ? next : next + "\n", "utf8");
     });

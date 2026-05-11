@@ -36,6 +36,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { formatAddition, formatBookHeader } from "./lib/diff-format.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const CSV = argv._[0];
@@ -228,7 +229,15 @@ async function main() {
   }
 
   if (!APPLY) {
-    process.stdout.write(final);
+    // Render the proposed file content as a unified-diff-style block —
+    // a header naming the target path, then every line of the new
+    // content as a green `+` insertion. Keeps the dry-run consistent
+    // with the rest of the vault-touching scripts so the operator
+    // scans the same shape everywhere.
+    process.stdout.write(`${formatBookHeader(path.relative(VAULT, triagePath))}\n`);
+    for (const line of final.split("\n")) {
+      process.stdout.write(`${formatAddition(line)}\n`);
+    }
     process.stderr.write(`\n(dry-run; rerun with --apply to write to ${triagePath}`);
     if (promotions.length > 0) {
       process.stderr.write(` and ${promotions.length} new vault dirs`);
@@ -237,7 +246,7 @@ async function main() {
     if (promotions.length > 0) {
       process.stderr.write("\nWould-promote (Read=truthy → vault dir, status: finished):\n");
       for (const p of promotions) {
-        process.stderr.write(`  ${p.slug}\n`);
+        process.stderr.write(`  ${formatAddition(p.slug)}\n`);
       }
     }
     return;
