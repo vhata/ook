@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BingoCellEl } from "@/components/BingoCell";
 import { Cover } from "@/components/Cover";
 import { foxingFor } from "@/lib/foxing";
 import {
@@ -16,7 +17,7 @@ import {
   loadHardcoverBooks,
 } from "@/lib/books";
 import { bingoAt, finishedAt, makeTimeMachine, readingAt } from "@/lib/time-machine";
-import type { BingoCard, BingoSquare, Book, LogEntry, Tbr } from "@/lib/types";
+import type { BingoCard, Book, LogEntry, Tbr } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -544,75 +545,6 @@ function BingoGrid({ card }: { card: BingoCard }) {
         </div>
       </div>
     </>
-  );
-}
-
-function BingoCellEl({ square }: { square: BingoSquare }) {
-  if (square.free) {
-    return (
-      <div className="border-rule bg-surface-mute relative flex aspect-[0.7/1] flex-col items-center justify-center gap-1.5 overflow-hidden rounded border">
-        <div className="font-serif text-accent text-[24px] italic">Free</div>
-        <div className="text-ink-soft text-[9px] tracking-[0.16em] uppercase">any book</div>
-      </div>
-    );
-  }
-  const inner = (
-    <>
-      <div
-        className={`bg-surface-mute w-full ${square.done || square.reading ? "" : "opacity-55 grayscale-[0.55] contrast-90"}`}
-        style={{
-          aspectRatio: "0.72 / 1",
-          backgroundImage: square.cover ? `url(${square.cover})` : undefined,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      />
-      <div className="border-rule bg-surface border-t p-2">
-        <div className="truncate text-[10px] leading-tight font-semibold">{square.title}</div>
-        <div className="text-ink-soft truncate text-[9px]">{square.authors[0] ?? ""}</div>
-      </div>
-      <div className="bg-bg-raised text-ink absolute top-1 left-1.5 rounded-sm px-1 py-0.5 text-[8px] tracking-[0.12em]">
-        {square.id}
-      </div>
-      {square.done && (
-        <div
-          className="text-star absolute top-1 right-1 text-[14px] drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)]"
-          aria-label="done"
-        >
-          ★
-        </div>
-      )}
-      {square.reading && !square.done && (
-        <div className="bg-accent absolute top-1 right-1 rounded-sm px-1.5 py-0.5 text-[8px] tracking-[0.16em] text-white uppercase">
-          now
-        </div>
-      )}
-    </>
-  );
-  const baseClasses =
-    "relative aspect-[0.7/1] overflow-hidden rounded border bg-surface transition-transform hover:-translate-y-0.5";
-  const ringClasses = square.reading ? "border-accent ring-2 ring-accent" : "border-rule";
-  const tooltip =
-    square.authors.length > 0
-      ? `${square.title ?? ""} — ${square.authors.join(", ")}`
-      : (square.title ?? "");
-
-  if (square.book) {
-    return (
-      <Link
-        href={`/books/${encodeURIComponent(square.book)}`}
-        className={`${baseClasses} ${ringClasses}`}
-        title={tooltip}
-        aria-label={tooltip}
-      >
-        {inner}
-      </Link>
-    );
-  }
-  return (
-    <div className={`${baseClasses} ${ringClasses}`} title={tooltip} aria-label={tooltip}>
-      {inner}
-    </div>
   );
 }
 
