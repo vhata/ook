@@ -26,16 +26,6 @@ Bulk operations are part of the brief: select multiple rows, pick an action, app
 - **Goodreads-shelf-aware promotion**: `scripts/promote-goodreads.mjs` reads each entry's `Bookshelves` column and routes accordingly. `to-read` → bullet in `_meta/tbr.md` (probably under a `## From Goodreads` pile, dated). `read` / `currently-reading` → existing vault-directory minting path with status set from the shelf. Same dry-run-by-default discipline. `#feature #goodreads #import #routing`
 - **Bulk multi-action (nice-to-have)**: heterogeneous actions in a single submit (e.g., 3 rows → TBR + 2 rows → reading + 1 row → finished). The batch endpoint already supports a heterogeneous list of patches; the UX change is per-row action selection rather than a single global action. Decide once single-action bulk lands. `#feature #triage #ux`
 
-### `/admin/backfill` — staged batched commits (codified 2026-05-10)
-
-Today: each card's "Save" posts to `/api/admin/agent/commit` immediately, one card = one commit. A visit that fills five cards spawns five commits in `vhata/books` — noisy in `/admin/audit`, and on a slow link the user waits per card.
-
-Decision: stage answers client-side; a single "Send all" button at the bottom commits the lot through the same `/api/admin/agent/commit-batch` endpoint introduced for `/triage` bulk actions. Skips and dismissals still take effect client-side only. Empty staging = button disabled.
-
-- **Staging UI**: each card's "Save" becomes "Stage." A footer (sticky on mobile, inline at the bottom on desktop) shows "N answers staged" with a Send-all button and a Discard-all link. Stage-state lives in component state — leaving the page drops it (acceptable for a "few questions per visit" surface that's already light-touch). `#feature #admin #backfill #batch`
-- **Shared batch endpoint**: same `/api/admin/agent/commit-batch` as `/triage` bulk. The two surfaces share the wire format. `#feature #admin #write-surface #batch`
-- **Audit hint** (defer to first use): tag a batch commit's trailer with `batch-size=N` so `/admin/audit` can render a "5 answers" chip. Not blocking on the first cut. `#polish #audit`
-
 ### Kindle reading-session import (codified 2026-05-10) — awaiting takeout
 
 Source notes (don't re-research):
@@ -76,6 +66,12 @@ The **finish prompt** (status → finished asks for pullquote + rating in one bu
 - **Reading-streak milestone**: when current streak crosses 10/30/100 days at commit time, agent says "that's a streak. Anything to note about it?" — answer goes to `_meta/log.md` as a Note entry. `#agent #voice #prompts #streak`
 - **Quiet → return**: when there's been no event for ≥14 days and the user comes back to /admin to mark something, agent asks "welcome back — anything interesting in the gap?" — answer to `_meta/log.md`. `#agent #voice #prompts #quiet`
 - **Series completion**: when status → finished completes a series the user has fully tracked, agent asks "you finished the series. Looking back, what stuck?" — answer to a new file `<slug>/series-finish.md` or appended to the final book's review. `#agent #voice #prompts #series`
+
+### Batch-commit audit hint (deferred 2026-05-10)
+
+When `/admin/backfill` "Send all" lands as a single commit, the `/admin/audit` row currently just says "MCP" — there's no on-row signal that it carried five answers rather than one. Extend the `via ook-admin/<id>` trailer with a `batch-size=N` field (or a sibling trailer line) so the audit page can render a "5 answers" chip alongside the MCP chip. Defer to first use of the staged-batch flow on `/admin/backfill` — once the user has a real batch commit in the audit log they can judge whether the chip is worth the parser change. Touches `src/lib/mcp/trailer.ts` (emit), `src/lib/admin/audit.ts` (parse), and the `/admin/audit` renderer (chip).
+
+- **Batch-size chip on `/admin/audit`**: extend the MCP trailer to optionally include `batch-size=N` and render a count chip on the audit row. `#polish #audit #batch`
 
 ## Researched dossiers
 

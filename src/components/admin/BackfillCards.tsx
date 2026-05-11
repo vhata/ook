@@ -6,17 +6,19 @@ import { Cover } from "@/components/Cover";
 import type { BackfillQuestion, BackfillKind } from "@/lib/admin/backfill";
 
 // Per-card interactivity for /admin/backfill. Each question is one
-// of three skip-or-save shapes — rate (1..5 select), review (textarea),
-// wouldReread (yes/no). Save posts a `CommitPatchInput`-shaped payload
-// to /api/admin/agent/commit so the existing audit + trailer wiring
-// applies uniformly; Skip is purely client-side state (no round-trip).
+// of three skip-or-stage shapes — rate (1..5 select), review (textarea),
+// wouldReread (yes/no). "Stage" moves the answer into a client-side
+// queue and visually marks the card; the footer's "Send all" posts the
+// whole queue to /api/admin/agent/commit-batch as one vault commit so
+// every backfill commit picks up the same `via ook-admin/<id>` trailer
+// and audit-log entry as a /admin console write. Skip and dismiss stay
+// purely client-side.
 //
-// Why post directly instead of routing through the Claude /api/admin/agent
-// endpoint: the backfill questions are deterministic structured updates,
-// not free-text — there's no clarification step the agent needs to run,
-// and burning Claude tokens for "set rating=4" is wasteful. We construct
-// the patch on the client (the shape is small and well-defined) and the
-// /commit endpoint re-validates the payload's schema as defence-in-depth.
+// Why direct POST rather than routing through the Claude agent: the
+// backfill answers are deterministic structured updates, not free-text
+// — there's no clarification step the agent needs to run, and burning
+// Claude tokens for "set rating=4" is wasteful. The commit-batch
+// endpoint re-validates each patch's schema as defence-in-depth.
 
 type CommitPatchInput = {
   slug: string;
@@ -27,7 +29,8 @@ type CommitPatchInput = {
 
 type CardState =
   | { kind: "pending" }
-  | { kind: "saving" }
+  | { kind: "staged" }
+  | { kind: "sending" }
   | { kind: "saved"; commits: Array<{ path: string; url: string | null }> }
   | { kind: "skipped" }
   | { kind: "error"; message: string };
@@ -38,11 +41,20 @@ type Answers = {
   wouldReread?: boolean;
 };
 
+type BatchCommit = { path: string; url: string | null };
+type BatchResponse = {
+  ok: true;
+  batchSize: number;
+  commits: BatchCommit[];
+  previews: Array<{ slug: string }>;
+};
+
 export default function BackfillCards({ questions }: { questions: BackfillQuestion[] }) {
   const [states, setStates] = useState<Record<string, CardState>>(() =>
     Object.fromEntries(questions.map((q) => [questionKey(q), { kind: "pending" } as CardState])),
   );
   const [answers, setAnswers] = useState<Record<string, Answers>>({});
+  const [batchError, setBatchError] = useState<string | null>(null);
 
   function updateAnswer(key: string, patch: Answers) {
     setAnswers((prev) => ({ ...prev, [key]: { ...(prev[key] ?? {}), ...patch } }));
@@ -52,34 +64,90 @@ export default function BackfillCards({ questions }: { questions: BackfillQuesti
     setStates((prev) => ({ ...prev, [key]: state }));
   }
 
-  async function save(q: BackfillQuestion) {
+  function stage(q: BackfillQuestion) {
     const key = questionKey(q);
     const answer = answers[key] ?? {};
-    const patch = buildPatch(q, answer);
-    if (!patch) {
-      setCard(key, { kind: "error", message: "Fill in an answer before saving." });
+    if (!canAnswer(q, answer)) {
+      setCard(key, { kind: "error", message: "Fill in an answer before staging." });
       return;
     }
-    setCard(key, { kind: "saving" });
-    try {
-      const res = await fetch("/api/admin/agent/commit", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(patch),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail ?? data.error ?? `${res.status}`);
-      }
-      const data = (await res.json()) as { commits: Array<{ path: string; url: string | null }> };
-      setCard(key, { kind: "saved", commits: data.commits });
-    } catch (e) {
-      setCard(key, { kind: "error", message: (e as Error).message });
-    }
+    setCard(key, { kind: "staged" });
+  }
+
+  function unstage(q: BackfillQuestion) {
+    // Returns the card to its pending-editable state so the user can
+    // re-edit and re-stage before "Send all" fires. The answer itself
+    // is preserved in `answers` so they don't have to retype.
+    setCard(questionKey(q), { kind: "pending" });
   }
 
   function skip(q: BackfillQuestion) {
     setCard(questionKey(q), { kind: "skipped" });
+  }
+
+  function discardAll() {
+    // Returns every staged card to pending. Saved / skipped / error
+    // cards are left alone — Discard-all is scoped to the staging
+    // queue, not the visit history.
+    setBatchError(null);
+    setStates((prev) => {
+      const next: Record<string, CardState> = { ...prev };
+      for (const [key, state] of Object.entries(prev)) {
+        if (state.kind === "staged") next[key] = { kind: "pending" };
+      }
+      return next;
+    });
+  }
+
+  async function sendAll() {
+    const stagedEntries = questions
+      .map((q) => ({ q, key: questionKey(q), state: states[questionKey(q)] }))
+      .filter((e) => e.state.kind === "staged");
+    if (stagedEntries.length === 0) return;
+
+    const patches: CommitPatchInput[] = [];
+    for (const { q, key } of stagedEntries) {
+      const patch = buildPatch(q, answers[key]);
+      if (!patch) {
+        // Shouldn't be reachable — staging requires canAnswer — but
+        // defence-in-depth in case the state ever drifts.
+        setBatchError(`Could not build patch for ${q.bookTitle}.`);
+        return;
+      }
+      patches.push(patch);
+    }
+
+    setBatchError(null);
+    for (const { key } of stagedEntries) setCard(key, { kind: "sending" });
+
+    try {
+      const res = await fetch("/api/admin/agent/commit-batch", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          patches,
+          message: `Backfill: ${patches.length} answer${patches.length === 1 ? "" : "s"}`,
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
+        throw new Error(data.detail ?? data.error ?? `${res.status}`);
+      }
+      const data = (await res.json()) as BatchResponse;
+      // All-or-nothing: every staged card flips to saved with the same
+      // batch commits attached. Per-patch attribution is via the slug
+      // → commits.path mapping when needed; the user-facing chip just
+      // links to the (single) batch commit.
+      for (const { key } of stagedEntries) {
+        setCard(key, { kind: "saved", commits: data.commits });
+      }
+    } catch (e) {
+      const message = (e as Error).message;
+      setBatchError(message);
+      // Roll the cards back to staged so the user can retry with the
+      // same selection, or Discard-all to drop them.
+      for (const { key } of stagedEntries) setCard(key, { kind: "staged" });
+    }
   }
 
   const total = questions.length;
@@ -87,10 +155,12 @@ export default function BackfillCards({ questions }: { questions: BackfillQuesti
     const s = states[questionKey(q)];
     return s.kind === "saved" || s.kind === "skipped";
   }).length;
+  const stagedCount = questions.filter((q) => states[questionKey(q)].kind === "staged").length;
+  const sending = questions.some((q) => states[questionKey(q)].kind === "sending");
   const allDone = total > 0 && resolved === total;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-32 sm:pb-6">
       {questions.map((q) => {
         const key = questionKey(q);
         const state = states[key];
@@ -101,7 +171,8 @@ export default function BackfillCards({ questions }: { questions: BackfillQuesti
             state={state}
             answer={answers[key]}
             onUpdate={(patch) => updateAnswer(key, patch)}
-            onSave={() => save(q)}
+            onStage={() => stage(q)}
+            onUnstage={() => unstage(q)}
             onSkip={() => skip(q)}
           />
         );
@@ -116,6 +187,76 @@ export default function BackfillCards({ questions }: { questions: BackfillQuesti
           .
         </div>
       )}
+
+      <StageFooter
+        stagedCount={stagedCount}
+        sending={sending}
+        error={batchError}
+        onSendAll={sendAll}
+        onDiscardAll={discardAll}
+      />
+    </div>
+  );
+}
+
+function StageFooter({
+  stagedCount,
+  sending,
+  error,
+  onSendAll,
+  onDiscardAll,
+}: {
+  stagedCount: number;
+  sending: boolean;
+  error: string | null;
+  onSendAll: () => void;
+  onDiscardAll: () => void;
+}) {
+  // Sticky on mobile so the staging queue stays reachable while
+  // scrolling; inline at the bottom on desktop because the whole
+  // page comfortably fits. Hidden entirely when there's nothing
+  // staged and no error to surface — keeps the page calm before the
+  // first stage action.
+  const empty = stagedCount === 0 && !error;
+  if (empty) return null;
+
+  return (
+    <div
+      data-testid="stage-footer"
+      className="bg-surface/95 border-rule fixed inset-x-0 bottom-0 z-30 border-t px-6 py-3 backdrop-blur sm:static sm:mt-6 sm:rounded sm:border sm:px-5 sm:py-4 sm:backdrop-blur-none"
+    >
+      <div className="mx-auto flex max-w-[700px] flex-wrap items-center gap-x-4 gap-y-2">
+        <span className="text-ink-soft text-[12px] tracking-[0.14em] uppercase">
+          {stagedCount === 0
+            ? "No answers staged"
+            : `${stagedCount} answer${stagedCount === 1 ? "" : "s"} staged`}
+        </span>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={onDiscardAll}
+          disabled={sending || stagedCount === 0}
+          className="text-ink-soft hover:text-ink text-[12px] tracking-[0.14em] uppercase disabled:opacity-50"
+        >
+          Discard all
+        </button>
+        <button
+          type="button"
+          onClick={onSendAll}
+          disabled={sending || stagedCount === 0}
+          className="border-accent text-accent hover:bg-accent-soft inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] tracking-[0.06em] disabled:opacity-50"
+        >
+          {sending ? "Sending…" : "Send all"}
+        </button>
+      </div>
+      {error && (
+        <div
+          role="alert"
+          className="border-accent bg-accent-soft text-ink mx-auto mt-2 max-w-[700px] rounded border-l-2 px-3 py-2 text-[13px]"
+        >
+          {error}
+        </div>
+      )}
     </div>
   );
 }
@@ -125,14 +266,16 @@ function BackfillCard({
   state,
   answer,
   onUpdate,
-  onSave,
+  onStage,
+  onUnstage,
   onSkip,
 }: {
   question: BackfillQuestion;
   state: CardState;
   answer: Answers | undefined;
   onUpdate: (patch: Answers) => void;
-  onSave: () => void;
+  onStage: () => void;
+  onUnstage: () => void;
   onSkip: () => void;
 }) {
   // Saved / skipped cards collapse to a one-line acknowledgement so
@@ -164,22 +307,42 @@ function BackfillCard({
     );
   }
 
-  const busy = state.kind === "saving";
-  const canSave = canAnswer(question, answer);
+  const staged = state.kind === "staged";
+  const sending = state.kind === "sending";
+  const busy = sending;
+  const canStage = canAnswer(question, answer);
 
+  // Staged cards get an accent border + a "staged" pill in the
+  // header. Pending cards keep the rule-grey border. The visual
+  // affordance is deliberately understated — the footer's count is
+  // where the queue's mass should be felt.
   return (
-    <article className="border-rule rounded border p-5">
+    <article
+      data-staged={staged ? "true" : undefined}
+      className={
+        staged
+          ? "border-accent bg-accent-soft/30 rounded border p-5"
+          : "border-rule rounded border p-5"
+      }
+    >
       <div className="flex gap-4">
         <div className="shrink-0">
           <Cover src={question.bookCover} title={question.bookTitle} width={60} height={90} />
         </div>
         <div className="min-w-0 flex-1">
-          <Link
-            href={`/books/${question.bookSlug}`}
-            className="font-serif text-ink hover:text-accent text-[18px] leading-tight"
-          >
-            {question.bookTitle}
-          </Link>
+          <div className="flex items-start justify-between gap-3">
+            <Link
+              href={`/books/${question.bookSlug}`}
+              className="font-serif text-ink hover:text-accent text-[18px] leading-tight"
+            >
+              {question.bookTitle}
+            </Link>
+            {staged && (
+              <span className="border-accent text-accent shrink-0 rounded-full border px-2 py-0.5 text-[10px] tracking-[0.16em] uppercase">
+                staged
+              </span>
+            )}
+          </div>
           {question.bookAuthors.length > 0 && (
             <div className="text-ink-soft mt-1 text-[13px]">{question.bookAuthors.join(", ")}</div>
           )}
@@ -192,7 +355,7 @@ function BackfillCard({
               question={question}
               answer={answer}
               onUpdate={onUpdate}
-              disabled={busy}
+              disabled={busy || staged}
             />
           </div>
 
@@ -203,18 +366,29 @@ function BackfillCard({
           )}
 
           <div className="mt-4 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={busy || !canSave}
-              className="border-accent text-accent hover:bg-accent-soft inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] tracking-[0.06em] disabled:opacity-50"
-            >
-              {busy ? "Saving…" : "Save"}
-            </button>
+            {staged ? (
+              <button
+                type="button"
+                onClick={onUnstage}
+                disabled={busy}
+                className="border-rule text-ink-soft hover:text-ink inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] tracking-[0.06em] disabled:opacity-50"
+              >
+                Edit
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onStage}
+                disabled={busy || !canStage}
+                className="border-accent text-accent hover:bg-accent-soft inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] tracking-[0.06em] disabled:opacity-50"
+              >
+                Stage
+              </button>
+            )}
             <button
               type="button"
               onClick={onSkip}
-              disabled={busy}
+              disabled={busy || staged}
               className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase disabled:opacity-50"
             >
               Skip
@@ -252,7 +426,7 @@ function BackfillInput({
               className={
                 active
                   ? "border-accent text-accent bg-accent-soft rounded border px-3 py-1.5 text-[13px]"
-                  : "border-rule text-ink-soft hover:text-ink rounded border px-3 py-1.5 text-[13px]"
+                  : "border-rule text-ink-soft hover:text-ink rounded border px-3 py-1.5 text-[13px] disabled:opacity-50"
               }
             >
               {n}★
@@ -291,7 +465,7 @@ function BackfillInput({
             className={
               active
                 ? "border-accent text-accent bg-accent-soft rounded border px-3 py-1.5 text-[13px]"
-                : "border-rule text-ink-soft hover:text-ink rounded border px-3 py-1.5 text-[13px]"
+                : "border-rule text-ink-soft hover:text-ink rounded border px-3 py-1.5 text-[13px] disabled:opacity-50"
             }
           >
             {opt.label}
@@ -321,13 +495,18 @@ export function canAnswer(q: BackfillQuestion, answer: Answers | undefined): boo
   return false;
 }
 
-// Build the CommitPatchInput posted to /api/admin/agent/commit. Each
-// kind maps to a single small change:
+// Build the CommitPatchInput posted to /api/admin/agent/commit-batch.
+// Each kind maps to a single small change:
 //   - rate → frontmatter rating: N
 //   - wouldReread → frontmatter would_reread: bool
 //   - review → file-backed section "review" with action "replace"
 //     (the section schema treats the special "review" name as a
 //     write to <slug>/review.md — see src/lib/mcp/book-paths.ts).
+//
+// `commit_message` is required by the wire schema but the batch path
+// ignores it in favour of the batch-level message; we still set a
+// per-patch message in case the same builder is reused for the single
+// /commit endpoint in dev or by tests.
 export function buildPatch(
   q: BackfillQuestion,
   answer: Answers | undefined,
