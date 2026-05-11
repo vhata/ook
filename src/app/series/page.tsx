@@ -177,9 +177,11 @@ function SeriesNav({ items }: { items: TocItem[] }) {
         </div>
       </nav>
 
-      {/* Desktop: sticky left rail */}
+      {/* Desktop: sticky left rail. Cap to viewport height with internal
+       * scroll so a long TOC (many series) doesn't push its tail below
+       * the fold where sticky leaves it unreachable. */}
       <aside
-        className="hidden self-start md:sticky md:top-6 md:block"
+        className="hidden self-start md:sticky md:top-6 md:block md:max-h-[calc(100vh-3rem)] md:overflow-y-auto md:pr-2"
         aria-label="Series navigation"
       >
         <div className="text-ink-soft mb-3 text-[10px] tracking-[0.18em] uppercase">
