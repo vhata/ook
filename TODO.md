@@ -73,6 +73,23 @@ Source notes:
 - **Public-page anti-spoiler guard for community quotes**: Filter community quotes that look like ending-spoilers before rendering on public per-book pages. Personal highlights unaffected (user has finished those). **Source:** Goodreads' optional `<spoiler>` markers + heuristic on phrases like "in the end", "finally,", "died" + agent pass on remainders. **Homework:** none — automatic. `#feature #highlights #spoilers`
 - **Punted: Storygraph / BookWyrm community quotes**: No public per-book quotes endpoints today (Storygraph is stat/recommendation-focused, BookWyrm uses ActivityPub federation per-instance). Revisit in 12 months. `#not-now #highlights`
 
+### Kindle reading-session import (codified 2026-05-10)
+
+Source notes (don't re-research):
+
+- Amazon's privacy-data takeout (`amazon.com/gp/privacycentral/dsar/preview.html`) emits a per-account zip including `Kindle.Devices.ReadingSession.csv` — one row per reading session, keyed on ASIN, with start/end timestamps, duration, page-flip counts, device. Typical arrival ~1 day after request. **No incremental API**; each takeout is a fresh snapshot, so this is one-shot historical excavation, not an ongoing sync.
+- Reference implementation: `arpanghosh8453/kindle-stats` (Reddit `r/kindle/comments/1da56lb`, May 2024). Joins the session CSV against a Calibre catalogue CSV export (ASIN ↔ title) and produces matplotlib charts in a Jupyter notebook. A hosted browser-only equivalent exists at `tools.infinus.ca/kindle` — does its own ASIN lookups so no Calibre catalogue needed — but we want to own the pipeline (offline-clean, vault-cached, future enrichment).
+- Sendtokindle-uploaded books land as "personal documents" without an ASIN; their sessions are recorded but unlinkable to a book by ID. Cable-transferred kfx books retain ASIN.
+
+The value: **one-shot recovery of behavioural data we can't reconstruct later.** Hardcover/Open Library backfills aggregate other people's signal; this is the user's own reading-session history stretching back to first Kindle ownership. Different category — file the takeout request, ingest once, future re-requests are optional. Awaiting a takeout the user has filed (2026-05-10).
+
+- **`scripts/import-kindle-sessions.mjs`**: read `Kindle.Devices.ReadingSession.csv` (Amazon takeout) and a Calibre catalogue CSV export (ASIN ↔ title ↔ author), emit `_meta/kindle-sessions.json` keyed by vault slug — per-book arrays of `{ start, end, durationSeconds, pageFlips, device }`. Operator-run via `make vault-kindle-sessions`. Dry-run by default with prompt-to-apply. Cache committed to the vault; build stays offline-clean. `#integration #kindle #amazon`
+- **`amazon_asin` frontmatter field + Calibre-driven backfill**: most vault books don't carry an ASIN today; without it session rows have nothing to link to. Add `amazon_asin: <string>` to the schema (`src/lib/types.ts`, `scripts/build-index.mjs` parse, the walk-fallback parser in `src/lib/books.ts`, `_meta/CLAUDE.md` in the vault), then `scripts/backfill-asin-from-calibre.mjs` that pairs the Calibre catalogue CSV against vault books by `goodreads_id` (Calibre exports it as a custom column when configured) or fuzzy title+author match. Pure cache-to-frontmatter, no network. `#schema #vault #asin`
+- **Per-book render surface**: under the metadata strip on `/books/[slug]`, a discreet line "read across 9 sessions over 14 days · ~6h total" when the cache has data for this slug. Same visual register as the existing Hardcover community-signal line. `#feature #per-book #stats`
+- **Inferred `started` backfill for date-blind finishes**: Goodreads-imported books often have a `finished` but no `started`. The first session timestamp for an ASIN gives a real start. Optional `scripts/backfill-started-from-sessions.mjs` that suggests started-dates per book and prompts to apply, never overrides an existing value. `#feature #vault #dates`
+- **Historical reach on `/stats` heatmaps**: the year-day heatmap currently renders from-vault-era only. Fold session-day data into the heatmap source so years prior to the vault's first commit can render too — properly back-fills the historical view of "when did I actually read." `#feature #stats #historical`
+- **Unlinked-Kindle-activity footnote**: sessions for sendtokindle / personal-document books can't link to a vault entry. Render an "unlinked Kindle activity: ~Nh across M sessions" footnote on `/stats` (or per-year) rather than silently dropping them — the data is honest about the gap. `#caveat #stats`
+
 ### Visual & experience (brainstormed 2026-05-03)
 
 Cosmetic and atmospheric ideas. Mostly low-stakes; pick whichever delights.
