@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { BingoCellEl } from "@/components/BingoCell";
 import { Cover } from "@/components/Cover";
+import { ProgressRibbon } from "@/components/ProgressRibbon";
 import { foxingFor } from "@/lib/foxing";
+import { parseProgress } from "@/lib/progress-parse";
 import {
   bookStuck,
   estimateReadingDaysRemaining,
@@ -414,11 +416,13 @@ function CurrentCard({
   daysIn: number | null;
   etaDays: number | null;
 }) {
+  const progress = parseProgress(book.progress, book.pages);
   return (
     <Link
       href={`/books/${encodeURIComponent(book.slug)}`}
-      className="bg-surface border-rule hover:border-accent block rounded-md border p-5 transition-colors sm:p-7"
+      className="bg-surface border-rule hover:border-accent relative block rounded-md border p-5 transition-colors sm:p-7"
     >
+      <ProgressRibbon percent={progress?.percent ?? null} />
       <div className="flex flex-col gap-5 sm:flex-row sm:gap-7">
         <div className="self-start">
           <Cover src={book.cover} title={book.title} width={96} height={144} />
@@ -442,6 +446,9 @@ function CurrentCard({
               {daysIn === 0 ? "Started today" : `${daysIn} day${daysIn === 1 ? "" : "s"} in`}
               {book.started && (
                 <span className="text-ink-dim ml-2 normal-case">· since {book.started}</span>
+              )}
+              {progress && (
+                <span className="text-ink-dim ml-2 normal-case">· {progress.percent}% through</span>
               )}
             </div>
           )}
