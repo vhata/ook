@@ -6,6 +6,7 @@ import { commitPatchInputSchema } from "../mcp/patch";
 import { listBingoInputSchema, listBooksInputSchema } from "../mcp/tools";
 import { getBookInputSchema } from "../mcp/book-tools";
 import { createFilePatchSchema, removeFilePatchSchema, type MetaPatch } from "../mcp/meta-patch";
+import { parseBookIds } from "../url-id-detect";
 import { z } from "zod";
 
 // Validation for the `propose_patch` tool input. Mirrors
@@ -81,11 +82,43 @@ Schema notes:
 - Status values: tbr, reading, finished, abandoned, paused.
 - Dates: ISO YYYY-MM-DD.
 - Pullquote lives in frontmatter as \`pullquote: "..."\` (string). Rating lives as \`rating: N\` (integer 1-5).
-- Premise (\`premise:\`) is the tier-0 back-cover blurb. Operator-populated from the Hardcover description cache via \`scripts/backfill-premises.mjs\` — the agent does NOT write it. If the user explicitly asks to overwrite a premise (rare), proceed; otherwise leave it alone.`;
+- Premise (\`premise:\`) is the tier-0 back-cover blurb. Operator-populated from the Hardcover description cache via \`scripts/backfill-premises.mjs\` — the agent does NOT write it. If the user explicitly asks to overwrite a premise (rare), proceed; otherwise leave it alone.
+
+URL-paste enrichment:
+When the user's message contains a book URL (Goodreads / Hardcover / Storygraph / Amazon / Bookwyrm), the system pre-parses it and appends a parenthetical at the end of the message of the form "(Parsed from <url>: goodreads_id: 12345, hardcover_slug: …)". Treat those parsed fields as ground-truth IDs ready to write to frontmatter when the user is adding or updating a book. The supported frontmatter ID fields today are: \`goodreads_id\`, \`hardcover_slug\`, \`storygraph_slug\`, \`bookwyrm_url\`. ASIN and ISBN may also appear in the parenthetical — mention them in your reply so the user knows they were detected, but DON'T write them to frontmatter yet (no schema slot for them today).`;
 
 // Exported for test pinning — the finish-flow rule is load-bearing
 // and a future agent.ts refactor must not silently drop it.
 export const FINISH_FLOW_INSTRUCTION_MARKER = "Finish-flow rule (load-bearing):";
+
+// URL-paste enrichment — scans the user's free-text input for any
+// book URLs we know how to parse, runs them through `parseBookIds`,
+// and appends a parenthetical at the end of the message listing every
+// non-empty field. The LLM treats the parenthetical as context and
+// can write the IDs to frontmatter without the user having to type
+// them by hand. URLs we don't recognise leave the text untouched.
+//
+// Exported for tests.
+export function enrichWithUrlIds(userText: string): string {
+  // Permissive URL extraction. The parser is forgiving (returns empty
+  // for unrecognised URLs) so casting a wide net here is safe.
+  const urlPattern = /https?:\/\/\S+/gi;
+  const urls = userText.match(urlPattern) ?? [];
+  const notes: string[] = [];
+  for (const raw of urls) {
+    // Strip a trailing punctuation char common in prose — comma, dot,
+    // closing paren, etc. The parser would tolerate it but the note
+    // reads cleaner without.
+    const url = raw.replace(/[.,;)]+$/, "");
+    const ids = parseBookIds(url);
+    const fields = Object.entries(ids).filter(([, v]) => typeof v === "string" && v.length > 0);
+    if (fields.length === 0) continue;
+    const formatted = fields.map(([k, v]) => `${k}: ${v}`).join(", ");
+    notes.push(`(Parsed from ${url}: ${formatted})`);
+  }
+  if (notes.length === 0) return userText;
+  return `${userText}\n\n${notes.join("\n")}`;
+}
 
 // Tool schemas exposed to Claude. We reuse the zod shapes from the
 // in-process tools — Anthropic's API takes JSON Schema, so we
@@ -243,9 +276,17 @@ export async function runAgent(opts: {
   const model = opts.model ?? "claude-opus-4-7";
   const maxIterations = opts.maxIterations ?? 8;
 
+  // Pre-parse any book URLs the user pasted into the message. The
+  // operator-side capture flow is "paste a URL, agent uses the IDs" —
+  // doing the URL → IDs extraction here means the LLM doesn't need a
+  // dedicated tool call for what's a pure-regex job, and the parsed
+  // IDs ride into the conversation as plain context for the model
+  // to act on (or ignore).
+  const enrichedUserText = enrichWithUrlIds(opts.userText);
+
   // Conversation log surfaced to the client so the user can see what
   // the agent did to arrive at the proposed patch.
-  const conversation: ConversationTurn[] = [{ role: "user", text: opts.userText }];
+  const conversation: ConversationTurn[] = [{ role: "user", text: enrichedUserText }];
 
   // Anthropic SDK message types — keep loose to avoid wrestling the
   // exact union shape across SDK versions.
@@ -253,7 +294,7 @@ export async function runAgent(opts: {
   // Seed with any prior history; append the new user text.
   const messages: Message[] = [
     ...((opts.priorState?.messages ?? []) as Message[]),
-    { role: "user", content: opts.userText },
+    { role: "user", content: enrichedUserText },
   ];
 
   for (let i = 0; i < maxIterations; i++) {
