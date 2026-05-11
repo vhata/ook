@@ -32,9 +32,14 @@ export type CommitResult = {
 // the multi-file path builds a fresh tree on top of the current branch
 // head, so there is no per-file optimistic-concurrency check. Callers
 // that need a sha-mismatch failure mode should stick with `commitFile`.
+//
+// `content: null` is a delete sentinel — the multi-file commit drops
+// the path from the tree (GitHub mode) or unlinks the file (local-fs).
+// Used by the finish-flow gate to archive `<slug>/progress.md` in the
+// same commit as the status flip.
 export type MultiFileWrite = {
   filePath: string;
-  content: string;
+  content: string | null;
 };
 
 export type MultiFileCommitResult = {
@@ -175,23 +180,32 @@ export class GitHubVaultClient implements VaultClient {
     });
     const baseTreeSha = parentCommit.data.tree.sha;
 
-    // 2. Upload a blob per file. Blobs are content-addressed, so
-    // multiple files with the same content reuse the same blob.
+    // 2. Upload a blob per writable file. Delete entries (content ===
+    // null) skip the blob step entirely — they go straight into the
+    // tree with sha=null which tells GitHub to drop the path. Blobs
+    // are content-addressed, so multiple files with the same content
+    // reuse the same blob.
     const blobs = await Promise.all(
       files.map(async (f) => {
+        if (f.content === null) {
+          return { path: f.filePath, sha: null as string | null };
+        }
         const blob = await this.octokit.rest.git.createBlob({
           owner: this.owner,
           repo: this.repo,
           content: Buffer.from(f.content, "utf8").toString("base64"),
           encoding: "base64",
         });
-        return { path: f.filePath, sha: blob.data.sha };
+        return { path: f.filePath, sha: blob.data.sha as string | null };
       }),
     );
 
     // 3. Build a tree on top of the parent tree. Each entry is a
     // file (mode 100644, type blob). Sub-tree paths are honoured by
     // GitHub — passing "Foo/bar.md" lands the blob at that path.
+    // Entries with `sha: null` are deletions — GitHub interprets the
+    // null sha as "remove this path from the parent tree" when the
+    // tree is built on top of `base_tree`.
     const treeRes = await this.octokit.rest.git.createTree({
       owner: this.owner,
       repo: this.repo,
@@ -224,7 +238,7 @@ export class GitHubVaultClient implements VaultClient {
     return {
       sha: commitRes.data.sha,
       url: commitRes.data.html_url ?? null,
-      files: blobs.map((b) => ({ path: b.path, sha: b.sha })),
+      files: blobs.map((b) => ({ path: b.path, sha: b.sha ?? "" })),
     };
   }
 
@@ -333,6 +347,15 @@ class LocalFsVaultClient implements VaultClient {
     const results: Array<{ path: string; sha: string }> = [];
     for (const file of files) {
       const full = this.resolve(file.filePath);
+      if (file.content === null) {
+        // Delete sentinel — unlink the file. Missing-target is silent;
+        // the meta-patch caller has already validated the file existed
+        // in the planning phase, so any race here is best-effort.
+        // eslint-disable-next-line no-restricted-syntax
+        await fs.rm(full, { force: true });
+        results.push({ path: file.filePath, sha: "" });
+        continue;
+      }
       // eslint-disable-next-line no-restricted-syntax
       await fs.mkdir(path.dirname(full), { recursive: true });
       // eslint-disable-next-line no-restricted-syntax
@@ -342,9 +365,15 @@ class LocalFsVaultClient implements VaultClient {
     }
     // No real commit sha in local-fs mode; surface the content hash of
     // the concatenated file payload as a deterministic-ish stand-in so
-    // tests can assert a stable shape.
+    // tests can assert a stable shape. Delete entries contribute
+    // `<path>\n<DELETED>` so two batches with different deletes hash
+    // differently.
     const batchSha = createHash("sha256")
-      .update(files.map((f) => `${f.filePath}\n${f.content}`).join("\n"))
+      .update(
+        files
+          .map((f) => `${f.filePath}\n${f.content === null ? "<DELETED>" : f.content}`)
+          .join("\n"),
+      )
       .digest("hex");
     return { sha: batchSha, url: null, files: results };
   }

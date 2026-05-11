@@ -11,6 +11,13 @@ type CommitPatchInput = {
   commit_message: string;
 };
 
+// Non-book-reference file operations the agent can stage alongside the
+// book patch (the progress-archive dance uses these on finish). Kept
+// loose-typed at this boundary — the server re-validates the shape.
+type MetaPatch =
+  | { kind: "create-file"; path: string; content: string }
+  | { kind: "remove-file"; path: string };
+
 type ConversationTurn = { role: "user" | "assistant" | "tool"; text: string };
 
 // Opaque per-turn state from the server; round-tripped verbatim so
@@ -28,6 +35,7 @@ type AgentResult =
   | {
       kind: "patch-staged";
       patch: CommitPatchInput;
+      metaPatches?: MetaPatch[];
       summary: string;
       conversation: ConversationTurn[];
       state: AgentState;
@@ -112,10 +120,18 @@ export default function AdminConsole({ initialText = "" }: { initialText?: strin
     setBusy(true);
     setError(null);
     try {
+      // Carry meta_patches through to the commit endpoint when the
+      // agent staged any (the progress-archive dance on finish). The
+      // server routes those through commitPatchBatch; without them it
+      // stays on the single-patch path.
+      const body =
+        agent.metaPatches && agent.metaPatches.length > 0
+          ? { ...agent.patch, meta_patches: agent.metaPatches }
+          : agent.patch;
       const res = await fetch("/api/admin/agent/commit", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(agent.patch),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const data = await res.json();

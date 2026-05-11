@@ -2,8 +2,8 @@ import { z } from "zod";
 
 // Meta-patch lane on the commit-batch endpoint. Targets vault files
 // that aren't book-reference notes — `_meta/triage.md`, `_meta/tbr.md`,
-// and the brand-new `<slug>/<slug>.md` we mint when promoting an entry
-// into a real book directory.
+// brand-new `<slug>/<slug>.md` we mint when promoting an entry into a
+// real book directory, and the `<slug>/progress.md` archive on finish.
 //
 // Book patches (CommitPatchInput) operate against an existing
 // `<slug>/<slug>.md` and validate the post-patch frontmatter. Meta
@@ -15,9 +15,15 @@ import { z } from "zod";
 //     pile when absent (used to land a TBR entry in `_meta/tbr.md`).
 //   - `create-file` writes a brand-new file, refusing if the path
 //     already exists (used to mint `<slug>/<slug>.md` when marking an
-//     unknown title as reading or finished).
+//     unknown title as reading or finished, and `_meta/progress-archive/
+//     <slug>.md` on finish-flow archive).
+//   - `remove-file` deletes a file from the vault. Used together with
+//     `create-file` to express a "move" — the finish-flow gate archives
+//     `<slug>/progress.md` by emitting a create-file pointing at
+//     `_meta/progress-archive/<slug>.md` (carrying the source content)
+//     plus a remove-file on the source path, both in one commit.
 //
-// All three resolve to entries in the same MultiFileWrite[] that the
+// All four resolve to entries in the same MultiFileWrite[] that the
 // book-patch lane builds, so the whole batch lands as one commit.
 
 export const removeBulletPatchSchema = z.object({
@@ -48,17 +54,27 @@ export const createFilePatchSchema = z.object({
 });
 export type CreateFilePatch = z.infer<typeof createFilePatchSchema>;
 
+export const removeFilePatchSchema = z.object({
+  kind: z.literal("remove-file"),
+  path: z.string().min(1),
+});
+export type RemoveFilePatch = z.infer<typeof removeFilePatchSchema>;
+
 export const metaPatchSchema = z.discriminatedUnion("kind", [
   removeBulletPatchSchema,
   appendBulletPatchSchema,
   createFilePatchSchema,
+  removeFilePatchSchema,
 ]);
 export type MetaPatch = z.infer<typeof metaPatchSchema>;
 
 export type ApplyMetaPatchResult = {
   path: string;
   before: string;
-  after: string;
+  // `null` means the patch removes the file (`remove-file` kind).
+  // The batch builder lifts this to a delete entry in the
+  // MultiFileWrite list. All other kinds produce a string.
+  after: string | null;
   kind: MetaPatch["kind"];
 };
 
@@ -83,6 +99,13 @@ export function applyMetaPatch(existing: string | null, patch: MetaPatch): Apply
   if (patch.kind === "remove-bullet") {
     const after = removeBulletFromSection(existing, patch.section, patch.bullet);
     return { path: patch.path, before: existing, after, kind: patch.kind };
+  }
+
+  if (patch.kind === "remove-file") {
+    // `after: null` is the sentinel the batch builder lifts to a
+    // delete entry in MultiFileWrite[]. The before-content is kept so
+    // the diff preview can show what's about to disappear.
+    return { path: patch.path, before: existing, after: null, kind: patch.kind };
   }
 
   // append-bullet

@@ -174,9 +174,10 @@ export async function commitPatchBatch(
   }
   // Meta-patch writes come last so they win on path collision with a
   // book patch — meta patches are explicit-target by design, book
-  // patches target derived `<slug>/<slug>.md` paths.
+  // patches target derived `<slug>/<slug>.md` paths. A `null` content
+  // here means a `remove-file` patch landed against this path; we
+  // pass it through to MultiFileWrite as a delete sentinel.
   for (const [path, content] of pending.entries()) {
-    if (content === null) continue;
     fileMap.set(path, { filePath: path, content });
   }
   const files = Array.from(fileMap.values());

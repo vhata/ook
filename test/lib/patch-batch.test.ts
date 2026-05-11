@@ -392,6 +392,86 @@ describe("commitPatchBatch — vault-client routing", () => {
     ).rejects.toThrow(/already exists/);
   });
 
+  it("propagates a `remove-file` patch as a null-content MultiFileWrite entry (archive-on-finish)", async () => {
+    // Pins the wire shape the finish-flow agent emits: a status flip
+    // on the book patch + create-file the archive + remove-file the
+    // source progress.md, all in one commit.
+    const refContent = readFileSync(path.join(workingVault, "TestBook", "TestBook.md"), "utf8");
+    const progressContent = "First read-through notes.\nChapter 3 was great.\n";
+    const multiCalls: Array<{
+      files: Array<{ filePath: string; content: string | null }>;
+      message: string;
+    }> = [];
+    const fakeClient = {
+      async getFile(p: string) {
+        if (p === "TestBook/TestBook.md") return { content: refContent, sha: "r" };
+        if (p === "TestBook/progress.md") return { content: progressContent, sha: "p" };
+        // The archive path is brand-new — must not exist before this batch.
+        if (p === "_meta/progress-archive/TestBook.md") return null;
+        return null;
+      },
+      async commitFile() {
+        return { sha: "x", url: null };
+      },
+      async commitMultiFile(opts: {
+        files: Array<{ filePath: string; content: string | null }>;
+        message: string;
+      }) {
+        multiCalls.push(opts);
+        return {
+          sha: "batch-sha",
+          url: null,
+          files: opts.files.map((f) => ({ path: f.filePath, sha: "fake" })),
+        };
+      },
+      async exists() {
+        return true;
+      },
+      async listDirectory() {
+        return [];
+      },
+    };
+
+    const result = await commitPatchBatch(
+      {
+        patches: [
+          {
+            slug: "TestBook",
+            frontmatter_changes: { status: "finished", finished: "2026-05-11" },
+            commit_message: "Finish TestBook",
+          },
+        ],
+        metaPatches: [
+          {
+            kind: "create-file",
+            path: "_meta/progress-archive/TestBook.md",
+            content: progressContent,
+          },
+          {
+            kind: "remove-file",
+            path: "TestBook/progress.md",
+          },
+        ],
+        message: "Finish TestBook",
+      },
+      fakeClient,
+    );
+
+    expect(multiCalls).toHaveLength(1);
+    expect(result.batchSize).toBe(3);
+
+    const filesByPath = new Map(multiCalls[0].files.map((f) => [f.filePath, f.content]));
+    // The book ref got rewritten.
+    expect(filesByPath.has("TestBook/TestBook.md")).toBe(true);
+    expect(filesByPath.get("TestBook/TestBook.md")).toMatch(/status: finished/);
+    // The archive was created with the source content.
+    expect(filesByPath.get("_meta/progress-archive/TestBook.md")).toBe(
+      `${progressContent}`.endsWith("\n") ? progressContent : `${progressContent}\n`,
+    );
+    // The source progress.md is marked for deletion (null content).
+    expect(filesByPath.get("TestBook/progress.md")).toBeNull();
+  });
+
   it("skips the commit entirely when every patch is a no-op", async () => {
     const refContent = readFileSync(path.join(workingVault, "TestBook", "TestBook.md"), "utf8");
     const calls: unknown[] = [];

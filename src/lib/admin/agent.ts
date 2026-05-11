@@ -5,7 +5,20 @@ import { listBingo, listBooks } from "../mcp/tools";
 import { commitPatchInputSchema } from "../mcp/patch";
 import { listBingoInputSchema, listBooksInputSchema } from "../mcp/tools";
 import { getBookInputSchema } from "../mcp/book-tools";
+import { createFilePatchSchema, removeFilePatchSchema, type MetaPatch } from "../mcp/meta-patch";
 import { z } from "zod";
+
+// Validation for the `propose_patch` tool input. Mirrors
+// `commitPatchInputSchema` with an optional `meta_patches` field — the
+// only kinds the agent is permitted to stage are `create-file` and
+// `remove-file`, used together for the progress-archive dance on
+// finish. (The book-patch lane covers everything else; bullet edits
+// are out of scope for this surface.)
+const proposedPatchSchema = commitPatchInputSchema.extend({
+  meta_patches: z
+    .array(z.discriminatedUnion("kind", [createFilePatchSchema, removeFilePatchSchema]))
+    .optional(),
+});
 
 // Server-side agent that turns free-text vault edits into a staged
 // patch. Uses the Claude API's native tool-use loop with prompt
@@ -50,6 +63,16 @@ Override: if the user clearly insists on committing without one or both ("just m
 If the book is ALREADY finished (the get_book result shows status: finished) and the user is e.g. editing a quote or fixing a typo, the finish gate doesn't apply — proceed as usual.
 
 If the user includes the pullquote and rating in their initial free-text ("I just finished Piranesi, rating 5, pullquote 'a man lives in a house of statues'"), no follow-up is needed — bundle and propose_patch directly.
+
+Progress-archive rule (rides on the finish flow):
+When the patch flips a book to status: finished AND the book has a progress.md file (get_book frontmatter shows hasProgress: true), the same propose_patch must also archive that file. The dance:
+  1. On get_book for the finish flip, also fetch sections: ["progress"] so you have the file's current content.
+  2. In the propose_patch call, populate meta_patches with TWO entries — in this order:
+     a. { kind: "create-file", path: "_meta/progress-archive/<slug>.md", content: "<the progress.md content>" }
+     b. { kind: "remove-file", path: "<slug>/progress.md" }
+Both land in the same commit as the status flip + pullquote + rating, so the archive and the source delete are atomic. The archive preserves the user's own running notes outside the active book directory; the source removal keeps the live vault to "voice content the reader has finalised."
+If hasProgress is false, skip the archive dance — there's nothing to archive.
+This rule applies ONLY at the initial status → finished transition. For books that are already finished and the user is editing something else, leave any existing progress.md untouched.
 
 Schema notes:
 - Frontmatter scalars: string, number, boolean, string array, or null (null deletes the key).
@@ -110,7 +133,7 @@ const TOOL_DEFINITIONS: AnthropicTool[] = [
   {
     name: "propose_patch",
     description:
-      "Stage a write to the vault. Does NOT commit — the user is shown a diff and confirms separately. Call this exactly once per turn when you know what change to make. The schema mirrors commit_patch.",
+      "Stage a write to the vault. Does NOT commit — the user is shown a diff and confirms separately. Call this exactly once per turn when you know what change to make. The schema mirrors commit_patch, with an optional meta_patches lane for non-book-reference file operations (create-file / remove-file used by the progress-archive dance on finish).",
     input_schema: {
       type: "object",
       properties: {
@@ -137,6 +160,20 @@ const TOOL_DEFINITIONS: AnthropicTool[] = [
           type: "string",
           description:
             "Conventional commit subject. Include the user's verbatim free-text in the message body for audit.",
+        },
+        meta_patches: {
+          type: "array",
+          description:
+            "Optional non-book-reference file operations applied in the same commit. Each entry is { kind, ...fields }. Supported kinds: 'create-file' { kind, path, content } — writes a brand-new file; refuses if path already exists. 'remove-file' { kind, path } — deletes an existing file. Used together for the progress-archive dance on finish (create-file the archive, remove-file the source).",
+          items: {
+            type: "object",
+            properties: {
+              kind: { type: "string", enum: ["create-file", "remove-file"] },
+              path: { type: "string" },
+              content: { type: "string" },
+            },
+            required: ["kind", "path"],
+          },
         },
       },
       required: ["slug", "commit_message"],
@@ -165,6 +202,13 @@ export type AgentResult =
   | {
       kind: "patch-staged";
       patch: CommitPatchInput;
+      // Optional non-book-reference operations applied in the same
+      // commit as the patch. Currently the progress-archive dance on
+      // finish (create-file the archive, remove-file the source).
+      // Empty / absent means the commit endpoint routes through the
+      // single-file path; non-empty means it routes through the batch
+      // path so the patch + meta operations all land atomically.
+      metaPatches?: MetaPatch[];
       summary: string;
       conversation: ConversationTurn[];
       state: AgentState;
@@ -257,7 +301,7 @@ export async function runAgent(opts: {
     // Was a propose_patch among the calls? If so, validate and stage it.
     const proposeCall = toolUses.find((t) => t.name === "propose_patch");
     if (proposeCall) {
-      const parsed = commitPatchInputSchema.safeParse(proposeCall.input);
+      const parsed = proposedPatchSchema.safeParse(proposeCall.input);
       if (!parsed.success) {
         // Tell the agent its proposal was malformed; it might fix and retry.
         const errMsg = `propose_patch input failed validation: ${parsed.error.message}`;
@@ -275,9 +319,11 @@ export async function runAgent(opts: {
         });
         continue;
       }
+      const { meta_patches: metaPatchesRaw, ...patchOnly } = parsed.data;
       return {
         kind: "patch-staged",
-        patch: parsed.data,
+        patch: patchOnly,
+        metaPatches: metaPatchesRaw && metaPatchesRaw.length > 0 ? metaPatchesRaw : undefined,
         summary: assistantText.trim(),
         conversation,
         state: { messages },

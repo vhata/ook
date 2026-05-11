@@ -81,7 +81,8 @@ describe("applyMetaPatch", () => {
 
   it("create-file produces content with a trailing newline", () => {
     const r = applyMetaPatch(null, { kind: "create-file", path: "x/x.md", content: "hello" });
-    expect(r.after.endsWith("\n")).toBe(true);
+    expect(r.after).not.toBeNull();
+    expect(r.after!.endsWith("\n")).toBe(true);
   });
 
   it("remove-bullet errors when the file is missing", () => {
@@ -104,5 +105,19 @@ describe("applyMetaPatch", () => {
         bullet: "**x**",
       }),
     ).toThrow(/not found/);
+  });
+
+  it("remove-file returns null `after` and preserves the before content", () => {
+    const r = applyMetaPatch("old content", { kind: "remove-file", path: "x/progress.md" });
+    expect(r.kind).toBe("remove-file");
+    expect(r.before).toBe("old content");
+    expect(r.after).toBeNull();
+    expect(r.path).toBe("x/progress.md");
+  });
+
+  it("remove-file on a missing file errors so callers can't no-op a typo", () => {
+    expect(() => applyMetaPatch(null, { kind: "remove-file", path: "x/progress.md" })).toThrow(
+      /not found/,
+    );
   });
 });
