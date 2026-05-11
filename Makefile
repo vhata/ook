@@ -16,6 +16,7 @@
 .PHONY: help install dev build check format lint typecheck test e2e clean \
 	vault-lint vault-backfill vault-series-rosters vault-hardcover-books \
 	vault-hardcover-reviews vault-hardcover-ids vault-import-kindle \
+	vault-import-triage vault-promote-goodreads \
 	vault-hardcover-sync deploy-status deploy-logs
 
 help: ## Show this help
@@ -85,6 +86,12 @@ vault-hardcover-ids: ## Copy hardcover_slug + hardcover_id from the cache into p
 
 vault-import-kindle: ## Parse a Kindle My Clippings.txt and append matched highlights into per-book quotes.md (FILE=path)
 	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)")
+
+vault-import-triage: ## Build/extend _meta/triage.md from a CSV (CSV=path; dry-run by default — rerun script directly with --apply)
+	@node scripts/import-triage.mjs $(if $(CSV),"$(CSV)")
+
+vault-promote-goodreads: ## Mint per-book vault directories from _meta/goodreads.md stubs (dry-run by default — rerun script directly with --apply)
+	@node scripts/promote-goodreads.mjs
 
 vault-hardcover-sync: ## Push vault status/rating/dates to Hardcover via insert_user_book mutations
 	@node scripts/sync-hardcover-status.mjs
