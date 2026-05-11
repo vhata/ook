@@ -16,9 +16,9 @@
 .PHONY: help install dev build check format lint typecheck test e2e clean \
 	vault-lint vault-backfill vault-series-rosters vault-hardcover-books \
 	vault-hardcover-reviews vault-hardcover-ids vault-covers \
-	vault-premises vault-pages vault-rename-summary-to-progress \
-	vault-import-kindle vault-import-triage vault-promote-goodreads \
-	vault-hardcover-sync deploy-status deploy-logs
+	vault-premises vault-pages vault-wikiquotes \
+	vault-rename-summary-to-progress vault-import-kindle vault-import-triage \
+	vault-promote-goodreads vault-hardcover-sync deploy-status deploy-logs
 
 # `help` reads its own Makefile twice: once to pick up `## --- name ---`
 # section headers as bold dividers, once to render each target line.
@@ -109,6 +109,9 @@ vault-premises: ## Populate empty per-book premise: blurbs from the Hardcover-de
 
 vault-pages: ## Populate empty per-book pages: counts from the Hardcover cache
 	@node scripts/backfill-pages.mjs
+
+vault-wikiquotes: ## Fetch community quotes from Wikiquote for finished books → _meta/wikiquotes.json
+	@node scripts/backfill-wikiquotes.mjs
 
 vault-rename-summary-to-progress: ## One-shot vault migration — rename every <slug>/summary.md to <slug>/progress.md
 	@node scripts/rename-summary-to-progress.mjs

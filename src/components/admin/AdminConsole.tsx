@@ -211,6 +211,13 @@ export default function AdminConsole({ initialText = "" }: { initialText?: strin
               Backfill →
             </Link>
             <Link
+              href="/admin/community-quotes"
+              className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase"
+              title="Read-only browser of community quotes cached from Wikiquote"
+            >
+              Community quotes →
+            </Link>
+            <Link
               href="/admin/audit"
               className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase"
               title="Recent commits to the books vault"
