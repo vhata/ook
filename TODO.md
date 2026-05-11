@@ -75,6 +75,24 @@ Organization: as the vault target count grows, the flat `make help` listing is s
 
 Leaning A — the file is still short enough that the dividers buy clarity without the spread of B.
 
+### Cover-URL backfill (codified 2026-05-10)
+
+Source notes:
+
+- Vault `cover:` field is a URL — no binaries in git, never has been. Empty/null today on 269 of 280 reference files (only 5 hand-picked). Most of the corpus renders the procedural foxing-color tile from `src/lib/foxing.ts`.
+- Manual picker exists: `bin/book covers <slug>` opens an Open Library edition grid; `bin/book cover <slug> <url>` sets a URL. Fine for one-offs, doesn't scale to clearing 269 blanks.
+- Hardcover cache at `_meta/hardcover-books.json` is keyed by `goodreads_id` and stores rating / readers / pages / year — but no cover URL today. Hardcover's GraphQL `Book.image.url` (and `default_cover_edition.image.url` as fallback) is one query field away.
+- Matches the established offline-clean pattern: external API touched only at operator-initiated `make` time, cache committed to the vault, build never reaches outward.
+
+Plan, in order:
+
+- **Extend `scripts/backfill-hardcover-books.mjs`** to fetch and store `image_url` (and a `default_cover_image_url` fallback) alongside the existing fields in `_meta/hardcover-books.json`. One query-field change, one re-run of `make vault-hardcover-books`. `#feature #covers #hardcover`
+- **New `scripts/backfill-covers.mjs`** (operator-run via `make vault-covers`): pure cache-to-frontmatter, no network. Reads `_meta/hardcover-books.json`, writes `image_url` into each matching book's `cover:` line, anchored on `goodreads_id`. Per-field skip — never overwrites an existing value. Mirrors the shape of `scripts/backfill-hardcover-ids.mjs`. `#feature #covers #vault`
+- **Open Library fallback** in the same script: for books with empty `cover:` and no Hardcover cache hit, query Open Library by ISBN13 → ISBN10 → title+author, accept the first non-placeholder cover. Rate-limited (≥ 100ms between requests). Same prompt-to-apply discipline as the other backfills. `#feature #covers #open-library`
+- **Manual override survives**: `bin/book cover <slug> <url>` keeps working; the auto-backfill never touches a populated field, so hand-picked covers and corrections survive re-runs. `#discipline #covers`
+
+Expected outcome: most of the 269 currently-blank books pick up a real cover URL in one operator session. The residual (media-list entries without an ID, hand-built records) stays on the procedural fallback or waits for a manual pick. Doesn't displace the existing "Cover-picker improvements" entry under Site / render — that one's about the manual picker's edge cases (ISBN13 fallback in the picker, Google Books candidates, language/region prefs), which remain valuable for the residual.
+
 ### Goodreads / reading-ecosystem (researched 2026-05-03)
 
 Source notes for everything below (don't re-research — surfaced from a feral run):
