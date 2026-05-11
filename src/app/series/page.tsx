@@ -116,7 +116,15 @@ type TocItem = {
   anchor: string;
   count: number;
   isSub: boolean;
+  // True when no member of the series has `status: "finished"` — i.e.
+  // the series is shelved but not started. Drives the left-rail italic
+  // so "owned but untouched" reads differently from "in progress".
+  unstarted: boolean;
 };
+
+function hasNoFinishedMembers(group: SeriesGroup): boolean {
+  return !group.members.some((m) => m.status === "finished");
+}
 
 // Top-level series first (alphabetical, matching the page's order),
 // each followed immediately by its sub-series. We don't elide
@@ -142,6 +150,7 @@ function buildTocItems(series: SeriesGroup[]): TocItem[] {
       anchor: `series-${slugifySeriesName(parent.name)}`,
       count: parent.members.length,
       isSub: false,
+      unstarted: hasNoFinishedMembers(parent),
     });
     const subs = childrenByParent.get(parent.name) ?? [];
     subs.sort((a, b) => a.name.localeCompare(b.name));
@@ -151,6 +160,7 @@ function buildTocItems(series: SeriesGroup[]): TocItem[] {
         anchor: `series-${slugifySeriesName(sub.name)}`,
         count: sub.members.length,
         isSub: true,
+        unstarted: hasNoFinishedMembers(sub),
       });
     }
   }
@@ -171,7 +181,7 @@ function SeriesNav({ items }: { items: TocItem[] }) {
               key={item.anchor}
               href={`#${item.anchor}`}
               className={`border-rule bg-surface text-ink-soft hover:border-accent hover:text-ink shrink-0 rounded-full border px-3 py-1 text-[11px] whitespace-nowrap ${
-                item.isSub ? "italic" : ""
+                item.isSub || item.unstarted ? "italic" : ""
               }`}
             >
               {item.name}
@@ -199,7 +209,7 @@ function SeriesNav({ items }: { items: TocItem[] }) {
                 className={`font-serif hover:text-accent flex items-baseline justify-between gap-2 leading-[1.3] ${
                   item.isSub
                     ? "text-ink-soft text-[12px] italic"
-                    : "text-ink text-[13px] font-medium"
+                    : `text-ink text-[13px] font-medium${item.unstarted ? " italic" : ""}`
                 }`}
               >
                 <span className="truncate">{item.name}</span>

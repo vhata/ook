@@ -174,6 +174,71 @@ describe("SeriesPage server component", { timeout: 15000 }, () => {
     expect(subLink).toBeTruthy();
   });
 
+  it("italicises the left-rail link for a series with zero finished members", async () => {
+    // Two fresh series: one whose only member is still `tbr` (unstarted),
+    // and one whose member is `finished` (started). The TOC link on the
+    // unstarted one should pick up the `italic` class; the started one
+    // should not.
+    const unstartedMember: SeriesMember = {
+      slug: "unstarted-1",
+      title: "Unstarted #1",
+      authors: ["Test Author"],
+      status: "tbr",
+      rating: null,
+      finished: null,
+      started: null,
+      cover: null,
+      index: 1,
+    };
+    const startedMember: SeriesMember = {
+      slug: "started-1",
+      title: "Started #1",
+      authors: ["Test Author"],
+      status: "finished",
+      rating: null,
+      finished: null,
+      started: null,
+      cover: null,
+      index: 1,
+    };
+    const unstarted: SeriesGroup = {
+      name: "Unstarted Series",
+      members: [unstartedMember],
+      gaps: [],
+      rosterMissing: [],
+    };
+    const started: SeriesGroup = {
+      name: "Started Series",
+      members: [startedMember],
+      gaps: [],
+      rosterMissing: [],
+    };
+
+    const lib = await import("../../src/lib/books");
+    const original = lib.getAllSeries;
+    (lib as unknown as { getAllSeries: typeof original }).getAllSeries = async () => [
+      unstarted,
+      started,
+    ];
+
+    try {
+      const SeriesPage = await importPage();
+      const tree = await SeriesPage({ searchParams: Promise.resolve({}) });
+      const { container } = render(tree);
+
+      const nav = container.querySelector("aside[aria-label='Series navigation']");
+      expect(nav).toBeTruthy();
+      const unstartedLink = nav!.querySelector("a[href='#series-unstarted-series']");
+      const startedLink = nav!.querySelector("a[href='#series-started-series']");
+      expect(unstartedLink).toBeTruthy();
+      expect(startedLink).toBeTruthy();
+      expect(unstartedLink!.className).toContain("italic");
+      expect(startedLink!.className).not.toContain("italic");
+    } finally {
+      (lib as unknown as { getAllSeries: typeof original }).getAllSeries = original;
+    }
+  });
+
   it("shows the empty state when no series exist", async () => {
     const lib = await import("../../src/lib/books");
     const original = lib.getAllSeries;

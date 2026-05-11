@@ -131,7 +131,6 @@ Source notes:
 - `/shelf` author legibility — author names under spines are near-invisible at default zoom. Either bump them ~1px or drop them entirely and reserve the author for hover/tap. Half-legible is the worst of both. (review 2026-05-11) `#polish #shelf`
 - `/shelf` spine text direction — currently bottom-to-top (head tilts left). Try the US/UK trade convention (top-to-bottom, head tilts right) and see how it feels for an Anglophone reader. (review 2026-05-11) `#polish #shelf`
 - `/shelf` chrome — the faint outline box around the strip reads web-y. Either drop the box entirely and let the spines float, or commit to a real shelf edge (1px highlight on top + 2px shadow on bottom). (review 2026-05-11) `#polish #shelf`
-- `/series` left-rail italics — italicise series with zero finished entries so "shelved but not started" reads differently from "in progress" at a glance. (review 2026-05-11 micro) `#polish #series`
 
 ## Brainstormed inventory
 
