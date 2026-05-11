@@ -92,17 +92,36 @@ async function main() {
   let skippedSlugCollision = 0;
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    const title = (row[titleCol] ?? "").trim();
-    if (!title) {
-      skippedNoTitle++;
-      continue;
-    }
+    const rawTitle = (row[titleCol] ?? "").trim();
     const author = authorCol >= 0 ? (row[authorCol] ?? "").trim() : "";
     const why = whyCol >= 0 ? (row[whyCol] ?? "").trim() : "";
     const source = sourceCol >= 0 ? (row[sourceCol] ?? "").trim() : "";
     const indexNum = indexCol >= 0 ? (row[indexCol] ?? "").trim() : "";
     const pileRaw = pileCol >= 0 ? (row[pileCol] ?? "").trim() : "";
     const isRead = readCol >= 0 && isTruthy((row[readCol] ?? "").trim());
+
+    // Title fallback chain: title → series → author. Spreadsheet rows
+    // often record "I want to investigate this whole series" as
+    // series-only (no specific volume yet) or "I want to read more by
+    // this author" as author-only. Both shapes still convey intent
+    // worth preserving in triage; only rows with none of the three
+    // are unambiguously empty and dropped. The fallback also records
+    // which axis won, so the pile bucket can reflect it.
+    let title = rawTitle;
+    let fallbackAxis = /** @type {"title" | "series" | "author"} */ ("title");
+    if (!title) {
+      if (pileRaw) {
+        title = pileRaw;
+        fallbackAxis = "series";
+      } else if (author) {
+        title = author;
+        fallbackAxis = "author";
+      }
+    }
+    if (!title) {
+      skippedNoTitle++;
+      continue;
+    }
 
     if (isRead) {
       // Read entries become vault directories with status: finished.
@@ -133,9 +152,29 @@ async function main() {
     }
 
     // Unread → triage pile.
-    const pileName = pileRaw || (indexNum ? "Other" : DEFAULT_PILE);
+    // - Real titles: use the Series column as the pile (current shape).
+    // - Series-only rows (title fell back to series): single "Whole
+    //   series" pile so the series is the entry, not the pile header.
+    // - Author-only rows (title fell back to author): single "By
+    //   author" pile, same reason.
+    let pileName;
+    if (fallbackAxis === "title") {
+      pileName = pileRaw || (indexNum ? "Other" : DEFAULT_PILE);
+    } else if (fallbackAxis === "series") {
+      pileName = "Whole series";
+    } else {
+      pileName = "By author";
+    }
     const list = piles.get(pileName) ?? [];
-    list.push({ title, author, why, source, indexNum, pileName: pileRaw });
+    list.push({
+      title,
+      author,
+      why,
+      source,
+      // Index only meaningful for real per-volume rows.
+      indexNum: fallbackAxis === "title" ? indexNum : "",
+      pileName: pileRaw,
+    });
     piles.set(pileName, list);
     parsed++;
   }
