@@ -26,6 +26,22 @@ The **finish prompt** (status → finished asks for pullquote + rating in one bu
 - Bingo `done:` YAML cleanup (vault-side). Render now derives done-ness from the bound book's status, so the per-square `done:` field is dead weight. Either strip it from `_meta/bingo-YYYY.md` or have `bin/book` keep it stripped going forward. `#polish #vault #bingo`
 - `summary.md` tier reconsideration. Per the existing convention `summary.md` is a "full-spoiler plot summary," but the tiered model puts it at tier 1 (one click). For books like Ra where the summary really is a full plot dump, that's too eager a reveal. Options: move the full-spoiler content into the body (tier 2) and reserve `summary.md` for synopses; OR add a per-section `:::spoiler` wrap; OR allow a frontmatter `summary_tier: 2` override (we said no overrides — revisit). `#design #spoilers`
 
+### `/shelf` and `/triage` — clarify purpose (codified 2026-05-10)
+
+Both pages read today as observation surfaces, not working ones — a person who navigates to either isn't sure what to do once they arrive. Question is whether to give each verbs, accept it as ornament, or retire it. Codifying the alternatives so they can sit while the decision settles.
+
+**`/shelf`** — every finished book rendered as a 32px × 220px SVG spine, hash-coloured from first tag/author, four sort options (finish date / author / rating / title). ~7000px-wide horizontal strip at the current corpus size. No filter, search, banding, or aggregation. Pure visual flourish; clicks through to the per-book page.
+
+- **A. Give it verbs.** Add filters (tag / decade / rating bucket), banded year groups with a label between groups, a "spines you haven't visited in a year" callout panel, click-a-chip-to-dim-everything-else interaction. Becomes a way of _wandering_ the corpus rather than just looking at it. `#feature #shelf #navigation`
+- **B. Keep as ornament, but make it earn the visual.** Land the deferred `pages` schema field, then scale spine height by `sqrt(pages)` for authentic shelf rhythm (already separately captured under Visual & experience). Don't add verbs — accept that `/shelf` is for the "look at all I've read" moment, nothing more. `#polish #shelf #pages`
+- **C. Retire.** Drop the route, remove the footer + Controls links. Series, tags, log, and stats already cover catalog wandering; the shelf doesn't add a navigation axis. Cheap to undo if the decision flips. `#prune #shelf`
+
+**`/triage`** — two sections in one room: manual piles from `_meta/triage.md` (recommendations gathered but not committed to) and Goodreads-imported entries without a vault directory (the "fleshed out: NO" stubs). Both read-only. The page even prints "Run `scripts/promote-goodreads.mjs` with `--apply`" — inside instructions for outside tooling. No per-book links (by definition, the books don't have pages yet). No promote button. Observation, not action.
+
+- **A. Wire to the agent.** Each row gets a passkey-gated "promote to vault" button that posts a structured `CommitPatchInput` to `/api/admin/agent/commit`, same path as `/admin/backfill`. Triage entries get a "promote to TBR" button instead. Turns observation into action without leaving the surface. `#feature #triage #admin #write-surface`
+- **B. Split the page.** Goodreads stubs move into `/admin/backfill` (passkey already present, gap-fill questions already live there); `/triage` becomes just the manual piles. Cleaner separation: backfill is for finishing books that exist, triage is for considering books that might. `#refactor #triage #admin`
+- **C. Retire `/triage`.** Promotion already happens through the `/admin` agent ("started Piranesi today" mints a directory). Drop the standalone view; manual piles remain in `_meta/triage.md` as a private vault file the agent reads. Lightest move; loses the public-side queue visibility. `#prune #triage`
+
 ### Goodreads / reading-ecosystem (researched 2026-05-03)
 
 Source notes for everything below (don't re-research — surfaced from a feral run):
