@@ -131,6 +131,7 @@ function book(overrides: Partial<Book> & { slug: string }): Book {
     hasQuotes: false,
     hasProgress: false,
     premise: null,
+    pages: null,
     goodreadsId: null,
     hardcoverSlug: null,
     storygraphSlug: null,

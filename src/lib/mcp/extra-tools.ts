@@ -112,6 +112,7 @@ export async function createBook(input: CreateBookInput): Promise<CreateBookResu
     bookwyrmUrl: null,
     source: null,
     hideExternalReviews: false,
+    pages: null,
   });
   await store.sadd(keys.booksIndex(), validated.slug);
 

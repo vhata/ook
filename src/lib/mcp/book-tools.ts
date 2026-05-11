@@ -284,6 +284,7 @@ function defaultBook(slug: string): Book {
     bookwyrmUrl: null,
     source: null,
     hideExternalReviews: false,
+    pages: null,
   };
 }
 

@@ -103,6 +103,7 @@ async function main() {
           ? data.source
           : null,
       hideExternalReviews: data.hide_external_reviews === true,
+      pages: parseNullableNumber(data.pages),
     });
   }
 

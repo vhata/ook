@@ -58,6 +58,12 @@ export type Book = {
   // in the book's YAML frontmatter to suppress the section even when
   // the cache has qualifying reviews. Defaults to false.
   hideExternalReviews: boolean;
+  // Page count from the book's own frontmatter. Optional; `null` when
+  // the vault hasn't recorded one. The `/shelf` renderer scales spine
+  // width by this value, falling back to a default when null. The
+  // Hardcover cache also carries a `pages` field per book, but this is
+  // the vault-frontmatter projection — single source of truth per book.
+  pages: number | null;
 };
 
 export type BookSource = "goodreads" | "media-list" | "manual";

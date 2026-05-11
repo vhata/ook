@@ -46,6 +46,7 @@ const baseBook: Book = {
   bookwyrmUrl: null,
   source: "manual",
   hideExternalReviews: false,
+  pages: null,
 };
 
 const finishedBook: Book = {

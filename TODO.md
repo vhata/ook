@@ -8,15 +8,6 @@ Sections are grouped by readiness: decided plans first, then open verdicts, defe
 
 ## Decided & ready to build
 
-### `/shelf` — width by pages, year separators, status markers (review 2026-05-11)
-
-Resolves the prior "clarify purpose" verdict in favour of keeping `/shelf` as ornament — but making the ornament earn its keep. Highest visual payoff per line of code per the reviewer.
-
-- **Page-count-driven spine width**: `width = clamp(24, round(pages / 12), 72)` px. Real shelves have wild variance; uniform widths look web-y. Requires `pages` frontmatter; falls back to 32px when null so deploy is safe before the schema lands across the corpus. `#feature #shelf #pages`
-- **Year separators**: at 190+ spines the eye can't find year boundaries. 2px gap + a tiny year tick on the bottom rail at every year change. Keep the timeline metaphor — don't break to a new row. `#feature #shelf #visual`
-- **Bingo + currently-reading markers**: 2px accent stripe along the top edge of the spine for books on the active bingo card; a small bookmark tongue above the shelf line for currently-reading. `#feature #shelf #visual`
-- **Paused / abandoned styling**: paired with the `/now` paused state above. Paused spine is matte (no highlight); abandoned spine renders a broken-spine treatment. Both still on the shelf — `/shelf` is the archive. `#feature #shelf #visual`
-
 ### Kindle reading-session import (codified 2026-05-10) — awaiting takeout
 
 Source notes (don't re-research):
@@ -105,9 +96,6 @@ Source notes:
 - Cover-picker improvements. `book covers` already opens an HTML grid of Open Library editions and `book cover <slug> <url>` sets any URL by hand — those are done. Still wanted: ISBN13 fallback when title-search returns no editions; surface non-Open-Library candidates (Google Books) when OL has thin coverage; per-cover language / region preference. `#feature #covers #polish`
 - Bingo cover dedup at promote time. When `bin/book` auto-promotes a bingo entry to a vault directory, the bingo file's `cover:` line for that square becomes redundant (the renderer prefers the new directory's frontmatter). Strip it during promotion to keep the dedup automatic. Currently the duplicate sits there until the user runs the cleanup script by hand. `#polish #vault`
 - Bingo `done:` YAML cleanup (vault-side). Render now derives done-ness from the bound book's status, so the per-square `done:` field is dead weight. Either strip it from `_meta/bingo-YYYY.md` or have `bin/book` keep it stripped going forward. `#polish #vault #bingo`
-- `/shelf` author legibility — author names under spines are near-invisible at default zoom. Either bump them ~1px or drop them entirely and reserve the author for hover/tap. Half-legible is the worst of both. (review 2026-05-11) `#polish #shelf`
-- `/shelf` spine text direction — currently bottom-to-top (head tilts left). Try the US/UK trade convention (top-to-bottom, head tilts right) and see how it feels for an Anglophone reader. (review 2026-05-11) `#polish #shelf`
-- `/shelf` chrome — the faint outline box around the strip reads web-y. Either drop the box entirely and let the spines float, or commit to a real shelf edge (1px highlight on top + 2px shadow on bottom). (review 2026-05-11) `#polish #shelf`
 
 ## Brainstormed inventory
 
@@ -115,7 +103,6 @@ Source notes:
 
 Cosmetic and atmospheric ideas. Mostly low-stakes; pick whichever delights.
 
-- Page-count sizing for bookspines on `/shelf`. The shelf renders uniform-height spines today; once a `pages` field lands in the vault, scale spine height by `sqrt(pages)` for an authentic shelf shape. `#polish #shelf #pages`
 - **Bookmark-ribbon progress strip**: silk-ribbon-style indicator on currently-reading cards showing chapter or % progress. Needs structured progress data. `#feature #visual #currently-reading`
 - **Page-turn micro-interaction**: animate the switch between review/quotes/synopsis tabs as a page-curl. `#polish #visual #per-book`
 - **Embossed/letterpress alternative theme**: a third theme beyond light/dark, vintage printer's aesthetic. `#feature #visual #theme`

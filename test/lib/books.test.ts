@@ -350,6 +350,7 @@ describe("externalLinks", () => {
       bookwyrmUrl: null,
       source: null,
       hideExternalReviews: false,
+      pages: null,
       ...overrides,
     };
   }
@@ -414,6 +415,7 @@ describe("bookStuck", () => {
       bookwyrmUrl: null,
       source: null,
       hideExternalReviews: false,
+      pages: null,
       ...overrides,
     };
   }
@@ -944,6 +946,7 @@ describe("computeYearPagesTotal", () => {
       bookwyrmUrl: null,
       source: null,
       hideExternalReviews: false,
+      pages: null,
       ...overrides,
     };
   }
@@ -1041,6 +1044,7 @@ describe("computeReadingPace", () => {
       bookwyrmUrl: null,
       source: null,
       hideExternalReviews: false,
+      pages: null,
       ...overrides,
     };
   }
@@ -1141,6 +1145,7 @@ describe("estimateReadingDaysRemaining", () => {
       bookwyrmUrl: null,
       source: null,
       hideExternalReviews: false,
+      pages: null,
       ...overrides,
     };
   }

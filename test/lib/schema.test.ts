@@ -31,6 +31,7 @@ function book(overrides: Partial<Book> = {}): Book {
     bookwyrmUrl: null,
     source: null,
     hideExternalReviews: false,
+    pages: null,
     ...overrides,
   };
 }

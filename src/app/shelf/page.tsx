@@ -1,6 +1,13 @@
 import Link from "next/link";
 import { HomeMark } from "@/components/HomeMark";
-import { getAllBooks } from "@/lib/books";
+import { getAllBooks, getBingo, getCurrentBingoYear } from "@/lib/books";
+import {
+  SPINE_FALLBACK_WIDTH,
+  SPINE_MAX_WIDTH,
+  SPINE_MIN_WIDTH,
+  buildShelfItems,
+  computeSpineWidth,
+} from "@/lib/shelf";
 import type { Book } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -11,24 +18,44 @@ type SearchParams = Promise<{ sort?: string }>;
 
 const VALID_SORTS = new Set(["finished", "author", "rating", "title"]);
 
-// /shelf — vertical SVG spines for every finished book, arranged
-// shoulder-to-shoulder like a physical shelf strip. Each spine is a
-// fixed-size rectangle with the title running up the spine and the
-// author tucked at the foot. Colour comes from a hash of the first
-// tag (or first author when there's no tag), sampled from a small
-// palette that doesn't fight the paper-and-ink scheme.
+// /shelf — vertical SVG spines for every finished and currently-reading
+// book, arranged shoulder-to-shoulder like a physical shelf strip.
 //
-// Without a `pages` field in the vault schema we can't size spines
-// honestly. Future-self: when pages lands, scale height by sqrt(pages)
-// for a more authentic shelf shape.
+// Each spine is a fixed-height rectangle whose width is derived from the
+// book's page count (when known): `clamp(24, round(pages / 12), 72)` px.
+// Real shelves vary wildly; uniform widths look web-y. Books without a
+// `pages` value fall back to a default width — the formula degrades
+// silently as the field is populated per-book.
+//
+// Colour comes from a hash of the first tag (or first author when
+// there's no tag), sampled from a small palette tuned to sit beside
+// the paper-and-ink scheme.
+//
+// Markers ride on top of the spine:
+//   - Books on the active bingo card carry a 2 px accent stripe along
+//     the top edge.
+//   - Currently-reading books carry a small bookmark tongue above the
+//     shelf line.
+//
+// When sorted by finish date (the default), year boundaries get a small
+// gap and a tick label below the shelf so the eye can find the seam in
+// ~200 spines without breaking the timeline metaphor.
 
 export default async function ShelfPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const sort = typeof sp.sort === "string" && VALID_SORTS.has(sp.sort) ? sp.sort : "finished";
 
-  const all = await getAllBooks();
-  const finished = all.filter((b) => b.status === "finished");
-  const sorted = sortBooks(finished, sort);
+  const [all, bingoYear] = await Promise.all([getAllBooks(), getCurrentBingoYear()]);
+  const bingo = bingoYear !== null ? await getBingo(bingoYear) : null;
+  const bingoSlugs = new Set<string>(
+    (bingo?.squares ?? []).map((s) => s.book).filter((b): b is string => !!b),
+  );
+
+  // Currently-reading sits on the shelf alongside finished — the bookmark
+  // tongue distinguishes them. Abandoned / paused are deliberately omitted
+  // here; their treatment lands with the `/now` paused-state work.
+  const shown = all.filter((b) => b.status === "finished" || b.status === "reading");
+  const sorted = sortBooks(shown, sort);
 
   return (
     <main className="mx-auto box-border w-full max-w-[1200px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
@@ -45,13 +72,15 @@ export default async function ShelfPage({ searchParams }: { searchParams: Search
         <SortLinks current={sort} />
       </header>
 
-      {finished.length === 0 ? (
+      {shown.length === 0 ? (
         <div className="border-rule bg-surface-mute font-serif text-ink-soft rounded border border-dashed p-8 text-center text-[15px] italic">
           Nothing finished yet — the shelf is bare.
         </div>
       ) : (
-        <Shelf books={sorted} />
+        <Shelf books={sorted} sort={sort} bingoSlugs={bingoSlugs} />
       )}
+
+      <WidthLegend />
     </main>
   );
 }
@@ -69,8 +98,9 @@ function sortBooks(books: Book[], sort: string): Book[] {
   } else if (sort === "title") {
     out.sort((a, b) => a.title.localeCompare(b.title));
   } else {
-    // finished (default): newest first
-    out.sort((a, b) => (b.finished ?? "").localeCompare(a.finished ?? ""));
+    // finished (default): newest finish first. Currently-reading books
+    // (no finished date) sort to the front.
+    out.sort((a, b) => (b.finished ?? "9999-99-99").localeCompare(a.finished ?? "9999-99-99"));
   }
   return out;
 }
@@ -104,24 +134,79 @@ function SortLinks({ current }: { current: string }) {
   );
 }
 
-function Shelf({ books }: { books: Book[] }) {
+function Shelf({
+  books,
+  sort,
+  bingoSlugs,
+}: {
+  books: Book[];
+  sort: string;
+  bingoSlugs: Set<string>;
+}) {
+  // Year separators are only meaningful when the row is in finish-date
+  // order. Sorting by title or rating scrambles the chronology.
+  const showYearBreaks = sort === "finished";
+  const items = buildShelfItems(books, showYearBreaks);
+
   return (
-    <div
-      className="bg-surface border-rule overflow-x-auto rounded border p-5"
-      // The shelf base — a thin rule below the spines suggests a wood plank.
-      style={{ borderBottom: "3px solid var(--rule)" }}
-    >
-      <div className="flex items-end gap-[2px]">
-        {books.map((b) => (
-          <Spine key={b.slug} book={b} />
-        ))}
+    <div className="overflow-x-auto">
+      {/* The shelf edge. A 1 px highlight on top + a 2 px shadow on the
+          bottom commits to a real shelf instead of the previous outline
+          box. The spines sit on the highlight; the shadow falls below. */}
+      <div
+        className="bg-surface relative"
+        style={{
+          paddingTop: "8px",
+          paddingBottom: "20px",
+          borderTop: "1px solid var(--rule)",
+          boxShadow: "inset 0 -1px 0 var(--rule), 0 2px 4px -2px rgba(0,0,0,0.18)",
+        }}
+      >
+        <div className="flex items-end gap-[1px]">
+          {items.map((item, i) =>
+            item.kind === "spine" ? (
+              <Spine
+                key={`${item.book.slug}-${i}`}
+                book={item.book}
+                onBingoCard={bingoSlugs.has(item.book.slug)}
+              />
+            ) : (
+              <YearTick key={`year-${item.year}-${i}`} year={item.year} />
+            ),
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-const SPINE_W = 32;
 const SPINE_H = 220;
+
+// Year tick — a 2 px horizontal gap on the spine row, with the year
+// label set under the shelf rail so it reads as a date stripe instead
+// of dropping a new row in the middle of the timeline.
+function YearTick({ year }: { year: number }) {
+  return (
+    <div
+      aria-label={`finished in ${year}`}
+      className="relative shrink-0 self-stretch"
+      style={{ width: "2px" }}
+    >
+      <span
+        className="text-ink-dim absolute font-mono text-[9px] tracking-[0.08em]"
+        style={{
+          // Sit on the shelf bottom, centred over the gap.
+          top: `${SPINE_H + 4}px`,
+          left: "50%",
+          transform: "translateX(-50%)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {year}
+      </span>
+    </div>
+  );
+}
 
 // Eight spine colours, deliberately desaturated to sit beside the
 // paper-and-ink palette. Tuned by eye in HSL for similar luminance so
@@ -147,34 +232,63 @@ function spineColor(book: Book): string {
   return SPINE_COLORS[idx];
 }
 
-function Spine({ book }: { book: Book }) {
+function Spine({ book, onBingoCard }: { book: Book; onBingoCard: boolean }) {
   const fill = spineColor(book);
-  const titleShort = abbreviate(book.title, 28);
-  const authorShort = abbreviate(book.authors[0] ?? "", 22);
+  const width = computeSpineWidth(book.pages);
+  // Title length budget scales with width — narrow spines elide aggressively,
+  // wide ones get more room. The SVG text runs along the spine's vertical
+  // axis, so the budget here is roughly characters per ~SPINE_H pixels.
+  const titleBudget = Math.max(16, Math.round((SPINE_H - 24) / 8));
+  const titleShort = abbreviate(book.title, titleBudget);
   const rating = book.rating !== null ? "★".repeat(Math.floor(book.rating)) : "";
+  const isReading = book.status === "reading";
 
   return (
     <Link
       href={`/books/${encodeURIComponent(book.slug)}`}
-      title={`${book.title}${book.authors.length > 0 ? ` — ${book.authors.join(", ")}` : ""}${book.finished ? ` · ${book.finished}` : ""}${rating ? ` · ${rating}` : ""}`}
+      title={`${book.title}${book.authors.length > 0 ? ` — ${book.authors.join(", ")}` : ""}${book.finished ? ` · ${book.finished}` : ""}${rating ? ` · ${rating}` : ""}${isReading ? " · currently reading" : ""}${onBingoCard ? " · on the bingo card" : ""}`}
       className="block shrink-0 transition-transform hover:-translate-y-1"
+      aria-label={book.title}
     >
       <svg
-        width={SPINE_W}
-        height={SPINE_H}
-        viewBox={`0 0 ${SPINE_W} ${SPINE_H}`}
-        aria-label={`${book.title} spine`}
+        width={width}
+        // Extra headroom above the spine so the bookmark tongue has room
+        // to extend up without being clipped.
+        height={SPINE_H + 8}
+        viewBox={`0 0 ${width} ${SPINE_H + 8}`}
       >
-        {/* Spine background */}
-        <rect x="0" y="0" width={SPINE_W} height={SPINE_H} fill={fill} />
-        {/* Top + bottom decorative bands (the printer's rule) */}
-        <rect x="0" y="6" width={SPINE_W} height="1" fill="rgba(255,255,255,0.25)" />
-        <rect x="0" y={SPINE_H - 7} width={SPINE_W} height="1" fill="rgba(255,255,255,0.25)" />
-        {/* Title — text origin at the spine centre, rotated -90° so
-            it runs upward (book-spine convention). After the rotate,
-            the text's natural x-axis is the spine's vertical axis. */}
+        {/* Bookmark tongue for currently-reading. Sits just above the
+            spine, narrower than the spine itself, in the accent colour. */}
+        {isReading && (
+          <rect
+            x={Math.max(2, Math.floor(width / 2) - 3)}
+            y={0}
+            width={6}
+            height={10}
+            fill="var(--accent)"
+          />
+        )}
+        {/* Spine background — origin shifts down by 8 px to leave room
+            for the bookmark tongue above. */}
+        <rect x="0" y="8" width={width} height={SPINE_H} fill={fill} />
+        {/* Bingo-card accent stripe along the top edge of the spine. */}
+        {onBingoCard && <rect x="0" y="8" width={width} height="2" fill="var(--accent)" />}
+        {/* Top + bottom decorative bands (the printer's rule). */}
+        <rect
+          x="0"
+          y={onBingoCard ? 12 : 14}
+          width={width}
+          height="1"
+          fill="rgba(255,255,255,0.25)"
+        />
+        <rect x="0" y={SPINE_H + 1} width={width} height="1" fill="rgba(255,255,255,0.25)" />
+        {/* Title. The text runs along the spine's vertical axis,
+            top-to-bottom in the US/UK trade convention — when the
+            book is laid flat with the cover up, the head tilts to
+            the right. After the +90° rotate, the text's natural
+            x-axis points downward along the spine. */}
         <text
-          transform={`translate(${SPINE_W / 2}, ${SPINE_H / 2}) rotate(-90)`}
+          transform={`translate(${width / 2}, ${(SPINE_H + 8) / 2}) rotate(90)`}
           textAnchor="middle"
           dy="4"
           fontFamily="ui-serif, serif"
@@ -184,18 +298,6 @@ function Spine({ book }: { book: Book }) {
         >
           {titleShort}
         </text>
-        {/* Author — at the foot, smaller, italic */}
-        <text
-          x={SPINE_W / 2}
-          y={SPINE_H - 14}
-          textAnchor="middle"
-          fontFamily="ui-serif, serif"
-          fontSize="6"
-          fontStyle="italic"
-          fill="rgba(255,255,255,0.7)"
-        >
-          {authorShort}
-        </text>
       </svg>
     </Link>
   );
@@ -204,4 +306,36 @@ function Spine({ book }: { book: Book }) {
 function abbreviate(s: string, max: number): string {
   if (s.length <= max) return s;
   return `${s.slice(0, max - 1)}…`;
+}
+
+// A small legend under the shelf that explains the size scale and the
+// markers, so the spine variance reads as intentional rather than
+// arbitrary. Set in the same uppercase-tracking register as the sort
+// links.
+function WidthLegend() {
+  return (
+    <div className="text-ink-soft mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] tracking-[0.14em] uppercase">
+      <span>
+        Width by pages · {SPINE_MIN_WIDTH}–{SPINE_MAX_WIDTH} px · fallback {SPINE_FALLBACK_WIDTH} px
+      </span>
+      <span className="text-ink-dim">·</span>
+      <span className="inline-flex items-center gap-1">
+        <span
+          aria-hidden
+          className="inline-block"
+          style={{ width: "10px", height: "2px", background: "var(--accent)" }}
+        />
+        bingo card
+      </span>
+      <span className="text-ink-dim">·</span>
+      <span className="inline-flex items-center gap-1">
+        <span
+          aria-hidden
+          className="inline-block"
+          style={{ width: "4px", height: "8px", background: "var(--accent)" }}
+        />
+        currently reading
+      </span>
+    </div>
+  );
 }

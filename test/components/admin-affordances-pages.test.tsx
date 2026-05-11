@@ -62,6 +62,7 @@ const baseBook: Book = {
   bookwyrmUrl: null,
   source: "manual",
   hideExternalReviews: false,
+  pages: null,
 };
 
 vi.mock("../../src/lib/books", async () => {
