@@ -29,6 +29,23 @@ describe("renderBullet", () => {
       "**Foo** — Author.",
     );
   });
+
+  it("replays the raw bullet text verbatim when present", () => {
+    // The real parser sets `raw` from the source markdown. Replaying
+    // it verbatim is what makes the remove-bullet round-trip work for
+    // shapes the reconstruction can't reproduce (e.g. the `#N` series-
+    // index prefix the parser folds into the author field).
+    const rawShape = "**Ancillary Justice** #1 — Ann Leckie.";
+    expect(
+      renderBullet({
+        title: "Ancillary Justice",
+        author: "#1 — Ann Leckie",
+        why: null,
+        added: null,
+        raw: rawShape,
+      }),
+    ).toBe(rawShape);
+  });
 });
 
 describe("sanitiseSlug", () => {

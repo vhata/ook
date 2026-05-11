@@ -85,6 +85,16 @@ export type TbrEntry = {
   author: string | null;
   why: string | null;
   added: string | null;
+  // Literal bullet text from the source markdown (everything after the
+  // `- ` marker, with trailing whitespace trimmed). The real parser
+  // always sets this; write-back paths (remove-bullet patches against
+  // `_meta/triage.md` / `_meta/tbr.md`) replay it verbatim so the
+  // bullet matches the on-disk text character-for-character.
+  // Reconstructing the bullet from the structured fields doesn't
+  // round-trip cleanly for every shape (e.g. the `#N` series-index
+  // prefix the parser folds into the author field). Optional in the
+  // type so test fixtures can omit it; production code always has it.
+  raw?: string;
 };
 
 export type LogEntry = {

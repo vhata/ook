@@ -99,13 +99,14 @@ export function buildEntryPatches(
   ];
 }
 
-// Reconstructs the bullet text exactly as `parseTbrEntry` would have
-// seen it. The bullet patch in `_meta/triage.md` must match the on-disk
-// text verbatim, so we preserve the canonical shape:
-//   **Title** — Author. _why_
-// Author and why are optional. When both are absent the bullet is just
-// `**Title**`.
+// Returns the on-disk bullet text for an entry. When `entry.raw` is
+// present (real parse path), return it verbatim so the bullet matches
+// `_meta/triage.md` character-for-character — required by the remove-
+// bullet patch. The reconstruction below is the fallback for callers
+// that build TbrEntry objects without going through the parser (mostly
+// tests).
 export function renderBullet(entry: TbrEntry): string {
+  if (entry.raw) return entry.raw;
   let s = `**${entry.title}**`;
   if (entry.author) s += ` — ${entry.author}.`;
   if (entry.why) s += ` _${entry.why}_`;

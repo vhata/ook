@@ -578,7 +578,7 @@ function parseTbrEntry(text: string): TbrEntry | null {
   const addedMatch = /\((\d{4}-\d{2}-\d{2})\)/.exec(text);
   if (addedMatch) added = addedMatch[1];
 
-  return { title, author, why, added };
+  return { title, author, why, added, raw: text.replace(/\s+$/, "") };
 }
 
 // Reading log: frontmatter-derived entries (started/finished dates per

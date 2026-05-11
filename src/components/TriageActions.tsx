@@ -37,6 +37,11 @@ export default function TriageActions({ piles }: { piles: TbrPile[] }) {
   const [bulkAction, setBulkAction] = useState<TriageAction>("promote-tbr");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // When a per-row action fails the error surfaces both inline next to
+  // the row (so the click feels acknowledged) AND in the bulk bar at
+  // the bottom of the page. Bulk-action errors leave `errorRow` null
+  // so only the bulk bar shows them.
+  const [errorRow, setErrorRow] = useState<RowKey | null>(null);
   const [done, setDone] = useState<Set<RowKey>>(new Set());
 
   function toggleRow(key: RowKey) {
@@ -50,6 +55,7 @@ export default function TriageActions({ piles }: { piles: TbrPile[] }) {
 
   async function submitRow(pile: string, entry: TbrEntry, action: TriageAction, key: RowKey) {
     setError(null);
+    setErrorRow(null);
     setBusy(true);
     try {
       const body = buildTriageBatch([{ pile, entry }], action, today());
@@ -62,6 +68,7 @@ export default function TriageActions({ piles }: { piles: TbrPile[] }) {
       });
     } catch (e) {
       setError((e as Error).message);
+      setErrorRow(key);
     } finally {
       setBusy(false);
     }
@@ -70,6 +77,7 @@ export default function TriageActions({ piles }: { piles: TbrPile[] }) {
   async function submitBulk() {
     if (selected.size === 0) return;
     setError(null);
+    setErrorRow(null);
     setBusy(true);
     try {
       const entries: TriageActionEntry[] = [];
@@ -127,6 +135,7 @@ export default function TriageActions({ piles }: { piles: TbrPile[] }) {
                   selected={selected.has(key)}
                   finished={done.has(key)}
                   busy={busy}
+                  rowError={errorRow === key ? error : null}
                   onToggle={() => toggleRow(key)}
                   onAction={(action) => submitRow(pile.name, entry, action, key)}
                 />
@@ -153,6 +162,7 @@ function RowWithActions({
   selected,
   finished,
   busy,
+  rowError,
   onToggle,
   onAction,
 }: {
@@ -162,6 +172,7 @@ function RowWithActions({
   selected: boolean;
   finished: boolean;
   busy: boolean;
+  rowError: string | null;
   onToggle: () => void;
   onAction: (action: TriageAction) => void;
 }) {
@@ -218,6 +229,15 @@ function RowWithActions({
             <span className="text-ink-dim text-[11px] tracking-[0.14em] uppercase">done</span>
           )}
         </div>
+        {rowError && (
+          <div
+            role="alert"
+            data-testid={`triage-row-error-${rowKey}`}
+            className="border-accent bg-accent-soft/30 text-accent mt-2 rounded border px-2 py-1 text-[12px]"
+          >
+            {rowError}
+          </div>
+        )}
       </div>
       {entry.added && (
         <div className="text-ink-dim font-mono text-[11px] tracking-[0.04em] sm:text-right">
