@@ -26,21 +26,54 @@ The **finish prompt** (status → finished asks for pullquote + rating in one bu
 - Bingo `done:` YAML cleanup (vault-side). Render now derives done-ness from the bound book's status, so the per-square `done:` field is dead weight. Either strip it from `_meta/bingo-YYYY.md` or have `bin/book` keep it stripped going forward. `#polish #vault #bingo`
 - `summary.md` tier reconsideration. Per the existing convention `summary.md` is a "full-spoiler plot summary," but the tiered model puts it at tier 1 (one click). For books like Ra where the summary really is a full plot dump, that's too eager a reveal. Options: move the full-spoiler content into the body (tier 2) and reserve `summary.md` for synopses; OR add a per-section `:::spoiler` wrap; OR allow a frontmatter `summary_tier: 2` override (we said no overrides — revisit). `#design #spoilers`
 
-### `/shelf` and `/triage` — clarify purpose (codified 2026-05-10)
+### `/shelf` — clarify purpose (codified 2026-05-10)
 
-Both pages read today as observation surfaces, not working ones — a person who navigates to either isn't sure what to do once they arrive. Question is whether to give each verbs, accept it as ornament, or retire it. Codifying the alternatives so they can sit while the decision settles.
-
-**`/shelf`** — every finished book rendered as a 32px × 220px SVG spine, hash-coloured from first tag/author, four sort options (finish date / author / rating / title). ~7000px-wide horizontal strip at the current corpus size. No filter, search, banding, or aggregation. Pure visual flourish; clicks through to the per-book page.
+`/shelf` reads today as an observation surface, not a working one — a person who navigates there isn't sure what to do once they arrive. Every finished book rendered as a 32px × 220px SVG spine, hash-coloured from first tag/author, four sort options (finish date / author / rating / title). ~7000px-wide horizontal strip at the current corpus size. No filter, search, banding, or aggregation. Pure visual flourish; clicks through to the per-book page.
 
 - **A. Give it verbs.** Add filters (tag / decade / rating bucket), banded year groups with a label between groups, a "spines you haven't visited in a year" callout panel, click-a-chip-to-dim-everything-else interaction. Becomes a way of _wandering_ the corpus rather than just looking at it. `#feature #shelf #navigation`
 - **B. Keep as ornament, but make it earn the visual.** Land the deferred `pages` schema field, then scale spine height by `sqrt(pages)` for authentic shelf rhythm (already separately captured under Visual & experience). Don't add verbs — accept that `/shelf` is for the "look at all I've read" moment, nothing more. `#polish #shelf #pages`
 - **C. Retire.** Drop the route, remove the footer + Controls links. Series, tags, log, and stats already cover catalog wandering; the shelf doesn't add a navigation axis. Cheap to undo if the decision flips. `#prune #shelf`
 
-**`/triage`** — two sections in one room: manual piles from `_meta/triage.md` (recommendations gathered but not committed to) and Goodreads-imported entries without a vault directory (the "fleshed out: NO" stubs). Both read-only. The page even prints "Run `scripts/promote-goodreads.mjs` with `--apply`" — inside instructions for outside tooling. No per-book links (by definition, the books don't have pages yet). No promote button. Observation, not action.
+### `/triage` — actionable inbox of unknowns (decided 2026-05-10)
 
-- **A. Wire to the agent.** Each row gets a passkey-gated "promote to vault" button that posts a structured `CommitPatchInput` to `/api/admin/agent/commit`, same path as `/admin/backfill`. Triage entries get a "promote to TBR" button instead. Turns observation into action without leaving the surface. `#feature #triage #admin #write-surface`
-- **B. Split the page.** Goodreads stubs move into `/admin/backfill` (passkey already present, gap-fill questions already live there); `/triage` becomes just the manual piles. Cleaner separation: backfill is for finishing books that exist, triage is for considering books that might. `#refactor #triage #admin`
-- **C. Retire `/triage`.** Promotion already happens through the `/admin` agent ("started Piranesi today" mints a directory). Drop the standalone view; manual piles remain in `_meta/triage.md` as a private vault file the agent reads. Lightest move; loses the public-side queue visibility. `#prune #triage`
+Decision: `/triage` becomes the home of "things I might want to read but haven't seen before" — the user's manually-gathered recommendations only. Imported Goodreads entries leave the page entirely; they belong to whichever vault file matches what Goodreads says about them. Per-row passkey-gated buttons turn observation into action.
+
+Goodreads routing splits by shelf:
+
+- `to-read` → bullet appended to `_meta/tbr.md`. The user already knows about it; it just needs to land in TBR with everything else there.
+- `read` / `currently-reading` → vault directory minted with the matching status, surfaces in `/admin/backfill` for rating/review/finish-date gap-fill.
+- Stop minting unfleshed-out entries into `_meta/triage.md` from Goodreads. Triage is for unknowns.
+
+Per-row triage actions (passkey-gated, route through `/api/admin/agent/commit-batch`): **promote to TBR**, **mark as reading**, **mark as finished**. Each action mints (or appends to) the appropriate vault file and removes the entry from `_meta/triage.md` in the same commit.
+
+Bulk operations are part of the brief: select multiple rows, pick an action, apply in one commit. A multi-action submit (different actions for different rows in the same commit) is nice-to-have but not required for the first cut — single-action across the selection is acceptable v1.
+
+- **`/triage` page restructure**: drop the "From Goodreads, not yet fleshed out" section entirely. Render the manual piles only. Each row carries a checkbox + per-row action buttons (promote to TBR / start reading / mark finished) for one-at-a-time use. A sticky bottom bar shows "N selected" with a single-action dropdown and a submit. `#feature #triage #admin #write-surface`
+- **Goodreads-shelf-aware promotion**: `scripts/promote-goodreads.mjs` reads each entry's `Bookshelves` column and routes accordingly. `to-read` → bullet in `_meta/tbr.md` (probably under a `## From Goodreads` pile, dated). `read` / `currently-reading` → existing vault-directory minting path with status set from the shelf. Same dry-run-by-default discipline. `#feature #goodreads #import #routing`
+- **Batch commit endpoint** (`/api/admin/agent/commit-batch`): accepts a list of `CommitPatchInput` and lands them as a single commit. Implementation: GitHub Git Data API (create blob per file, create tree, create commit) rather than the per-file Contents API. Local-fs adapter writes each in turn. Same `via ook-admin/<id>` trailer per commit (one trailer for the whole batch). `#feature #admin #write-surface #batch`
+- **Bulk multi-action (nice-to-have)**: heterogeneous actions in a single submit (e.g., 3 rows → TBR + 2 rows → reading + 1 row → finished). The batch endpoint already supports a heterogeneous list of patches; the UX change is per-row action selection rather than a single global action. Decide once single-action bulk lands. `#feature #triage #ux`
+
+### `/admin/backfill` — staged batched commits (codified 2026-05-10)
+
+Today: each card's "Save" posts to `/api/admin/agent/commit` immediately, one card = one commit. A visit that fills five cards spawns five commits in `vhata/books` — noisy in `/admin/audit`, and on a slow link the user waits per card.
+
+Decision: stage answers client-side; a single "Send all" button at the bottom commits the lot through the same `/api/admin/agent/commit-batch` endpoint introduced for `/triage` bulk actions. Skips and dismissals still take effect client-side only. Empty staging = button disabled.
+
+- **Staging UI**: each card's "Save" becomes "Stage." A footer (sticky on mobile, inline at the bottom on desktop) shows "N answers staged" with a Send-all button and a Discard-all link. Stage-state lives in component state — leaving the page drops it (acceptable for a "few questions per visit" surface that's already light-touch). `#feature #admin #backfill #batch`
+- **Shared batch endpoint**: same `/api/admin/agent/commit-batch` as `/triage` bulk. The two surfaces share the wire format. `#feature #admin #write-surface #batch`
+- **Audit hint** (defer to first use): tag a batch commit's trailer with `batch-size=N` so `/admin/audit` can render a "5 answers" chip. Not blocking on the first cut. `#polish #audit`
+
+### Makefile coverage and organization (codified 2026-05-10)
+
+Coverage: two operator-runnable scripts (`promote-goodreads.mjs`, `import-triage.mjs`) were missing Makefile entries — landed as `vault-promote-goodreads` and `vault-import-triage` on 2026-05-10. Going forward, any new operator-runnable script in `scripts/` should land with a Makefile entry in the same commit. Prebuild scripts (`fetch-vault.mjs`, `build-index.mjs`) stay invocation-less by design — they're called from `package.json` lifecycle hooks, not by the user.
+
+Organization: as the vault target count grows, the flat `make help` listing is starting to crowd. GNU Make doesn't have true subcommands; closest options:
+
+- **A. Section comments + section-aware `help`.** Keep one Makefile; add `## --- vault ---` style separator comments; teach the `help` target's awk to render those as bold dividers. Cheapest move, no structural change. `#tooling #makefile`
+- **B. Sub-Makefiles**: split into `make/vault.mk`, `make/deploy.mk`, included from the root. Targets remain `vault-*` etc. at the user's invocation. More files; lower risk of one-Makefile rot at higher target counts. `#tooling #makefile`
+- **C. Subcommand pattern** (`make vault TARGET=lint`): GNU Make has no real subcommands. This works mechanically but loses tab-completion and flat `make help`. Rejected. `#rejected #makefile`
+
+Leaning A — the file is still short enough that the dividers buy clarity without the spread of B.
 
 ### Goodreads / reading-ecosystem (researched 2026-05-03)
 
