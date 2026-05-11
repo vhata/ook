@@ -37,6 +37,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { formatAddition, formatBookHeader } from "./lib/diff-format.mjs";
+import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const CSV = argv._[0];
@@ -228,44 +229,44 @@ async function main() {
     }
   }
 
-  if (!APPLY) {
-    // Render the proposed file content as a unified-diff-style block —
-    // a header naming the target path, then every line of the new
-    // content as a green `+` insertion. Keeps the dry-run consistent
-    // with the rest of the vault-touching scripts so the operator
-    // scans the same shape everywhere.
-    process.stdout.write(`${formatBookHeader(path.relative(VAULT, triagePath))}\n`);
-    for (const line of final.split("\n")) {
-      process.stdout.write(`${formatAddition(line)}\n`);
-    }
-    process.stderr.write(`\n(dry-run; rerun with --apply to write to ${triagePath}`);
-    if (promotions.length > 0) {
-      process.stderr.write(` and ${promotions.length} new vault dirs`);
-    }
-    process.stderr.write(")\n");
-    if (promotions.length > 0) {
-      process.stderr.write("\nWould-promote (Read=truthy → vault dir, status: finished):\n");
-      for (const p of promotions) {
-        process.stderr.write(`  ${formatAddition(p.slug)}\n`);
-      }
-    }
-    return;
-  }
-
-  await fs.mkdir(path.dirname(triagePath), { recursive: true });
-  await fs.writeFile(triagePath, final, "utf8");
-  process.stderr.write(`wrote ${triagePath}\n`);
-
-  // Mint vault directories for the Read=truthy rows.
-  for (const p of promotions) {
-    const dir = path.join(VAULT, p.slug);
-    await fs.mkdir(dir, { recursive: true });
-    const refFile = path.join(dir, `${p.slug}.md`);
-    await fs.writeFile(refFile, renderBookFile(p.frontmatter), "utf8");
+  // Dry-run output: render the proposed file content as a unified-diff
+  // block — header naming the target path, then every line of the new
+  // content as a green `+` insertion. Matches the rest of the vault-
+  // touching scripts so the operator scans the same shape everywhere.
+  process.stdout.write(`${formatBookHeader(path.relative(VAULT, triagePath))}\n`);
+  for (const line of final.split("\n")) {
+    process.stdout.write(`${formatAddition(line)}\n`);
   }
   if (promotions.length > 0) {
-    process.stderr.write(`wrote ${promotions.length} vault directories under ${VAULT}\n`);
+    process.stderr.write("\nWould-promote (Read=truthy → vault dir, status: finished):\n");
+    for (const p of promotions) {
+      process.stderr.write(`  ${formatAddition(p.slug)}\n`);
+    }
   }
+
+  const changeCount = 1 + promotions.length; // triage.md + each new vault dir
+  await maybePromptApply({
+    apply: APPLY,
+    changeCount,
+    changeNoun:
+      promotions.length === 0
+        ? "triage.md write"
+        : `writes (triage.md + ${promotions.length} new vault dirs)`,
+    doApply: async () => {
+      await fs.mkdir(path.dirname(triagePath), { recursive: true });
+      await fs.writeFile(triagePath, final, "utf8");
+      process.stderr.write(`wrote ${triagePath}\n`);
+      for (const p of promotions) {
+        const dir = path.join(VAULT, p.slug);
+        await fs.mkdir(dir, { recursive: true });
+        const refFile = path.join(dir, `${p.slug}.md`);
+        await fs.writeFile(refFile, renderBookFile(p.frontmatter), "utf8");
+      }
+      if (promotions.length > 0) {
+        process.stderr.write(`wrote ${promotions.length} vault directories under ${VAULT}\n`);
+      }
+    },
+  });
 }
 
 // ---------- vault-dir helpers (mirrors promote-goodreads.mjs) ----------

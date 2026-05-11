@@ -106,10 +106,10 @@ vault-covers: ## Populate empty per-book cover: URLs from the Hardcover cache, w
 vault-import-kindle: ## Parse a Kindle My Clippings.txt and append matched highlights into per-book quotes.md (FILE=path)
 	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)")
 
-vault-import-triage: ## Build/extend _meta/triage.md from a CSV (CSV=path; dry-run by default — rerun script directly with --apply)
+vault-import-triage: ## Build/extend _meta/triage.md from a CSV (CSV=path; prompts to apply when interactive)
 	@node scripts/import-triage.mjs $(if $(CSV),"$(CSV)")
 
-vault-promote-goodreads: ## Mint per-book vault directories from _meta/goodreads.md stubs (dry-run by default — rerun script directly with --apply)
+vault-promote-goodreads: ## Mint per-book vault directories from _meta/goodreads.md stubs (prompts to apply when interactive)
 	@node scripts/promote-goodreads.mjs
 
 vault-hardcover-sync: ## Push vault status/rating/dates to Hardcover via insert_user_book mutations
