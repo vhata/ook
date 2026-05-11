@@ -19,14 +19,13 @@ export const metadata = { title: "Triage" };
 // (`to-read` → `_meta/tbr.md`, `read` / `currently-reading` → vault
 // directory). Triage is for unknowns only.
 //
-// Owner viewers (passkey-gated session) get inline action affordances
-// on each row plus a sticky bulk-action bar:
-//   - Promote to TBR
-//   - Mark as reading
-//   - Mark as finished
-// All actions submit through `/api/admin/agent/commit-batch` and land
-// as a single vault commit. Anonymous viewers see the read-only
-// rendering exactly as before.
+// Owner viewers (passkey-gated session) get a per-row action selector
+// on each row (None / Promote to TBR / Start reading / Mark finished)
+// plus a sticky queue bar with a running count and a single submit.
+// One click can promote three rows, start reading two, and finish one
+// — every row's action lands in the same `meta_patches` list against
+// `/api/admin/agent/commit-batch` as a single vault commit. Anonymous
+// viewers see the read-only rendering exactly as before.
 
 export default async function TriagePage() {
   const [triage, session, allBooks] = await Promise.all([
@@ -56,8 +55,8 @@ export default async function TriagePage() {
           Decide later, not now.
         </h1>
         <p className="font-serif text-ink-soft mt-3 max-w-[560px] text-[17px] italic">
-          Recommendations gathered but not committed to. Promote, start, or finish — each row
-          carries its own action; bulk selection applies one action across many.
+          Recommendations gathered but not committed to. Pick an action per row — promote, start, or
+          finish — then send the whole queue in one commit.
         </p>
       </header>
 

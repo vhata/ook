@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEntryPatches,
+  buildHeterogeneousTriageBatch,
   buildTriageBatch,
   renderBullet,
   sanitiseSlug,
@@ -190,5 +191,114 @@ describe("buildTriageBatch", () => {
 
   it("throws when given an empty selection", () => {
     expect(() => buildTriageBatch([], "promote-tbr", "2026-05-10")).toThrow(/at least one/);
+  });
+});
+
+describe("buildHeterogeneousTriageBatch", () => {
+  const anomaly = {
+    title: "The Anomaly",
+    author: "Hervé Le Tellier",
+    why: "Plane lands twice",
+    added: null,
+  };
+  const piranesi = { title: "Piranesi", author: "Susanna Clarke", why: null, added: null };
+  const blackPrism = { title: "Black Prism", author: "Brent Weeks", why: null, added: null };
+
+  it("emits one meta-patch list across rows with different actions", () => {
+    const body = buildHeterogeneousTriageBatch(
+      [
+        { pile: "Maybe", entry: anomaly, action: "promote-tbr" },
+        { pile: "Maybe", entry: piranesi, action: "start-reading" },
+        { pile: "Lightbringer", entry: blackPrism, action: "mark-finished" },
+      ],
+      "2026-05-10",
+    );
+    expect(body.patches).toEqual([]);
+    // 3 rows × 2 meta-patches each = 6.
+    expect(body.meta_patches).toHaveLength(6);
+    expect(body.meta_patches[0]).toMatchObject({
+      kind: "remove-bullet",
+      path: "_meta/triage.md",
+      section: "Maybe",
+    });
+    expect(body.meta_patches[1]).toMatchObject({
+      kind: "append-bullet",
+      path: "_meta/tbr.md",
+    });
+    expect(body.meta_patches[3]).toMatchObject({
+      kind: "create-file",
+      path: "Piranesi/Piranesi.md",
+    });
+    expect(body.meta_patches[5]).toMatchObject({
+      kind: "create-file",
+      path: "Black Prism/Black Prism.md",
+    });
+  });
+
+  it("summarises mixed-action batches as 'N actions (X promoted, Y started, Z finished)'", () => {
+    const body = buildHeterogeneousTriageBatch(
+      [
+        { pile: "Maybe", entry: anomaly, action: "promote-tbr" },
+        { pile: "Maybe", entry: piranesi, action: "start-reading" },
+        { pile: "Lightbringer", entry: blackPrism, action: "mark-finished" },
+      ],
+      "2026-05-10",
+    );
+    expect(body.message).toBe("Triage: 3 actions (1 promoted, 1 started, 1 finished)");
+  });
+
+  it("omits empty kinds from the mixed-action summary", () => {
+    const body = buildHeterogeneousTriageBatch(
+      [
+        { pile: "Maybe", entry: anomaly, action: "promote-tbr" },
+        { pile: "Maybe", entry: piranesi, action: "mark-finished" },
+      ],
+      "2026-05-10",
+    );
+    expect(body.message).toBe("Triage: 2 actions (1 promoted, 1 finished)");
+  });
+
+  it("falls through to the homogeneous summary when every row shares an action", () => {
+    const body = buildHeterogeneousTriageBatch(
+      [
+        { pile: "Maybe", entry: anomaly, action: "promote-tbr" },
+        { pile: "Maybe", entry: piranesi, action: "promote-tbr" },
+      ],
+      "2026-05-10",
+    );
+    // Same shape buildTriageBatch would emit for a 2-row promote-tbr.
+    expect(body.message).toBe("Triage: 2 promoted to TBR");
+  });
+
+  it("names the book on single-entry batches regardless of action", () => {
+    const body = buildHeterogeneousTriageBatch(
+      [{ pile: "Maybe", entry: anomaly, action: "start-reading" }],
+      "2026-05-10",
+    );
+    expect(body.message).toBe("Triage: The Anomaly started reading");
+  });
+
+  it("routes per-row through book-patch when the slug already lives in the vault", () => {
+    const body = buildHeterogeneousTriageBatch(
+      [
+        { pile: "Maybe", entry: anomaly, action: "promote-tbr" },
+        { pile: "Maybe", entry: piranesi, action: "mark-finished" },
+      ],
+      "2026-05-10",
+      new Set(["Piranesi"]),
+    );
+    // Piranesi → book patch, anomaly stays meta-only.
+    expect(body.patches).toHaveLength(1);
+    expect(body.patches[0]).toEqual({
+      slug: "Piranesi",
+      frontmatter_changes: { status: "finished", finished: "2026-05-10" },
+      commit_message: "Piranesi: marked finished via triage",
+    });
+    // Anomaly: 2 metas (remove + append); Piranesi: 1 (remove only — book patch handles status).
+    expect(body.meta_patches).toHaveLength(3);
+  });
+
+  it("throws when given an empty selection", () => {
+    expect(() => buildHeterogeneousTriageBatch([], "2026-05-10")).toThrow(/at least one/);
   });
 });

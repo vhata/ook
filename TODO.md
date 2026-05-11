@@ -27,12 +27,6 @@ Resolves the prior "clarify purpose" verdict in favour of keeping `/shelf` as or
 - **Ratings-over-time lean-in caption** (decided 2026-05-11): keep the existing rolling-average chart but add a self-aware caption — "a record of taste calibration" or similar. Lean into the editorial honesty that the post-2018 ~4.8 average reflects "I only log books I expect to love." The reviewer's alternative (re-frame as stacked bars per year) is **not** the chosen path. `#polish #stats #editorial`
 - **Reading-days heatmap low-data fallback**: at `< 20` events for the year, render a horizontal timeline strip — a line across the year with dots per event, sized by book length. At `≥ 20` events, switch to the calendar heatmap as today. Fixes the empty-grid that reads as a bug on `/stats/2026`. `#feature #stats #visual`
 
-### `/triage` — bulk multi-action (deferred from 2026-05-10 redesign)
-
-Single-action bulk shipped: a checkbox selection + a single dropdown (Promote to TBR / Start reading / Mark finished) applied uniformly across the selected rows in one batched commit. The remaining `nice-to-have` is heterogeneous-bulk: per-row action selection so a single submit can promote three rows, start reading two, and finish one. The batch endpoint already accepts a heterogeneous `meta_patches` list (different `kind`s per entry); the UX change is a per-row action selector rather than a single global dropdown. Decide whether the friction is worth it after a few days of real use of the single-action bulk.
-
-- **Bulk multi-action**: per-row action selection on `/triage`, heterogeneous actions in a single submit. `#feature #triage #ux`
-
 ### Kindle reading-session import (codified 2026-05-10) — awaiting takeout
 
 Source notes (don't re-research):

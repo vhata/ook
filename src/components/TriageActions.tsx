@@ -2,21 +2,29 @@
 
 import { useMemo, useState } from "react";
 import type { TbrPile, TbrEntry } from "@/lib/types";
-import { buildTriageBatch, type TriageAction, type TriageActionEntry } from "@/lib/triage/actions";
-
-// Slugs that already have a vault directory. The action builder uses
-// it to upsert frontmatter on existing books instead of trying to mint
-// a new file (which would 500 because of the create-file safety check).
+import {
+  buildHeterogeneousTriageBatch,
+  type TriageAction,
+  type TriageActionEntryWithAction,
+} from "@/lib/triage/actions";
 
 // Owner-only client renderer for the `/triage` manual piles. Replaces
 // the read-only server rendering when the viewer holds a session.
 // Renders the same H2-pile/bullet shape the public render emits, plus
-// per-row checkboxes + action buttons and a sticky bulk-action bar.
+// a per-row action selector (None / Promote to TBR / Start reading /
+// Mark finished). A single "Send N actions" submit at the bottom of the
+// page batches every row with a non-None action into one
+// `meta_patches` list and POSTs it to `/api/admin/agent/commit-batch`,
+// so one click can promote three rows, start reading two, and finish
+// one in a single commit.
 //
-// All actions submit through `/api/admin/agent/commit-batch` and land
-// as a single vault commit. The component tracks "done" rows in local
-// state so the operator sees immediate feedback before the next page
-// reload picks up the post-commit `_meta/triage.md`.
+// Stage state lives in component state only — leaving the page drops
+// every queued action, consistent with the existing `/admin/backfill`
+// pattern.
+
+// `none` is the leave-this-row-alone sentinel — rows in that state are
+// excluded from the batch on submit.
+type RowAction = TriageAction | "none";
 
 type RowKey = string; // `${pile} ${index}`
 
@@ -44,70 +52,49 @@ export default function TriageActions({
     return out;
   }, [piles]);
 
-  const [selected, setSelected] = useState<Set<RowKey>>(new Set());
-  const [bulkAction, setBulkAction] = useState<TriageAction>("promote-tbr");
+  // Per-row queued action. Rows not in this map (or mapped to `none`)
+  // are excluded from the batch on submit.
+  const [actions, setActions] = useState<Map<RowKey, RowAction>>(new Map());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // When a per-row action fails the error surfaces both inline next to
-  // the row (so the click feels acknowledged) AND in the bulk bar at
-  // the bottom of the page. Bulk-action errors leave `errorRow` null
-  // so only the bulk bar shows them.
-  const [errorRow, setErrorRow] = useState<RowKey | null>(null);
   const [done, setDone] = useState<Set<RowKey>>(new Set());
 
-  function toggleRow(key: RowKey) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+  function setRowAction(key: RowKey, action: RowAction) {
+    setActions((prev) => {
+      const next = new Map(prev);
+      if (action === "none") next.delete(key);
+      else next.set(key, action);
       return next;
     });
   }
 
-  async function submitRow(pile: string, entry: TbrEntry, action: TriageAction, key: RowKey) {
+  function discardAll() {
+    setActions(new Map());
     setError(null);
-    setErrorRow(null);
-    setBusy(true);
-    try {
-      const body = buildTriageBatch([{ pile, entry }], action, today(), existingSlugSet);
-      await postBatch(body);
-      setDone((prev) => new Set(prev).add(key));
-      setSelected((prev) => {
-        const next = new Set(prev);
-        next.delete(key);
-        return next;
-      });
-    } catch (e) {
-      setError((e as Error).message);
-      setErrorRow(key);
-    } finally {
-      setBusy(false);
-    }
   }
 
-  async function submitBulk() {
-    if (selected.size === 0) return;
+  async function submitQueue() {
+    const queued: TriageActionEntryWithAction[] = [];
+    const submittedKeys: RowKey[] = [];
+    for (const row of allRows) {
+      if (done.has(row.key)) continue;
+      const action = actions.get(row.key);
+      if (!action || action === "none") continue;
+      queued.push({ pile: row.pile, entry: row.entry, action });
+      submittedKeys.push(row.key);
+    }
+    if (queued.length === 0) return;
     setError(null);
-    setErrorRow(null);
     setBusy(true);
     try {
-      const entries: TriageActionEntry[] = [];
-      const submittedKeys: RowKey[] = [];
-      for (const row of allRows) {
-        if (!selected.has(row.key)) continue;
-        if (done.has(row.key)) continue;
-        entries.push({ pile: row.pile, entry: row.entry });
-        submittedKeys.push(row.key);
-      }
-      if (entries.length === 0) return;
-      const body = buildTriageBatch(entries, bulkAction, today(), existingSlugSet);
+      const body = buildHeterogeneousTriageBatch(queued, today(), existingSlugSet);
       await postBatch(body);
       setDone((prev) => {
         const next = new Set(prev);
         for (const k of submittedKeys) next.add(k);
         return next;
       });
-      setSelected(new Set());
+      setActions(new Map());
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -115,7 +102,12 @@ export default function TriageActions({
     }
   }
 
-  const selectedCount = [...selected].filter((k) => !done.has(k)).length;
+  // Effective queued count — excludes rows we've already committed in
+  // this session so a row can't double-count even if the user re-picks
+  // an action on it after submit.
+  const queuedCount = [...actions.entries()].filter(
+    ([k, a]) => a !== "none" && !done.has(k),
+  ).length;
 
   return (
     <section className="mb-16">
@@ -137,29 +129,26 @@ export default function TriageActions({
           <ul className="m-0 list-none space-y-2 p-0">
             {pile.entries.map((entry, index) => {
               const key = rowKey(pile.name, index);
+              const action = actions.get(key) ?? "none";
               return (
-                <RowWithActions
+                <RowWithActionSelector
                   key={key}
                   rowKey={key}
                   entry={entry}
-                  pile={pile.name}
-                  selected={selected.has(key)}
+                  action={action}
                   finished={done.has(key)}
                   busy={busy}
-                  rowError={errorRow === key ? error : null}
-                  onToggle={() => toggleRow(key)}
-                  onAction={(action) => submitRow(pile.name, entry, action, key)}
+                  onActionChange={(a) => setRowAction(key, a)}
                 />
               );
             })}
           </ul>
         </div>
       ))}
-      <BulkBar
-        selectedCount={selectedCount}
-        action={bulkAction}
-        onActionChange={setBulkAction}
-        onSubmit={submitBulk}
+      <QueueBar
+        queuedCount={queuedCount}
+        onSubmit={submitQueue}
+        onDiscard={discardAll}
         busy={busy}
         error={error}
       />
@@ -167,39 +156,26 @@ export default function TriageActions({
   );
 }
 
-function RowWithActions({
+function RowWithActionSelector({
   rowKey,
   entry,
-  selected,
+  action,
   finished,
   busy,
-  rowError,
-  onToggle,
-  onAction,
+  onActionChange,
 }: {
   rowKey: RowKey;
   entry: TbrEntry;
-  pile: string;
-  selected: boolean;
+  action: RowAction;
   finished: boolean;
   busy: boolean;
-  rowError: string | null;
-  onToggle: () => void;
-  onAction: (action: TriageAction) => void;
+  onActionChange: (a: RowAction) => void;
 }) {
   return (
     <li
       data-triage-row={rowKey}
-      className={`border-rule grid grid-cols-1 gap-1 border-t py-3 sm:grid-cols-[auto_1fr_auto] sm:items-baseline sm:gap-3 ${finished ? "opacity-60" : ""}`}
+      className={`border-rule grid grid-cols-1 gap-1 border-t py-3 sm:grid-cols-[1fr_auto] sm:items-baseline sm:gap-3 ${finished ? "opacity-60" : ""}`}
     >
-      <input
-        type="checkbox"
-        checked={selected}
-        disabled={busy || finished}
-        onChange={onToggle}
-        aria-label={`Select ${entry.title}`}
-        className="mt-1 h-3.5 w-3.5 self-start sm:mt-0 sm:self-center"
-      />
       <div>
         <div className="font-serif text-ink text-[16px] leading-tight font-medium">
           {entry.title}
@@ -208,50 +184,30 @@ function RowWithActions({
         {entry.why && (
           <div className="text-ink-soft mt-2 text-[13px] leading-[1.5] italic">{entry.why}</div>
         )}
-        <div
-          data-testid={`triage-row-actions-${rowKey}`}
-          className="mt-2 flex flex-wrap items-center gap-2 text-[11px] tracking-[0.06em]"
-        >
-          <button
-            type="button"
-            disabled={busy || finished}
-            onClick={() => onAction("promote-tbr")}
-            className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2 py-0.5 uppercase disabled:opacity-40"
-          >
-            Promote to TBR
-          </button>
-          <button
-            type="button"
-            disabled={busy || finished}
-            onClick={() => onAction("start-reading")}
-            className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2 py-0.5 uppercase disabled:opacity-40"
-          >
-            Mark as reading
-          </button>
-          <button
-            type="button"
-            disabled={busy || finished}
-            onClick={() => onAction("mark-finished")}
-            className="border-rule text-ink-soft hover:border-accent hover:text-accent rounded-full border px-2 py-0.5 uppercase disabled:opacity-40"
-          >
-            Mark as finished
-          </button>
-          {finished && (
-            <span className="text-ink-dim text-[11px] tracking-[0.14em] uppercase">done</span>
-          )}
-        </div>
-        {rowError && (
-          <div
-            role="alert"
-            data-testid={`triage-row-error-${rowKey}`}
-            className="border-accent bg-accent-soft/30 text-accent mt-2 rounded border px-2 py-1 text-[12px]"
-          >
-            {rowError}
-          </div>
+        {finished && (
+          <div className="text-ink-dim mt-2 text-[11px] tracking-[0.14em] uppercase">done</div>
         )}
       </div>
+      <label className="text-ink-soft inline-flex items-center gap-2 text-[12px] tracking-[0.06em] sm:justify-end">
+        <span className="uppercase sr-only sm:not-sr-only">Action</span>
+        <select
+          data-testid={`triage-row-action-${rowKey}`}
+          aria-label={`Action for ${entry.title}`}
+          value={action}
+          disabled={busy || finished}
+          onChange={(e) => onActionChange(e.target.value as RowAction)}
+          className={`border-rule bg-surface text-ink rounded border px-2 py-1 text-[12px] disabled:opacity-50 ${
+            action !== "none" ? "border-accent text-accent" : ""
+          }`}
+        >
+          <option value="none">— no action —</option>
+          <option value="promote-tbr">Promote to TBR</option>
+          <option value="start-reading">Start reading</option>
+          <option value="mark-finished">Mark finished</option>
+        </select>
+      </label>
       {entry.added && (
-        <div className="text-ink-dim font-mono text-[11px] tracking-[0.04em] sm:text-right">
+        <div className="text-ink-dim font-mono text-[11px] tracking-[0.04em] sm:col-span-2 sm:text-right">
           added {entry.added}
         </div>
       )}
@@ -259,54 +215,54 @@ function RowWithActions({
   );
 }
 
-function BulkBar({
-  selectedCount,
-  action,
-  onActionChange,
+function QueueBar({
+  queuedCount,
   onSubmit,
+  onDiscard,
   busy,
   error,
 }: {
-  selectedCount: number;
-  action: TriageAction;
-  onActionChange: (a: TriageAction) => void;
+  queuedCount: number;
   onSubmit: () => void;
+  onDiscard: () => void;
   busy: boolean;
   error: string | null;
 }) {
-  const empty = selectedCount === 0 && !error;
-  if (empty) return null;
+  if (queuedCount === 0 && !error) return null;
   return (
     <div
       data-testid="triage-bulk-bar"
       className="bg-surface/95 border-rule fixed inset-x-0 bottom-0 z-30 border-t px-6 py-3 backdrop-blur sm:static sm:mt-6 sm:rounded sm:border sm:px-5 sm:py-4 sm:backdrop-blur-none"
     >
       <div className="mx-auto flex max-w-[700px] flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="text-ink-soft text-[12px] tracking-[0.14em] uppercase">
-          {selectedCount === 0 ? "Nothing selected" : `${selectedCount} selected`}
+        <span
+          data-testid="triage-queue-count"
+          className="text-ink-soft text-[12px] tracking-[0.14em] uppercase"
+        >
+          {queuedCount === 0
+            ? "Nothing queued"
+            : `${queuedCount} action${queuedCount === 1 ? "" : "s"} queued`}
         </span>
         <div className="flex-1" />
-        <label className="text-ink-soft inline-flex items-center gap-2 text-[12px] tracking-[0.06em]">
-          <span className="uppercase">Action</span>
-          <select
-            value={action}
-            onChange={(e) => onActionChange(e.target.value as TriageAction)}
-            disabled={busy}
-            aria-label="Bulk action"
-            className="border-rule bg-surface text-ink rounded border px-2 py-1 text-[12px]"
-          >
-            <option value="promote-tbr">Promote to TBR</option>
-            <option value="start-reading">Start reading</option>
-            <option value="mark-finished">Mark finished</option>
-          </select>
-        </label>
+        <button
+          type="button"
+          onClick={onDiscard}
+          disabled={busy || queuedCount === 0}
+          className="text-ink-soft hover:text-accent text-[12px] tracking-[0.06em] uppercase disabled:opacity-40"
+        >
+          Discard all
+        </button>
         <button
           type="button"
           onClick={onSubmit}
-          disabled={busy || selectedCount === 0}
+          disabled={busy || queuedCount === 0}
           className="border-accent text-accent hover:bg-accent-soft inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] tracking-[0.06em] disabled:opacity-50"
         >
-          {busy ? "Sending…" : "Submit"}
+          {busy
+            ? "Sending…"
+            : queuedCount === 0
+              ? "Send"
+              : `Send ${queuedCount} action${queuedCount === 1 ? "" : "s"}`}
         </button>
       </div>
       {error && (

@@ -37,6 +37,13 @@ export type TriageActionEntry = {
   entry: TbrEntry;
 };
 
+// Heterogeneous variant — each row carries its own action. Used by the
+// per-row action-selector UX where one submit can promote three rows,
+// start reading two, and finish one in a single batched commit.
+export type TriageActionEntryWithAction = TriageActionEntry & {
+  action: TriageAction;
+};
+
 export type TriageBatchBody = {
   patches: CommitPatchInput[];
   meta_patches: MetaPatch[];
@@ -79,6 +86,37 @@ export function buildTriageBatch(
     patches,
     meta_patches: metaPatches,
     message: buildBatchMessage(entries, action),
+  };
+}
+
+// Heterogeneous variant of `buildTriageBatch`: each row carries its
+// own action. One submit can promote three rows, start reading two,
+// and finish one — emitted as a single `meta_patches` list against the
+// same commit-batch endpoint. Same per-entry patch shape as the single-
+// action path; only the commit message differs (mixed-action summary).
+export function buildHeterogeneousTriageBatch(
+  entries: TriageActionEntryWithAction[],
+  today: string,
+  existingSlugs: ReadonlySet<string> = new Set(),
+): TriageBatchBody {
+  if (entries.length === 0) {
+    throw new Error("buildHeterogeneousTriageBatch: at least one entry is required");
+  }
+
+  const patches: CommitPatchInput[] = [];
+  const metaPatches: MetaPatch[] = [];
+  for (const { pile, entry, action } of entries) {
+    const slug = sanitiseSlug(entry.title);
+    const exists = existingSlugs.has(slug);
+    const result = buildEntryPatches(pile, entry, action, today, exists);
+    patches.push(...result.patches);
+    metaPatches.push(...result.metaPatches);
+  }
+
+  return {
+    patches,
+    meta_patches: metaPatches,
+    message: buildHeterogeneousBatchMessage(entries),
   };
 }
 
@@ -201,6 +239,45 @@ function buildBatchMessage(entries: TriageActionEntry[], action: TriageAction): 
     return `Triage: ${entries[0].entry.title} ${verb}`;
   }
   return `Triage: ${entries.length} ${verb}`;
+}
+
+// Commit-message shape for the heterogeneous batch. Single-entry
+// batches collapse to the same per-action message the single-action
+// path emits, so a one-row submit looks the same in the audit log
+// whether the user picked the action from the per-row select or from
+// the (now-removed) global bulk dropdown. Multi-entry batches summarise
+// the action mix — "Triage: 6 actions (3 promoted, 2 started, 1
+// finished)" — so the audit row is scannable without expanding the
+// commit.
+function buildHeterogeneousBatchMessage(entries: TriageActionEntryWithAction[]): string {
+  if (entries.length === 1) {
+    return buildBatchMessage(
+      [{ pile: entries[0].pile, entry: entries[0].entry }],
+      entries[0].action,
+    );
+  }
+  const counts: Record<TriageAction, number> = {
+    "promote-tbr": 0,
+    "start-reading": 0,
+    "mark-finished": 0,
+  };
+  for (const e of entries) counts[e.action] += 1;
+  // If every row carries the same action, fall through to the same
+  // single-action summary the homogeneous path emits — keeps the audit
+  // row indistinguishable from a single-action submit when the user
+  // happened to pick the same action on every row.
+  const distinct = (Object.keys(counts) as TriageAction[]).filter((k) => counts[k] > 0);
+  if (distinct.length === 1) {
+    return buildBatchMessage(
+      entries.map((e) => ({ pile: e.pile, entry: e.entry })),
+      distinct[0],
+    );
+  }
+  const parts: string[] = [];
+  if (counts["promote-tbr"] > 0) parts.push(`${counts["promote-tbr"]} promoted`);
+  if (counts["start-reading"] > 0) parts.push(`${counts["start-reading"]} started`);
+  if (counts["mark-finished"] > 0) parts.push(`${counts["mark-finished"]} finished`);
+  return `Triage: ${entries.length} actions (${parts.join(", ")})`;
 }
 
 // Frontmatter for a freshly-minted book directory. Same vault style as
