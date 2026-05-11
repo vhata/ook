@@ -122,5 +122,30 @@ describe("transform", () => {
     expect(out?.pages).toBeNull();
     expect(out?.release_year).toBeNull();
     expect(out?.image_url).toBeNull();
+    expect(out?.description).toBeNull();
+  });
+
+  it("carries the description through when Hardcover returns one", () => {
+    const out = transform(
+      withBook({
+        id: 1,
+        slug: "x",
+        description: "Back-cover prose for the test book.",
+      }),
+      CANDIDATE,
+    );
+    expect(out?.description).toBe("Back-cover prose for the test book.");
+  });
+
+  it("treats whitespace-only and empty descriptions as null", () => {
+    expect(
+      transform(withBook({ id: 1, slug: "x", description: "" }), CANDIDATE)?.description,
+    ).toBeNull();
+    expect(
+      transform(withBook({ id: 1, slug: "x", description: "   " }), CANDIDATE)?.description,
+    ).toBeNull();
+    expect(
+      transform(withBook({ id: 1, slug: "x", description: null }), CANDIDATE)?.description,
+    ).toBeNull();
   });
 });

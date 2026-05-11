@@ -39,7 +39,6 @@ type Answers = {
   rating?: number;
   reviewText?: string;
   wouldReread?: boolean;
-  premiseText?: string;
 };
 
 type BatchCommit = { path: string; url: string | null };
@@ -449,18 +448,6 @@ function BackfillInput({
       />
     );
   }
-  if (question.kind === "premise") {
-    return (
-      <textarea
-        value={answer?.premiseText ?? ""}
-        onChange={(e) => onUpdate({ premiseText: e.target.value })}
-        rows={3}
-        disabled={disabled}
-        placeholder="Back-cover style, non-spoiler…"
-        className="border-rule bg-surface w-full rounded border p-3 font-serif text-[14px] leading-[1.5] disabled:opacity-60"
-      />
-    );
-  }
   // wouldReread
   return (
     <div className="flex items-center gap-2">
@@ -504,7 +491,6 @@ export function canAnswer(q: BackfillQuestion, answer: Answers | undefined): boo
   if (!answer) return false;
   if (q.kind === "rate") return typeof answer.rating === "number";
   if (q.kind === "review") return (answer.reviewText ?? "").trim().length > 0;
-  if (q.kind === "premise") return (answer.premiseText ?? "").trim().length > 0;
   if (q.kind === "wouldReread") return typeof answer.wouldReread === "boolean";
   return false;
 }
@@ -513,7 +499,6 @@ export function canAnswer(q: BackfillQuestion, answer: Answers | undefined): boo
 // Each kind maps to a single small change:
 //   - rate → frontmatter rating: N
 //   - wouldReread → frontmatter would_reread: bool
-//   - premise → frontmatter premise: <text>
 //   - review → file-backed section "review" with action "replace"
 //     (the section schema treats the special "review" name as a
 //     write to <slug>/review.md — see src/lib/mcp/book-paths.ts).
@@ -540,13 +525,6 @@ export function buildPatch(
       slug,
       frontmatter_changes: { would_reread: answer!.wouldReread! },
       commit_message: `Mark would_reread=${answer!.wouldReread} for ${q.bookTitle}`,
-    };
-  }
-  if (q.kind === "premise") {
-    return {
-      slug,
-      frontmatter_changes: { premise: answer!.premiseText!.trim() },
-      commit_message: `Add premise for ${q.bookTitle}`,
     };
   }
   // review

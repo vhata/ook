@@ -16,8 +16,8 @@
 .PHONY: help install dev build check format lint typecheck test e2e clean \
 	vault-lint vault-backfill vault-series-rosters vault-hardcover-books \
 	vault-hardcover-reviews vault-hardcover-ids vault-covers \
-	vault-import-kindle vault-import-triage vault-promote-goodreads \
-	vault-hardcover-sync deploy-status deploy-logs
+	vault-premises vault-import-kindle vault-import-triage \
+	vault-promote-goodreads vault-hardcover-sync deploy-status deploy-logs
 
 # `help` reads its own Makefile twice: once to pick up `## --- name ---`
 # section headers as bold dividers, once to render each target line.
@@ -102,6 +102,9 @@ vault-hardcover-ids: ## Copy hardcover_slug + hardcover_id from the cache into p
 
 vault-covers: ## Populate empty per-book cover: URLs from the Hardcover cache, with Open Library fallback
 	@node scripts/backfill-covers.mjs
+
+vault-premises: ## Populate empty per-book premise: blurbs from the Hardcover-description cache
+	@node scripts/backfill-premises.mjs
 
 vault-import-kindle: ## Parse a Kindle My Clippings.txt and append matched highlights into per-book quotes.md (FILE=path)
 	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)")

@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 function q(
-  kind: "rate" | "review" | "wouldReread" | "premise",
+  kind: "rate" | "review" | "wouldReread",
   overrides: Partial<BackfillQuestion> = {},
 ): BackfillQuestion {
   return {
@@ -51,13 +51,6 @@ describe("canAnswer", () => {
     expect(canAnswer(q("wouldReread"), {})).toBe(false);
     expect(canAnswer(q("wouldReread"), { wouldReread: true })).toBe(true);
     expect(canAnswer(q("wouldReread"), { wouldReread: false })).toBe(true);
-  });
-
-  it("requires non-empty trimmed text for premise questions", () => {
-    expect(canAnswer(q("premise"), {})).toBe(false);
-    expect(canAnswer(q("premise"), { premiseText: "" })).toBe(false);
-    expect(canAnswer(q("premise"), { premiseText: "   " })).toBe(false);
-    expect(canAnswer(q("premise"), { premiseText: "Two sentences of back cover." })).toBe(true);
   });
 });
 
@@ -102,23 +95,11 @@ describe("buildPatch — wire format", () => {
     expect(patch?.section_changes?.review.content).toBe("Loved it.\n");
   });
 
-  it("builds a frontmatter premise patch for premise questions", () => {
-    const patch = buildPatch(q("premise", { bookSlug: "test-book", bookTitle: "Test Book" }), {
-      premiseText: "  A back-cover blurb.  ",
-    });
-    expect(patch).toEqual({
-      slug: "test-book",
-      frontmatter_changes: { premise: "A back-cover blurb." },
-      commit_message: "Add premise for Test Book",
-    });
-  });
-
   it("returns null when the answer is missing or unanswerable", () => {
     expect(buildPatch(q("rate"), undefined)).toBeNull();
     expect(buildPatch(q("rate"), {})).toBeNull();
     expect(buildPatch(q("review"), { reviewText: "" })).toBeNull();
     expect(buildPatch(q("wouldReread"), {})).toBeNull();
-    expect(buildPatch(q("premise"), { premiseText: "   " })).toBeNull();
   });
 
   it("produces patches that satisfy the commit-batch wire shape", () => {

@@ -58,7 +58,7 @@ Schema notes:
 - Status values: tbr, reading, finished, abandoned, paused.
 - Dates: ISO YYYY-MM-DD.
 - Pullquote lives in frontmatter as \`pullquote: "..."\` (string). Rating lives as \`rating: N\` (integer 1-5).
-- Premise is the always-visible tier-0 back-cover blurb. Lives in frontmatter as \`premise: "..."\` (a sentence or two, non-spoiler). The full plot recap stays in the tier-2 \`summary.md\` file.`;
+- Premise (\`premise:\`) is the tier-0 back-cover blurb. Operator-populated from the Hardcover description cache via \`scripts/backfill-premises.mjs\` — the agent does NOT write it. If the user explicitly asks to overwrite a premise (rare), proceed; otherwise leave it alone.`;
 
 // Exported for test pinning — the finish-flow rule is load-bearing
 // and a future agent.ts refactor must not silently drop it.

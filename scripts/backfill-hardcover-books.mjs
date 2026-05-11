@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // Looks up each vault book on Hardcover (by goodreads_id) and caches the
 // canonical metadata — rating, ratings_count, reviews_count, users_count,
-// pages, release_year, image_url — keyed by vault slug. Writes the result
-// to `_meta/hardcover-books.json` for the per-book renderer to consume,
-// and for `scripts/backfill-covers.mjs` to drive per-book `cover:`
-// frontmatter writes from.
+// pages, release_year, image_url, description — keyed by vault slug.
+// Writes the result to `_meta/hardcover-books.json` for the per-book
+// renderer to consume, for `scripts/backfill-covers.mjs` to drive
+// per-book `cover:` frontmatter writes from, and for
+// `scripts/backfill-premises.mjs` to populate the tier-0 `premise:`
+// frontmatter field from the cached description.
 //
 // Designed to run on the operator's machine. The build is offline-clean;
 // the cache is the data. Same shape as `backfill-series-rosters.mjs`.
@@ -187,6 +189,7 @@ async function fetchByGoodreads(goodreadsId) {
           users_count
           users_read_count
           release_year
+          description
           image {
             url
           }
@@ -237,6 +240,16 @@ export function transform(raw, candidate) {
       : typeof fallback === "string" && fallback.length > 0
         ? fallback
         : null;
+  // Hardcover's `description` is plain text on most records, the
+  // occasional title has HTML scattered through it. We don't strip HTML
+  // here because the description is consumed downstream by
+  // `scripts/backfill-premises.mjs`, which is where any sanitisation
+  // would belong if it's ever needed. Cache as-is; null when absent or
+  // empty so consumers can treat "no description" uniformly.
+  const description =
+    typeof book.description === "string" && book.description.trim().length > 0
+      ? book.description
+      : null;
   return {
     goodreadsId: candidate.goodreadsId,
     hardcoverId: book.id ?? null,
@@ -250,6 +263,7 @@ export function transform(raw, candidate) {
     users_read_count: book.users_read_count ?? 0,
     release_year: book.release_year ?? null,
     image_url: imageUrl,
+    description,
   };
 }
 
