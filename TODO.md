@@ -1,38 +1,12 @@
 # TODO
 
-Flat backlog. Each entry tagged with `#area`. Done items deleted, not struck through.
+Backlog, grouped by readiness state. Each entry tagged with `#area`. Done items deleted, not struck through.
 
 **New ideas go in here first.** When a feature, polish item, or design idea surfaces — whether from the user or the assistant — the first move is an entry below with the rationale captured at idea-time. Then, separately, decide whether to implement now or leave it. The default is "codify, then defer"; pulling an entry forward is a second decision the user makes deliberately.
 
-## Backlog
+Sections are grouped by readiness: decided plans first, then open verdicts, deferred-by-design lines, researched dossiers, polish and housekeeping, and the longer brainstormed inventory last. Within each state, sections retain their topical headings.
 
-### Agent prompts at state-change moments (codified 2026-05-10)
-
-Pattern: at certain meaningful moments in the `/admin` flow, the agent asks one (or two, bundled) low-friction questions that draw out the user's voice. **Tenet**: voice > integrations > automation > polish. Capture must never feel like a slog. The user explicitly navigates or commits to these moments; the prompts piggyback on existing flow, never form-fill.
-
-The **finish prompt** (status → finished asks for pullquote + rating in one bundled commit) ships in this run. The other moments below are deferred for after a week or two of using the finish-prompt in anger, to see whether the bundled-commit-gates-the-action trade lands well or burns.
-
-- **Start prompt**: status flips tbr → reading. Agent asks "what brought you to this?" — answer goes into a new `trigger:` frontmatter field. Once per book. Skip on second-read. `#agent #voice #prompts`
-- **5-star unreviewed**: when a book is rated 5 and has no review file, agent's NEXT commit-message-prompt opportunistically asks "quick — why was this a five?" — answer seeds `review.md`. One ask per session per book. `#agent #voice #prompts #review`
-- **Reading-streak milestone**: when current streak crosses 10/30/100 days at commit time, agent says "that's a streak. Anything to note about it?" — answer goes to `_meta/log.md` as a Note entry. `#agent #voice #prompts #streak`
-- **Quiet → return**: when there's been no event for ≥14 days and the user comes back to /admin to mark something, agent asks "welcome back — anything interesting in the gap?" — answer to `_meta/log.md`. `#agent #voice #prompts #quiet`
-- **Series completion**: when status → finished completes a series the user has fully tracked, agent asks "you finished the series. Looking back, what stuck?" — answer to a new file `<slug>/series-finish.md` or appended to the final book's review. `#agent #voice #prompts #series`
-
-### Site / render
-
-- Strip instructional agent-prose from `_meta/tbr.md` (vault-side). The home renderer now hides the TBR section entirely when no pile has entries, so the prose isn't user-visible — but the file still reads oddly. Either populate the `## Wanted` / `## Re-Read Aspirations` piles with real entries or move the agent instructions out of the body. `#polish #vault`
-- Cover-picker improvements. `book covers` already opens an HTML grid of Open Library editions and `book cover <slug> <url>` sets any URL by hand — those are done. Still wanted: ISBN13 fallback when title-search returns no editions; surface non-Open-Library candidates (Google Books) when OL has thin coverage; per-cover language / region preference. `#feature #covers #polish`
-- Bingo cover dedup at promote time. When `bin/book` auto-promotes a bingo entry to a vault directory, the bingo file's `cover:` line for that square becomes redundant (the renderer prefers the new directory's frontmatter). Strip it during promotion to keep the dedup automatic. Currently the duplicate sits there until the user runs the cleanup script by hand. `#polish #vault`
-- Bingo `done:` YAML cleanup (vault-side). Render now derives done-ness from the bound book's status, so the per-square `done:` field is dead weight. Either strip it from `_meta/bingo-YYYY.md` or have `bin/book` keep it stripped going forward. `#polish #vault #bingo`
-- `summary.md` tier reconsideration. Per the existing convention `summary.md` is a "full-spoiler plot summary," but the tiered model puts it at tier 1 (one click). For books like Ra where the summary really is a full plot dump, that's too eager a reveal. Options: move the full-spoiler content into the body (tier 2) and reserve `summary.md` for synopses; OR add a per-section `:::spoiler` wrap; OR allow a frontmatter `summary_tier: 2` override (we said no overrides — revisit). `#design #spoilers`
-
-### `/shelf` — clarify purpose (codified 2026-05-10)
-
-`/shelf` reads today as an observation surface, not a working one — a person who navigates there isn't sure what to do once they arrive. Every finished book rendered as a 32px × 220px SVG spine, hash-coloured from first tag/author, four sort options (finish date / author / rating / title). ~7000px-wide horizontal strip at the current corpus size. No filter, search, banding, or aggregation. Pure visual flourish; clicks through to the per-book page.
-
-- **A. Give it verbs.** Add filters (tag / decade / rating bucket), banded year groups with a label between groups, a "spines you haven't visited in a year" callout panel, click-a-chip-to-dim-everything-else interaction. Becomes a way of _wandering_ the corpus rather than just looking at it. `#feature #shelf #navigation`
-- **B. Keep as ornament, but make it earn the visual.** Land the deferred `pages` schema field, then scale spine height by `sqrt(pages)` for authentic shelf rhythm (already separately captured under Visual & experience). Don't add verbs — accept that `/shelf` is for the "look at all I've read" moment, nothing more. `#polish #shelf #pages`
-- **C. Retire.** Drop the route, remove the footer + Controls links. Series, tags, log, and stats already cover catalog wandering; the shelf doesn't add a navigation axis. Cheap to undo if the decision flips. `#prune #shelf`
+## Decided & ready to build
 
 ### `/triage` — actionable inbox of unknowns (decided 2026-05-10)
 
@@ -84,18 +58,6 @@ The passkey gate itself does not change. Inline affordances are _links_, not wri
 
 Explicitly **not** doing: per-book lock fields, denylist arrays, or any other mechanism for protecting manual edits against the backfills. If a backfill re-derives a value the owner removed, the working assumption is that the backfill's evidence is probably more correct than the manual removal, and the owner should fix the upstream signal instead (remove the goodreads_id that maps wrong, edit the tag in the source data, etc.). The friction of inline edits is the right pressure to keep manual corrections rare and surgical.
 
-### Makefile coverage and organization (codified 2026-05-10)
-
-Coverage: two operator-runnable scripts (`promote-goodreads.mjs`, `import-triage.mjs`) were missing Makefile entries — landed as `vault-promote-goodreads` and `vault-import-triage` on 2026-05-10. Going forward, any new operator-runnable script in `scripts/` should land with a Makefile entry in the same commit. Prebuild scripts (`fetch-vault.mjs`, `build-index.mjs`) stay invocation-less by design — they're called from `package.json` lifecycle hooks, not by the user.
-
-Organization: as the vault target count grows, the flat `make help` listing is starting to crowd. GNU Make doesn't have true subcommands; closest options:
-
-- **A. Section comments + section-aware `help`.** Keep one Makefile; add `## --- vault ---` style separator comments; teach the `help` target's awk to render those as bold dividers. Cheapest move, no structural change. `#tooling #makefile`
-- **B. Sub-Makefiles**: split into `make/vault.mk`, `make/deploy.mk`, included from the root. Targets remain `vault-*` etc. at the user's invocation. More files; lower risk of one-Makefile rot at higher target counts. `#tooling #makefile`
-- **C. Subcommand pattern** (`make vault TARGET=lint`): GNU Make has no real subcommands. This works mechanically but loses tab-completion and flat `make help`. Rejected. `#rejected #makefile`
-
-Leaning A — the file is still short enough that the dividers buy clarity without the spread of B.
-
 ### Cover-URL backfill (codified 2026-05-10)
 
 Source notes:
@@ -113,6 +75,61 @@ Plan, in order:
 - **Manual override survives**: `bin/book cover <slug> <url>` keeps working; the auto-backfill never touches a populated field, so hand-picked covers and corrections survive re-runs. `#discipline #covers`
 
 Expected outcome: most of the 269 currently-blank books pick up a real cover URL in one operator session. The residual (media-list entries without an ID, hand-built records) stays on the procedural fallback or waits for a manual pick. Doesn't displace the existing "Cover-picker improvements" entry under Site / render — that one's about the manual picker's edge cases (ISBN13 fallback in the picker, Google Books candidates, language/region prefs), which remain valuable for the residual.
+
+### Kindle reading-session import (codified 2026-05-10) — awaiting takeout
+
+Source notes (don't re-research):
+
+- Amazon's privacy-data takeout (`amazon.com/gp/privacycentral/dsar/preview.html`) emits a per-account zip including `Kindle.Devices.ReadingSession.csv` — one row per reading session, keyed on ASIN, with start/end timestamps, duration, page-flip counts, device. Typical arrival ~1 day after request. **No incremental API**; each takeout is a fresh snapshot, so this is one-shot historical excavation, not an ongoing sync.
+- Reference implementation: `arpanghosh8453/kindle-stats` (Reddit `r/kindle/comments/1da56lb`, May 2024). Joins the session CSV against a Calibre catalogue CSV export (ASIN ↔ title) and produces matplotlib charts in a Jupyter notebook. A hosted browser-only equivalent exists at `tools.infinus.ca/kindle` — does its own ASIN lookups so no Calibre catalogue needed — but we want to own the pipeline (offline-clean, vault-cached, future enrichment).
+- Sendtokindle-uploaded books land as "personal documents" without an ASIN; their sessions are recorded but unlinkable to a book by ID. Cable-transferred kfx books retain ASIN.
+
+The value: **one-shot recovery of behavioural data we can't reconstruct later.** Hardcover/Open Library backfills aggregate other people's signal; this is the user's own reading-session history stretching back to first Kindle ownership. Different category — file the takeout request, ingest once, future re-requests are optional. Awaiting a takeout the user has filed (2026-05-10).
+
+- **`scripts/import-kindle-sessions.mjs`**: read `Kindle.Devices.ReadingSession.csv` (Amazon takeout) and a Calibre catalogue CSV export (ASIN ↔ title ↔ author), emit `_meta/kindle-sessions.json` keyed by vault slug — per-book arrays of `{ start, end, durationSeconds, pageFlips, device }`. Operator-run via `make vault-kindle-sessions`. Dry-run by default with prompt-to-apply. Cache committed to the vault; build stays offline-clean. `#integration #kindle #amazon`
+- **`amazon_asin` frontmatter field + Calibre-driven backfill**: most vault books don't carry an ASIN today; without it session rows have nothing to link to. Add `amazon_asin: <string>` to the schema (`src/lib/types.ts`, `scripts/build-index.mjs` parse, the walk-fallback parser in `src/lib/books.ts`, `_meta/CLAUDE.md` in the vault), then `scripts/backfill-asin-from-calibre.mjs` that pairs the Calibre catalogue CSV against vault books by `goodreads_id` (Calibre exports it as a custom column when configured) or fuzzy title+author match. Pure cache-to-frontmatter, no network. `#schema #vault #asin`
+- **Per-book render surface**: under the metadata strip on `/books/[slug]`, a discreet line "read across 9 sessions over 14 days · ~6h total" when the cache has data for this slug. Same visual register as the existing Hardcover community-signal line. `#feature #per-book #stats`
+- **Inferred `started` backfill for date-blind finishes**: Goodreads-imported books often have a `finished` but no `started`. The first session timestamp for an ASIN gives a real start. Optional `scripts/backfill-started-from-sessions.mjs` that suggests started-dates per book and prompts to apply, never overrides an existing value. `#feature #vault #dates`
+- **Historical reach on `/stats` heatmaps**: the year-day heatmap currently renders from-vault-era only. Fold session-day data into the heatmap source so years prior to the vault's first commit can render too — properly back-fills the historical view of "when did I actually read." `#feature #stats #historical`
+- **Unlinked-Kindle-activity footnote**: sessions for sendtokindle / personal-document books can't link to a vault entry. Render an "unlinked Kindle activity: ~Nh across M sessions" footnote on `/stats` (or per-year) rather than silently dropping them — the data is honest about the gap. `#caveat #stats`
+
+## Open verdicts
+
+### `/shelf` — clarify purpose (codified 2026-05-10)
+
+`/shelf` reads today as an observation surface, not a working one — a person who navigates there isn't sure what to do once they arrive. Every finished book rendered as a 32px × 220px SVG spine, hash-coloured from first tag/author, four sort options (finish date / author / rating / title). ~7000px-wide horizontal strip at the current corpus size. No filter, search, banding, or aggregation. Pure visual flourish; clicks through to the per-book page.
+
+- **A. Give it verbs.** Add filters (tag / decade / rating bucket), banded year groups with a label between groups, a "spines you haven't visited in a year" callout panel, click-a-chip-to-dim-everything-else interaction. Becomes a way of _wandering_ the corpus rather than just looking at it. `#feature #shelf #navigation`
+- **B. Keep as ornament, but make it earn the visual.** Land the deferred `pages` schema field, then scale spine height by `sqrt(pages)` for authentic shelf rhythm (already separately captured under Visual & experience). Don't add verbs — accept that `/shelf` is for the "look at all I've read" moment, nothing more. `#polish #shelf #pages`
+- **C. Retire.** Drop the route, remove the footer + Controls links. Series, tags, log, and stats already cover catalog wandering; the shelf doesn't add a navigation axis. Cheap to undo if the decision flips. `#prune #shelf`
+
+### Makefile coverage and organization (codified 2026-05-10)
+
+Coverage: two operator-runnable scripts (`promote-goodreads.mjs`, `import-triage.mjs`) were missing Makefile entries — landed as `vault-promote-goodreads` and `vault-import-triage` on 2026-05-10. Going forward, any new operator-runnable script in `scripts/` should land with a Makefile entry in the same commit. Prebuild scripts (`fetch-vault.mjs`, `build-index.mjs`) stay invocation-less by design — they're called from `package.json` lifecycle hooks, not by the user.
+
+Organization: as the vault target count grows, the flat `make help` listing is starting to crowd. GNU Make doesn't have true subcommands; closest options:
+
+- **A. Section comments + section-aware `help`.** Keep one Makefile; add `## --- vault ---` style separator comments; teach the `help` target's awk to render those as bold dividers. Cheapest move, no structural change. `#tooling #makefile`
+- **B. Sub-Makefiles**: split into `make/vault.mk`, `make/deploy.mk`, included from the root. Targets remain `vault-*` etc. at the user's invocation. More files; lower risk of one-Makefile rot at higher target counts. `#tooling #makefile`
+- **C. Subcommand pattern** (`make vault TARGET=lint`): GNU Make has no real subcommands. This works mechanically but loses tab-completion and flat `make help`. Rejected. `#rejected #makefile`
+
+Leaning A — the file is still short enough that the dividers buy clarity without the spread of B.
+
+## Deferred by design
+
+### Agent prompts at state-change moments (codified 2026-05-10)
+
+Pattern: at certain meaningful moments in the `/admin` flow, the agent asks one (or two, bundled) low-friction questions that draw out the user's voice. **Tenet**: voice > integrations > automation > polish. Capture must never feel like a slog. The user explicitly navigates or commits to these moments; the prompts piggyback on existing flow, never form-fill.
+
+The **finish prompt** (status → finished asks for pullquote + rating in one bundled commit) ships in this run. The other moments below are deferred for after a week or two of using the finish-prompt in anger, to see whether the bundled-commit-gates-the-action trade lands well or burns.
+
+- **Start prompt**: status flips tbr → reading. Agent asks "what brought you to this?" — answer goes into a new `trigger:` frontmatter field. Once per book. Skip on second-read. `#agent #voice #prompts`
+- **5-star unreviewed**: when a book is rated 5 and has no review file, agent's NEXT commit-message-prompt opportunistically asks "quick — why was this a five?" — answer seeds `review.md`. One ask per session per book. `#agent #voice #prompts #review`
+- **Reading-streak milestone**: when current streak crosses 10/30/100 days at commit time, agent says "that's a streak. Anything to note about it?" — answer goes to `_meta/log.md` as a Note entry. `#agent #voice #prompts #streak`
+- **Quiet → return**: when there's been no event for ≥14 days and the user comes back to /admin to mark something, agent asks "welcome back — anything interesting in the gap?" — answer to `_meta/log.md`. `#agent #voice #prompts #quiet`
+- **Series completion**: when status → finished completes a series the user has fully tracked, agent asks "you finished the series. Looking back, what stuck?" — answer to a new file `<slug>/series-finish.md` or appended to the final book's review. `#agent #voice #prompts #series`
+
+## Researched dossiers
 
 ### Goodreads / reading-ecosystem (researched 2026-05-03)
 
@@ -161,22 +178,17 @@ Source notes:
 - **Public-page anti-spoiler guard for community quotes**: Filter community quotes that look like ending-spoilers before rendering on public per-book pages. Personal highlights unaffected (user has finished those). **Source:** Goodreads' optional `<spoiler>` markers + heuristic on phrases like "in the end", "finally,", "died" + agent pass on remainders. **Homework:** none — automatic. `#feature #highlights #spoilers`
 - **Punted: Storygraph / BookWyrm community quotes**: No public per-book quotes endpoints today (Storygraph is stat/recommendation-focused, BookWyrm uses ActivityPub federation per-instance). Revisit in 12 months. `#not-now #highlights`
 
-### Kindle reading-session import (codified 2026-05-10)
+## Polish & housekeeping
 
-Source notes (don't re-research):
+### Site / render
 
-- Amazon's privacy-data takeout (`amazon.com/gp/privacycentral/dsar/preview.html`) emits a per-account zip including `Kindle.Devices.ReadingSession.csv` — one row per reading session, keyed on ASIN, with start/end timestamps, duration, page-flip counts, device. Typical arrival ~1 day after request. **No incremental API**; each takeout is a fresh snapshot, so this is one-shot historical excavation, not an ongoing sync.
-- Reference implementation: `arpanghosh8453/kindle-stats` (Reddit `r/kindle/comments/1da56lb`, May 2024). Joins the session CSV against a Calibre catalogue CSV export (ASIN ↔ title) and produces matplotlib charts in a Jupyter notebook. A hosted browser-only equivalent exists at `tools.infinus.ca/kindle` — does its own ASIN lookups so no Calibre catalogue needed — but we want to own the pipeline (offline-clean, vault-cached, future enrichment).
-- Sendtokindle-uploaded books land as "personal documents" without an ASIN; their sessions are recorded but unlinkable to a book by ID. Cable-transferred kfx books retain ASIN.
+- Strip instructional agent-prose from `_meta/tbr.md` (vault-side). The home renderer now hides the TBR section entirely when no pile has entries, so the prose isn't user-visible — but the file still reads oddly. Either populate the `## Wanted` / `## Re-Read Aspirations` piles with real entries or move the agent instructions out of the body. `#polish #vault`
+- Cover-picker improvements. `book covers` already opens an HTML grid of Open Library editions and `book cover <slug> <url>` sets any URL by hand — those are done. Still wanted: ISBN13 fallback when title-search returns no editions; surface non-Open-Library candidates (Google Books) when OL has thin coverage; per-cover language / region preference. `#feature #covers #polish`
+- Bingo cover dedup at promote time. When `bin/book` auto-promotes a bingo entry to a vault directory, the bingo file's `cover:` line for that square becomes redundant (the renderer prefers the new directory's frontmatter). Strip it during promotion to keep the dedup automatic. Currently the duplicate sits there until the user runs the cleanup script by hand. `#polish #vault`
+- Bingo `done:` YAML cleanup (vault-side). Render now derives done-ness from the bound book's status, so the per-square `done:` field is dead weight. Either strip it from `_meta/bingo-YYYY.md` or have `bin/book` keep it stripped going forward. `#polish #vault #bingo`
+- `summary.md` tier reconsideration. Per the existing convention `summary.md` is a "full-spoiler plot summary," but the tiered model puts it at tier 1 (one click). For books like Ra where the summary really is a full plot dump, that's too eager a reveal. Options: move the full-spoiler content into the body (tier 2) and reserve `summary.md` for synopses; OR add a per-section `:::spoiler` wrap; OR allow a frontmatter `summary_tier: 2` override (we said no overrides — revisit). `#design #spoilers`
 
-The value: **one-shot recovery of behavioural data we can't reconstruct later.** Hardcover/Open Library backfills aggregate other people's signal; this is the user's own reading-session history stretching back to first Kindle ownership. Different category — file the takeout request, ingest once, future re-requests are optional. Awaiting a takeout the user has filed (2026-05-10).
-
-- **`scripts/import-kindle-sessions.mjs`**: read `Kindle.Devices.ReadingSession.csv` (Amazon takeout) and a Calibre catalogue CSV export (ASIN ↔ title ↔ author), emit `_meta/kindle-sessions.json` keyed by vault slug — per-book arrays of `{ start, end, durationSeconds, pageFlips, device }`. Operator-run via `make vault-kindle-sessions`. Dry-run by default with prompt-to-apply. Cache committed to the vault; build stays offline-clean. `#integration #kindle #amazon`
-- **`amazon_asin` frontmatter field + Calibre-driven backfill**: most vault books don't carry an ASIN today; without it session rows have nothing to link to. Add `amazon_asin: <string>` to the schema (`src/lib/types.ts`, `scripts/build-index.mjs` parse, the walk-fallback parser in `src/lib/books.ts`, `_meta/CLAUDE.md` in the vault), then `scripts/backfill-asin-from-calibre.mjs` that pairs the Calibre catalogue CSV against vault books by `goodreads_id` (Calibre exports it as a custom column when configured) or fuzzy title+author match. Pure cache-to-frontmatter, no network. `#schema #vault #asin`
-- **Per-book render surface**: under the metadata strip on `/books/[slug]`, a discreet line "read across 9 sessions over 14 days · ~6h total" when the cache has data for this slug. Same visual register as the existing Hardcover community-signal line. `#feature #per-book #stats`
-- **Inferred `started` backfill for date-blind finishes**: Goodreads-imported books often have a `finished` but no `started`. The first session timestamp for an ASIN gives a real start. Optional `scripts/backfill-started-from-sessions.mjs` that suggests started-dates per book and prompts to apply, never overrides an existing value. `#feature #vault #dates`
-- **Historical reach on `/stats` heatmaps**: the year-day heatmap currently renders from-vault-era only. Fold session-day data into the heatmap source so years prior to the vault's first commit can render too — properly back-fills the historical view of "when did I actually read." `#feature #stats #historical`
-- **Unlinked-Kindle-activity footnote**: sessions for sendtokindle / personal-document books can't link to a vault entry. Render an "unlinked Kindle activity: ~Nh across M sessions" footnote on `/stats` (or per-year) rather than silently dropping them — the data is honest about the gap. `#caveat #stats`
+## Brainstormed inventory
 
 ### Visual & experience (brainstormed 2026-05-03)
 
