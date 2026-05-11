@@ -285,6 +285,19 @@ export type DayActivity = {
   count: number;
 };
 
+// One reading event in the year — a started, finished, or manual log
+// occurrence. Powers the low-data timeline strip on `/stats/[year]`,
+// the fallback render shown when the calendar heatmap would be too
+// sparse to read. `pages` is the Hardcover-cached length when available;
+// the strip falls back to a fixed dot size when it's null.
+export type YearEvent = {
+  date: string;
+  kind: "started" | "finished" | "note";
+  slug: string | null;
+  title: string | null;
+  pages: number | null;
+};
+
 export type ConnectionReason = {
   kind: "see-also" | "series" | "author" | "tag";
   detail: string;

@@ -17,11 +17,6 @@ Resolves the prior "clarify purpose" verdict in favour of keeping `/shelf` as or
 - **Bingo + currently-reading markers**: 2px accent stripe along the top edge of the spine for books on the active bingo card; a small bookmark tongue above the shelf line for currently-reading. `#feature #shelf #visual`
 - **Paused / abandoned styling**: paired with the `/now` paused state above. Paused spine is matte (no highlight); abandoned spine renders a broken-spine treatment. Both still on the shelf — `/shelf` is the archive. `#feature #shelf #visual`
 
-### `/stats` — ratings-over-time caption + heatmap fallback (review 2026-05-11)
-
-- **Ratings-over-time lean-in caption** (decided 2026-05-11): keep the existing rolling-average chart but add a self-aware caption — "a record of taste calibration" or similar. Lean into the editorial honesty that the post-2018 ~4.8 average reflects "I only log books I expect to love." The reviewer's alternative (re-frame as stacked bars per year) is **not** the chosen path. `#polish #stats #editorial`
-- **Reading-days heatmap low-data fallback**: at `< 20` events for the year, render a horizontal timeline strip — a line across the year with dots per event, sized by book length. At `≥ 20` events, switch to the calendar heatmap as today. Fixes the empty-grid that reads as a bug on `/stats/2026`. `#feature #stats #visual`
-
 ### Kindle reading-session import (codified 2026-05-10) — awaiting takeout
 
 Source notes (don't re-research):

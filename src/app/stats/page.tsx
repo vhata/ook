@@ -249,6 +249,12 @@ function RatingOverTime({ dots }: { dots: RatedDot[] }) {
           </span>
         </div>
       </div>
+      <p className="font-serif text-ink-soft mt-3 max-w-[560px] text-[13px] italic leading-snug">
+        A record of taste calibration more than absolute quality &mdash; I mostly log books I expect
+        to love, so the line drifts upward over time as I&rsquo;ve gotten better at picking. Read it
+        as &ldquo;what I&rsquo;ve learned about my own taste,&rdquo; not &ldquo;how good the books
+        were.&rdquo;
+      </p>
     </section>
   );
 }

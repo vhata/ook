@@ -3,8 +3,22 @@ import { notFound } from "next/navigation";
 import { Cover } from "@/components/Cover";
 import { HomeMark } from "@/components/HomeMark";
 import { foxingFor } from "@/lib/foxing";
-import { getAllBooks, getStatsYears, getYearActivity, getYearStats } from "@/lib/books";
-import type { Book, DayActivity, RatingBucket, YearStats } from "@/lib/types";
+import {
+  getAllBooks,
+  getStatsYears,
+  getYearActivity,
+  getYearEvents,
+  getYearStats,
+} from "@/lib/books";
+import type { Book, DayActivity, RatingBucket, YearEvent, YearStats } from "@/lib/types";
+
+// Below this event count, the calendar heatmap renders as a near-empty
+// grid (it reads as a bug, not a deliberate render). Swap it for a
+// horizontal timeline strip — same data, more readable at low N. The
+// threshold is small enough that sparse-but-real years still get the
+// heatmap; tuned to flip on the year-to-date for the current year and
+// stay flipped until the user has reasonable activity.
+export const HEATMAP_MIN_EVENTS = 20;
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +34,11 @@ export default async function StatsYearPage({ params }: { params: Params }) {
   const year = Number(yearParam);
   if (!Number.isInteger(year) || year < 1900 || year > 2999) notFound();
 
-  const [stats, allYears, activity, allBooks] = await Promise.all([
+  const [stats, allYears, activity, events, allBooks] = await Promise.all([
     getYearStats(year),
     getStatsYears(),
     getYearActivity(year),
+    getYearEvents(year),
     getAllBooks(),
   ]);
   const totalEvents = activity.reduce((sum, d) => sum + d.count, 0);
@@ -44,7 +59,12 @@ export default async function StatsYearPage({ params }: { params: Params }) {
         <>
           <Topline stats={stats} />
           {stats.paceProjection && <PaceProjection stats={stats} />}
-          {totalEvents > 0 && <Heatmap activity={activity} totalEvents={totalEvents} />}
+          {totalEvents > 0 &&
+            (totalEvents < HEATMAP_MIN_EVENTS ? (
+              <ReadingTimeline year={year} events={events} totalEvents={totalEvents} />
+            ) : (
+              <Heatmap activity={activity} totalEvents={totalEvents} />
+            ))}
           {totalEvents > 0 && <LongestStreak activity={activity} />}
           {totalEvents > 0 && <WeekendSplit activity={activity} />}
           {stats.pagesByMonth.some((p) => p > 0) && (
@@ -353,6 +373,208 @@ function Heatmap({ activity, totalEvents }: { activity: DayActivity[]; totalEven
       </div>
     </section>
   );
+}
+
+function ReadingTimeline({
+  year,
+  events,
+  totalEvents,
+}: {
+  year: number;
+  events: YearEvent[];
+  totalEvents: number;
+}) {
+  // Sparse-year fallback for the calendar heatmap. A horizontal line
+  // across the year with one dot per event — the same data the heatmap
+  // would render, but at a scale that reads correctly when there are
+  // five events instead of two hundred. Dot radius scales by book
+  // length when the Hardcover cache has a `pages` count; events
+  // without one get the fixed fallback. Finishes are filled, starts
+  // are hollow rings, manual log entries are small ticks so the three
+  // kinds stay distinguishable without a separate legend per row.
+  const W = 800;
+  const H = 64;
+  const padL = 28;
+  const padR = 18;
+  const padT = 20;
+  const padB = 22;
+  const innerW = W - padL - padR;
+  const lineY = padT + (H - padT - padB) / 2;
+
+  const yearStart = Date.UTC(year, 0, 1);
+  const yearEnd = Date.UTC(year, 11, 31);
+  const span = yearEnd - yearStart;
+  const x = (iso: string) => {
+    const t = Date.parse(`${iso}T12:00:00Z`);
+    const clamped = Math.max(yearStart, Math.min(yearEnd, t));
+    return padL + ((clamped - yearStart) / span) * innerW;
+  };
+
+  // Map page-count to dot radius. Realistic span is roughly 150..900
+  // pages; we map that to 3..7 px so a doorstopper reads as visibly
+  // larger than a short novel without crowding the timeline. Books
+  // outside the span clamp to the ends.
+  const pageRadius = (pages: number | null): number => {
+    if (pages === null) return 4; // fixed fallback
+    const minR = 3;
+    const maxR = 7;
+    const minP = 150;
+    const maxP = 900;
+    const clamped = Math.max(minP, Math.min(maxP, pages));
+    return minR + ((clamped - minP) / (maxP - minP)) * (maxR - minR);
+  };
+
+  // Month ticks at the first of each month, labelled with the short
+  // form. Twelve ticks on the rail, even when there are zero events
+  // in some months — that's what tells you it's a year.
+  const monthTicks: Array<{ month: number; xPos: number; label: string }> = [];
+  for (let m = 0; m < 12; m++) {
+    const t = Date.UTC(year, m, 1);
+    const date = new Date(t);
+    monthTicks.push({
+      month: m,
+      xPos: padL + ((t - yearStart) / span) * innerW,
+      label: date.toLocaleString("en", { month: "short", timeZone: "UTC" }),
+    });
+  }
+
+  return (
+    <section className="mt-12">
+      <div className="mb-5 flex items-baseline justify-between gap-3">
+        <h2 className="font-serif text-ink m-0 text-[22px] leading-tight font-medium tracking-[-0.012em]">
+          Reading days
+        </h2>
+        <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
+          {totalEvents} {totalEvents === 1 ? "event" : "events"}
+        </span>
+      </div>
+      <div className="bg-surface border-rule rounded border p-5">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          preserveAspectRatio="none"
+          className="block h-auto w-full"
+          aria-label={`${totalEvents} reading event${totalEvents === 1 ? "" : "s"} across ${year}`}
+        >
+          {/* Year rail */}
+          <line
+            x1={padL}
+            x2={W - padR}
+            y1={lineY}
+            y2={lineY}
+            stroke="var(--rule)"
+            strokeWidth={0.7}
+          />
+          {/* Month ticks */}
+          {monthTicks.map((t) => (
+            <g key={t.month}>
+              <line
+                x1={t.xPos}
+                x2={t.xPos}
+                y1={lineY - 3}
+                y2={lineY + 3}
+                stroke="var(--rule)"
+                strokeWidth={0.5}
+              />
+              <text
+                x={t.xPos}
+                y={H - 6}
+                fontSize="9"
+                fill="var(--ink-soft)"
+                textAnchor="middle"
+                fontFamily="ui-monospace, monospace"
+              >
+                {t.label}
+              </text>
+            </g>
+          ))}
+          {/* Event dots, finishes drawn on top */}
+          {events
+            .slice()
+            .sort((a, b) => kindOrder(a.kind) - kindOrder(b.kind))
+            .map((e, i) => {
+              const cx = x(e.date);
+              const r = pageRadius(e.pages);
+              const tooltipPages = e.pages !== null ? ` · ${e.pages} pp` : "";
+              const titlePart = e.title ?? "—";
+              const tooltip = `${e.date} · ${e.kind} · ${titlePart}${tooltipPages}`;
+              if (e.kind === "finished") {
+                return (
+                  <circle
+                    key={`${e.date}-${e.slug ?? "x"}-${i}`}
+                    cx={cx}
+                    cy={lineY}
+                    r={r}
+                    fill="var(--accent)"
+                    opacity={0.82}
+                  >
+                    <title>{tooltip}</title>
+                  </circle>
+                );
+              }
+              if (e.kind === "started") {
+                return (
+                  <circle
+                    key={`${e.date}-${e.slug ?? "x"}-${i}`}
+                    cx={cx}
+                    cy={lineY}
+                    r={r}
+                    fill="none"
+                    stroke="var(--accent)"
+                    strokeWidth={1.4}
+                    opacity={0.78}
+                  >
+                    <title>{tooltip}</title>
+                  </circle>
+                );
+              }
+              // Manual log entries — small tick above the line.
+              return (
+                <line
+                  key={`${e.date}-note-${i}`}
+                  x1={cx}
+                  x2={cx}
+                  y1={lineY - 6}
+                  y2={lineY - 1}
+                  stroke="var(--ink-soft)"
+                  strokeWidth={1.2}
+                  opacity={0.7}
+                >
+                  <title>{tooltip}</title>
+                </line>
+              );
+            })}
+        </svg>
+        <div className="text-ink-dim mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] tracking-[0.14em] uppercase">
+          <span className="flex items-center gap-1.5">
+            <span
+              className="bg-accent inline-block rounded-full opacity-82"
+              style={{ width: 8, height: 8 }}
+            />
+            <span className="text-ink-soft">finished</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="border-accent inline-block rounded-full border opacity-78"
+              style={{ width: 8, height: 8 }}
+            />
+            <span className="text-ink-soft">started</span>
+          </span>
+          <span className="text-ink-soft ml-auto italic normal-case opacity-80">
+            dot size scales with book length when known
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function kindOrder(kind: YearEvent["kind"]): number {
+  // Draw notes first (underneath), then starts (hollow rings), then
+  // finishes (filled dots) on top — so when events stack on a single
+  // day the most visually-prominent marker wins the foreground.
+  if (kind === "note") return 0;
+  if (kind === "started") return 1;
+  return 2;
 }
 
 function LongestStreak({ activity }: { activity: DayActivity[] }) {

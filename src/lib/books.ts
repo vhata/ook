@@ -27,6 +27,7 @@ import type {
   Tbr,
   TbrEntry,
   TbrPile,
+  YearEvent,
   YearStats,
 } from "./types";
 
@@ -1614,6 +1615,63 @@ export async function getYearActivity(year: number): Promise<DayActivity[]> {
     days.push({ date, weekday: d.getUTCDay(), count: counts.get(date) ?? 0 });
   }
   return days;
+}
+
+// One row per reading event in the year — started, finished, or
+// manual log entry. Powers the low-data timeline strip on `/stats/[year]`
+// shown in place of the calendar heatmap when total events fall below
+// the threshold (a near-empty grid reads as a bug, a single timeline
+// strip reads as a deliberate render).
+//
+// `pages` is sourced from the Hardcover cache by slug. The vault has
+// no `pages` frontmatter field today (deferred-by-design — see TODO);
+// the cache is the only page-count data the renderer has, and missing
+// entries stay null so the timeline can degrade to a fixed dot size.
+export async function getYearEvents(year: number): Promise<YearEvent[]> {
+  const [books, manual, hardcover] = await Promise.all([
+    getAllBooks(),
+    getManualLogEntries(),
+    loadHardcoverBooks(),
+  ]);
+  const events: YearEvent[] = [];
+  const inYear = (date: string | null) => Boolean(date && date.startsWith(`${year}-`));
+  for (const b of books) {
+    const hc = hardcover.get(b.slug);
+    const pages = typeof hc?.pages === "number" && hc.pages > 0 ? hc.pages : null;
+    if (inYear(b.started)) {
+      events.push({
+        date: b.started as string,
+        kind: "started",
+        slug: b.slug,
+        title: b.title,
+        pages,
+      });
+    }
+    if (inYear(b.finished)) {
+      events.push({
+        date: b.finished as string,
+        kind: "finished",
+        slug: b.slug,
+        title: b.title,
+        pages,
+      });
+    }
+  }
+  for (const m of manual) {
+    if (!inYear(m.date)) continue;
+    const slug = m.slug;
+    const hc = slug ? hardcover.get(slug) : undefined;
+    const pages = typeof hc?.pages === "number" && hc.pages > 0 ? hc.pages : null;
+    events.push({
+      date: m.date,
+      kind: "note",
+      slug,
+      title: m.title,
+      pages,
+    });
+  }
+  events.sort((a, b) => a.date.localeCompare(b.date));
+  return events;
 }
 
 // Aggregate every available stat for one calendar year. Pure derivation
