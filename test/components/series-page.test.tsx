@@ -112,17 +112,16 @@ describe("SeriesPage server component", { timeout: 15000 }, () => {
     }
   });
 
-  it("collapses series above the threshold by default; keeps short ones open", async () => {
+  it("collapses every series by default", async () => {
     const SeriesPage = await importPage();
     const tree = await SeriesPage({ searchParams: Promise.resolve({}) });
     const { container } = render(tree);
 
-    const discworldDetails = container.querySelector("#series-discworld") as HTMLDetailsElement;
-    const shortDetails = container.querySelector("#series-short-series") as HTMLDetailsElement;
-    expect(discworldDetails.tagName).toBe("DETAILS");
-    expect(shortDetails.tagName).toBe("DETAILS");
-    expect(discworldDetails.open).toBe(false);
-    expect(shortDetails.open).toBe(true);
+    const allDetails = container.querySelectorAll("details");
+    expect(allDetails.length).toBeGreaterThan(0);
+    for (const d of allDetails) {
+      expect((d as HTMLDetailsElement).open).toBe(false);
+    }
   });
 
   it("?expand=all forces every section open", async () => {

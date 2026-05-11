@@ -11,12 +11,6 @@ export const metadata = {
   title: "Series",
 };
 
-// Series with more rendered rows than this collapse by default.
-// "Rendered rows" = vault members + roster-missing placeholders, since
-// the latter inflate the section height the same way the former do. A
-// short series stays inline; only the bulky ones fold up.
-const COLLAPSE_THRESHOLD = 4;
-
 type SearchParams = Promise<{ expand?: string; collapse?: string }>;
 
 export default async function SeriesPage({ searchParams }: { searchParams: SearchParams }) {
@@ -226,12 +220,7 @@ function SeriesSection({
   // When a roster is available, the denominator is the canonical
   // total. Otherwise it's just what the vault has — same as before.
   const total = group.rosterCount ?? group.members.length;
-  // Total rows the section will render. Used for the collapse-by-
-  // default rule — a series with one member but ten roster-missing
-  // entries is still bulky.
-  const renderedRows = group.members.length + group.rosterMissing.length;
-  const defaultOpen = renderedRows <= COLLAPSE_THRESHOLD;
-  const open = forceExpandAll ? true : forceCollapseAll ? false : defaultOpen;
+  const open = forceExpandAll;
   const anchorId = `series-${slugifySeriesName(group.name)}`;
   // Native <details> owns its `open` state in the DOM. When a user
   // manually toggles a section, that mutation isn't visible to React's
