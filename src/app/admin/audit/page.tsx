@@ -95,6 +95,14 @@ export default async function AdminAuditPage() {
                         via MCP
                       </span>
                     ) : null}
+                    {c.viaAdmin && c.viaAdmin.batchSize && c.viaAdmin.batchSize >= 2 ? (
+                      <span
+                        className="border-rule text-ink-soft rounded-full border px-2 py-0.5 text-[10px] tracking-[0.16em] uppercase"
+                        title={`Batched commit of ${c.viaAdmin.batchSize} answers`}
+                      >
+                        ×{c.viaAdmin.batchSize}
+                      </span>
+                    ) : null}
                     <span className="border-rule text-ink-soft rounded border px-2 py-0.5 text-[10px] tracking-[0.08em] uppercase">
                       {c.filesChanged} {c.filesChanged === 1 ? "file" : "files"}
                     </span>

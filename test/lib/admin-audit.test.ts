@@ -164,6 +164,39 @@ describe("parseGitLogOutput", () => {
     expect(result[0].viaAdmin).toBeNull();
   });
 
+  it("surfaces batchSize when the trailer carries the batch-size=N field", () => {
+    const body = "Triage sweep.\n\nvia ook-admin/abc1234 batch-size=5";
+    const stdout = record({
+      sha: "sha1",
+      author: "A",
+      email: "a@e.com",
+      isoDate: "2026-05-09T10:00:00Z",
+      subject: "Batch promote",
+      body,
+      shortstat: " 6 files changed, 12 insertions(+)",
+    });
+
+    const result = parseGitLogOutput(stdout);
+    expect(result[0].viaAdmin).toEqual({ sessionId: "abc1234", batchSize: 5 });
+  });
+
+  it("leaves batchSize undefined on older trailers without the field", () => {
+    const body = "Single rating update.\n\nvia ook-admin/abc1234";
+    const stdout = record({
+      sha: "sha1",
+      author: "A",
+      email: "a@e.com",
+      isoDate: "2026-05-09T10:00:00Z",
+      subject: "Update rating",
+      body,
+      shortstat: " 1 file changed, 1 insertion(+)",
+    });
+
+    const result = parseGitLogOutput(stdout);
+    expect(result[0].viaAdmin).toEqual({ sessionId: "abc1234" });
+    expect(result[0].viaAdmin?.batchSize).toBeUndefined();
+  });
+
   it("does not match a stray 'via ook-admin' mention in the subject or mid-body", () => {
     // Subject mention with no trailer line.
     const subjectOnly = record({

@@ -227,7 +227,7 @@ describe("commitPatchBatch — vault-client routing", () => {
     // Exactly one trailer on the batch message.
     const trailerMatches = call.message.match(/via ook-admin\//g) ?? [];
     expect(trailerMatches).toHaveLength(1);
-    expect(call.message).toMatch(/^Two ratings\n\nvia ook-admin\/\w+$/);
+    expect(call.message).toMatch(/^Two ratings\n\nvia ook-admin\/\w+ batch-size=2$/);
     // Both files in the single tree.
     expect(call.files.map((f) => f.filePath).sort()).toEqual([
       "PrivateBook/PrivateBook.md",

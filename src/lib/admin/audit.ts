@@ -40,8 +40,12 @@ export type AuditEntry = {
   filesChanged: number;
   // Set when the commit body ends with the `via ook-admin/<id>` trailer
   // stamped by the MCP write tools (commit_patch, bind_book_to_bingo_square,
-  // create_book, append_log_entry). Null otherwise.
-  viaAdmin: { sessionId: string } | null;
+  // create_book, append_log_entry). Null otherwise. `batchSize` is
+  // present when the trailer carries the optional ` batch-size=N` field
+  // (emitted by `commitPatchBatch` for multi-patch commits); older
+  // single-patch commits omit the field and parse with `batchSize`
+  // undefined so the audit row falls back to the plain MCP chip.
+  viaAdmin: { sessionId: string; batchSize?: number } | null;
 };
 
 function vaultDir(): string {

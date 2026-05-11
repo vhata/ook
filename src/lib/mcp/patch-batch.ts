@@ -195,13 +195,16 @@ export async function commitPatchBatch(
     };
   }
 
-  // Phase 3 — one trailer-stamped message, one multi-file commit.
+  // Phase 3 — one trailer-stamped message, one multi-file commit. The
+  // batch-size suffix on the trailer is emitted only when more than one
+  // patch lands in the commit, so a single-patch batch looks identical
+  // to a per-patch commit at the audit-log level.
   const totalCount = input.patches.length + metaPatches.length;
   const baseMessage =
     input.message && input.message.trim().length > 0
       ? input.message
       : `Batch update: ${totalCount} patch${totalCount === 1 ? "" : "es"}`;
-  const message = withTrailer(baseMessage);
+  const message = withTrailer(baseMessage, undefined, totalCount);
 
   const result = await client.commitMultiFile({ files, message });
 

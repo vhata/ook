@@ -36,6 +36,33 @@ describe("withTrailer", () => {
     const out = withTrailer(msg, "abc1234");
     expect(out).toBe(`${msg}\n\nvia ook-admin/abc1234`);
   });
+
+  it("omits the batch-size field for single-patch commits (batchSize 1)", () => {
+    const out = withTrailer("Subject", "abc1234", 1);
+    expect(out).toBe("Subject\n\nvia ook-admin/abc1234");
+  });
+
+  it("omits the batch-size field when no batchSize is supplied", () => {
+    const out = withTrailer("Subject", "abc1234");
+    expect(out).toBe("Subject\n\nvia ook-admin/abc1234");
+  });
+
+  it("appends a batch-size suffix when batchSize is 2 or more", () => {
+    const out = withTrailer("Bulk triage", "abc1234", 5);
+    expect(out).toBe("Bulk triage\n\nvia ook-admin/abc1234 batch-size=5");
+  });
+
+  it("is idempotent — does not re-append over an existing trailer that already carries batch-size", () => {
+    const once = withTrailer("Subject", "abc1234", 3);
+    const twice = withTrailer(once, "abc1234", 3);
+    expect(twice).toBe(once);
+  });
+
+  it("is idempotent — leaves a bare trailer alone even when a batchSize is supplied on re-call", () => {
+    const once = withTrailer("Subject", "abc1234");
+    const twice = withTrailer(once, "abc1234", 5);
+    expect(twice).toBe(once);
+  });
 });
 
 describe("parseTrailer", () => {
@@ -58,5 +85,29 @@ describe("parseTrailer", () => {
 
   it("requires the trailer to be on its own line — partial-line matches do not count", () => {
     expect(parseTrailer("Body.\n\nNote: via ook-admin/abc")).toBeNull();
+  });
+
+  it("returns batchSize when the trailer carries a batch-size=N field", () => {
+    expect(parseTrailer("Bulk triage\n\nvia ook-admin/abc1234 batch-size=5")).toEqual({
+      sessionId: "abc1234",
+      batchSize: 5,
+    });
+  });
+
+  it("leaves batchSize undefined on older trailers without the field", () => {
+    const parsed = parseTrailer("Body text.\n\nvia ook-admin/abc1234");
+    expect(parsed).toEqual({ sessionId: "abc1234" });
+    expect(parsed?.batchSize).toBeUndefined();
+  });
+
+  it("rejects a malformed batch-size token (non-numeric)", () => {
+    expect(parseTrailer("Body.\n\nvia ook-admin/abc1234 batch-size=oops")).toBeNull();
+  });
+
+  it("round-trips emit → parse for a batched commit", () => {
+    const message = withTrailer("Triage sweep", "abc1234", 3);
+    const subject = message.split("\n", 1)[0];
+    const body = message.slice(subject.length + 1).trimStart();
+    expect(parseTrailer(body)).toEqual({ sessionId: "abc1234", batchSize: 3 });
   });
 });

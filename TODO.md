@@ -58,12 +58,6 @@ The **finish prompt** (status → finished asks for pullquote + rating in one bu
 - **Quiet → return**: when there's been no event for ≥14 days and the user comes back to /admin to mark something, agent asks "welcome back — anything interesting in the gap?" — answer to `_meta/log.md`. `#agent #voice #prompts #quiet`
 - **Series completion**: when status → finished completes a series the user has fully tracked, agent asks "you finished the series. Looking back, what stuck?" — answer to a new file `<slug>/series-finish.md` or appended to the final book's review. `#agent #voice #prompts #series`
 
-### Batch-commit audit hint (deferred 2026-05-10)
-
-When `/admin/backfill` "Send all" lands as a single commit, the `/admin/audit` row currently just says "MCP" — there's no on-row signal that it carried five answers rather than one. Extend the `via ook-admin/<id>` trailer with a `batch-size=N` field (or a sibling trailer line) so the audit page can render a "5 answers" chip alongside the MCP chip. Defer to first use of the staged-batch flow on `/admin/backfill` — once the user has a real batch commit in the audit log they can judge whether the chip is worth the parser change. Touches `src/lib/mcp/trailer.ts` (emit), `src/lib/admin/audit.ts` (parse), and the `/admin/audit` renderer (chip).
-
-- **Batch-size chip on `/admin/audit`**: extend the MCP trailer to optionally include `batch-size=N` and render a count chip on the audit row. `#polish #audit #batch`
-
 ## Researched dossiers
 
 ### Goodreads / reading-ecosystem (researched 2026-05-03)
