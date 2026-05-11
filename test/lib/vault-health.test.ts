@@ -23,7 +23,7 @@ function book(overrides: Partial<Book> = {}): Book {
     lastEdited: null,
     hasReview: false,
     hasQuotes: false,
-    hasSummary: false,
+    hasProgress: false,
     premise: null,
     goodreadsId: null,
     hardcoverSlug: null,

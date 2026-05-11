@@ -32,12 +32,17 @@ export type Book = {
   lastEdited: string | null;
   hasReview: boolean;
   hasQuotes: boolean;
-  hasSummary: boolean;
+  // True when `<slug>/progress.md` exists. The running-notes file the
+  // reader writes WHILE reading — a memory aid for the next pick-up.
+  // Tier-2 content (folded into the deep-notes endpoint payload), not
+  // rendered on the per-book page directly. Archived to
+  // `_meta/progress-archive/<slug>.md` when the book finishes.
+  hasProgress: boolean;
   // Tier-0 back-cover-style prose, always rendered on the per-book
   // page when present. A sentence or two in non-spoiler register;
-  // written by the user, not AI-generated. Distinct from `summary.md`
-  // (the full plot recap), which now lives at tier 2 alongside deep
-  // notes. Null when the field hasn't been written yet.
+  // populated automatically from the Hardcover description cache by
+  // `scripts/backfill-premises.mjs`. Null when the cache lookup hasn't
+  // happened yet or the cache record carries no description.
   premise: string | null;
   goodreadsId: string | null;
   hardcoverSlug: string | null;

@@ -23,7 +23,7 @@ function book(overrides: Partial<Book> = {}): Book {
     lastEdited: null,
     hasReview: false,
     hasQuotes: false,
-    hasSummary: false,
+    hasProgress: false,
     premise: null,
     goodreadsId: null,
     hardcoverSlug: null,
@@ -73,7 +73,7 @@ describe("getSchemaSummary", () => {
     expect(wr.populated).toBe(2);
   });
 
-  it("treats hasReview/hasQuotes/hasSummary as populated only when true", () => {
+  it("treats hasReview/hasQuotes/hasProgress as populated only when true", () => {
     const summary = getSchemaSummary([
       book({ hasReview: false }),
       book({ slug: "y", hasReview: true }),

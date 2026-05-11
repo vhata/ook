@@ -54,7 +54,7 @@ If the user includes the pullquote and rating in their initial free-text ("I jus
 Schema notes:
 - Frontmatter scalars: string, number, boolean, string array, or null (null deletes the key).
 - Section actions: replace, append, prepend.
-- Special section names "summary", "review", "quotes" map to top-level files (replace overwrites the file). Other names are H2 blocks in the reference notes.
+- Special section names "progress", "review", "quotes" map to top-level files (replace overwrites the file). Other names are H2 blocks in the reference notes. The "progress" file is the running-notes scratchpad the reader writes while reading; it's archived to _meta/progress-archive/<slug>.md on finish.
 - Status values: tbr, reading, finished, abandoned, paused.
 - Dates: ISO YYYY-MM-DD.
 - Pullquote lives in frontmatter as \`pullquote: "..."\` (string). Rating lives as \`rating: N\` (integer 1-5).
@@ -88,7 +88,7 @@ const TOOL_DEFINITIONS: AnthropicTool[] = [
   {
     name: "get_book",
     description:
-      "Fetch a book by slug. Returns the frontmatter plus optionally a list of named sections. Sections must be opt-in — fetching extra sections increases prompt-injection surface. Special section names: summary, review, quotes (top-level files). Other names map to H2 blocks in the reference notes.",
+      "Fetch a book by slug. Returns the frontmatter plus optionally a list of named sections. Sections must be opt-in — fetching extra sections increases prompt-injection surface. Special section names: progress, review, quotes (top-level files). Other names map to H2 blocks in the reference notes.",
     input_schema: {
       type: "object",
       properties: {

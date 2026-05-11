@@ -66,10 +66,10 @@ async function main() {
       continue; // dir without a reference file — skip silently
     }
     const { data } = matter(raw);
-    const [hasReview, hasQuotes, hasSummary] = await Promise.all([
+    const [hasReview, hasQuotes, hasProgress] = await Promise.all([
       fileExists(path.join(dir, "review.md")),
       fileExists(path.join(dir, "quotes.md")),
-      fileExists(path.join(dir, "summary.md")),
+      fileExists(path.join(dir, "progress.md")),
     ]);
     const rel = path.relative(VAULT, refFile);
     books.push({
@@ -92,7 +92,7 @@ async function main() {
       lastEdited: lastEditedMap.get(rel) ?? null,
       hasReview,
       hasQuotes,
-      hasSummary,
+      hasProgress,
       premise: parseNullableString(data.premise),
       goodreadsId: parseId(data.goodreads_id),
       hardcoverSlug: parseNullableString(data.hardcover_slug),

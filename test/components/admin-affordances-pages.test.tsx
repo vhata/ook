@@ -54,7 +54,7 @@ const baseBook: Book = {
   lastEdited: "2026-04-13",
   hasReview: false,
   hasQuotes: false,
-  hasSummary: false,
+  hasProgress: false,
   premise: null,
   goodreadsId: null,
   hardcoverSlug: null,

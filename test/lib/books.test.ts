@@ -69,7 +69,7 @@ describe("getAllBooks", () => {
     expect(test?.seeAlso).toEqual(["PrivateBook"]);
     expect(test?.hasReview).toBe(true);
     expect(test?.hasQuotes).toBe(true);
-    expect(test?.hasSummary).toBe(false);
+    expect(test?.hasProgress).toBe(false);
   });
 
   it("coerces a numeric goodreads_id to a string and reads other external IDs", async () => {
@@ -342,7 +342,7 @@ describe("externalLinks", () => {
       lastEdited: null,
       hasReview: false,
       hasQuotes: false,
-      hasSummary: false,
+      hasProgress: false,
       premise: null,
       goodreadsId: null,
       hardcoverSlug: null,
@@ -406,7 +406,7 @@ describe("bookStuck", () => {
       lastEdited: null,
       hasReview: true,
       hasQuotes: true,
-      hasSummary: false,
+      hasProgress: false,
       premise: null,
       goodreadsId: null,
       hardcoverSlug: null,
@@ -936,7 +936,7 @@ describe("computeYearPagesTotal", () => {
       lastEdited: null,
       hasReview: false,
       hasQuotes: false,
-      hasSummary: false,
+      hasProgress: false,
       premise: null,
       goodreadsId: null,
       hardcoverSlug: null,
@@ -1033,7 +1033,7 @@ describe("computeReadingPace", () => {
       lastEdited: null,
       hasReview: false,
       hasQuotes: false,
-      hasSummary: false,
+      hasProgress: false,
       premise: null,
       goodreadsId: null,
       hardcoverSlug: null,
@@ -1133,7 +1133,7 @@ describe("estimateReadingDaysRemaining", () => {
       lastEdited: null,
       hasReview: false,
       hasQuotes: false,
-      hasSummary: false,
+      hasProgress: false,
       premise: null,
       goodreadsId: null,
       hardcoverSlug: null,

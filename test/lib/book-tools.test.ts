@@ -163,7 +163,7 @@ describe("commitPatch — file-backed sections (review/quotes/summary)", () => {
     expect(onDisk).toContain("Another favourite");
   });
 
-  it("creates a summary.md when one didn't exist before", async () => {
+  it("creates a progress.md when one didn't exist before", async () => {
     const store = new MemoryStore();
     setStore(store);
     await reindex(store);
@@ -171,13 +171,13 @@ describe("commitPatch — file-backed sections (review/quotes/summary)", () => {
     await commitPatch({
       slug: "TestBook",
       section_changes: {
-        summary: { action: "replace", content: "Plot summary goes here." },
+        progress: { action: "replace", content: "First-pass reading notes." },
       },
-      commit_message: "Add summary",
+      commit_message: "Add progress",
     });
 
-    const onDisk = readFileSync(path.join(workingVault, "TestBook", "summary.md"), "utf8");
-    expect(onDisk).toContain("Plot summary goes here");
+    const onDisk = readFileSync(path.join(workingVault, "TestBook", "progress.md"), "utf8");
+    expect(onDisk).toContain("First-pass reading notes");
   });
 
   it("commits both reference + file-backed in one call", async () => {

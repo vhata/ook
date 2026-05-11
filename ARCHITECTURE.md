@@ -144,5 +144,4 @@ Env vars required for the write surface to operate in production:
 
 ## Open questions
 
-- **`summary.md` content.** The convention says it's a "full-spoiler plot summary," but tier 1 puts it one click away. For books where the summary really is full-spoiler (Ra), one option is moving that content into the reference notes (tier 2) and reserving `summary.md` for tier-1 synopses. Decide as the user populates more.
 - **Finish-flow gate** (shipped 2026-05-10) is a deliberate violation of the otherwise-strict "never gate the action" admin tenet. The bet: forcing the most evocative metadata (pullquote, rating) in at finish-time produces a fuller record than scraping it from `/admin/backfill` later. Watch in real use; if tab-close-loses-the-flip burns, revert is single-commit. The pattern-extension TODOs (`start prompt`, `5-star unreviewed`, `streak milestone`, `quiet-return`, `series completion`) are deferred until this trade has lived through a week or two.

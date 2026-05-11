@@ -104,7 +104,7 @@ export async function createBook(input: CreateBookInput): Promise<CreateBookResu
     lastEdited: null,
     hasReview: false,
     hasQuotes: false,
-    hasSummary: false,
+    hasProgress: false,
     premise: null,
     goodreadsId: null,
     hardcoverSlug: null,

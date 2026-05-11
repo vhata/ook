@@ -127,10 +127,10 @@ const FIELDS: FieldDef[] = [
     populated: (v) => v === true,
   },
   {
-    name: "summary.md",
+    name: "progress.md",
     kind: "boolean",
-    note: "Tier-2 plot recap folded into the deep-notes payload.",
-    pluck: (b) => b.hasSummary,
+    note: "Tier-2 running reading notes folded into the deep-notes payload. Archived to _meta/progress-archive/<slug>.md on finish.",
+    pluck: (b) => b.hasProgress,
     populated: (v) => v === true,
   },
 ];

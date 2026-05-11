@@ -18,7 +18,7 @@ import { withTrailer } from "./trailer";
 // in dev).
 //
 // Section model:
-//   - "summary", "review", "quotes" are top-level files. The tool
+//   - "progress", "review", "quotes" are top-level files. The tool
 //     treats each as a single content blob; replace/append/prepend
 //     operate on the whole file.
 //   - Any other section name is an H2 block in `<Slug>/<Slug>.md`.
@@ -34,7 +34,7 @@ export const getBookInputSchema = {
     .optional()
     .describe(
       "Section names to fetch alongside the frontmatter. Special values: " +
-        "summary, review, quotes (top-level files). Any other name maps to " +
+        "progress, review, quotes (top-level files). Any other name maps to " +
         "an H2 block in the reference-notes file. If omitted, returns " +
         "frontmatter only.",
     ),
@@ -276,7 +276,7 @@ function defaultBook(slug: string): Book {
     lastEdited: null,
     hasReview: false,
     hasQuotes: false,
-    hasSummary: false,
+    hasProgress: false,
     premise: null,
     goodreadsId: null,
     hardcoverSlug: null,

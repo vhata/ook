@@ -53,7 +53,7 @@ const baseBook: Book = {
   lastEdited: "2026-04-13",
   hasReview: true,
   hasQuotes: true,
-  hasSummary: false,
+  hasProgress: false,
   premise: null,
   goodreadsId: null,
   hardcoverSlug: null,
@@ -77,7 +77,7 @@ vi.mock("../../src/lib/books", async () => {
             quotes: "> A quote.",
             hardcover: null,
             hardcoverReviews: null,
-            summary: null,
+            progress: null,
           }
         : null,
     findBingoYearForBook: async () => null,
@@ -127,11 +127,11 @@ describe("BookPage server component", { timeout: 15000 }, () => {
     expect(screen.getByRole("button", { name: /show full notes/i })).toBeTruthy();
   });
 
-  it("does not render a synopsis / summary reveal button (summary is tier-2 now)", async () => {
+  it("does not render a synopsis / summary reveal button (running notes are tier-2 now)", async () => {
     // Pin the removal of the old tier-1 summary RevealSection. The
-    // synopsis content arrives only through the deep-notes payload,
-    // prefixed with `## Plot summary` — no separate reveal button on
-    // the page.
+    // reader's running notes arrive only through the deep-notes
+    // payload, prefixed with `## Reading notes` — no separate reveal
+    // button on the page.
     const BookPage = await importPage();
     const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
     render(tree);
@@ -150,7 +150,7 @@ describe("BookPage server component", { timeout: 15000 }, () => {
             quotes: null,
             hardcover: null,
             hardcoverReviews: null,
-            summary: null,
+            progress: null,
           }
         : null;
     try {
@@ -197,7 +197,7 @@ describe("BookPage server component", { timeout: 15000 }, () => {
             quotes: null,
             hardcover: null,
             hardcoverReviews: null,
-            summary: null,
+            progress: null,
           }
         : null;
 
@@ -238,7 +238,7 @@ describe("BookPage server component", { timeout: 15000 }, () => {
                 createdAt: "2024-01-01T00:00:00",
               },
             ],
-            summary: null,
+            progress: null,
           }
         : null;
 
@@ -273,7 +273,7 @@ describe("BookPage server component", { timeout: 15000 }, () => {
                 createdAt: "2024-01-01T00:00:00",
               },
             ],
-            summary: null,
+            progress: null,
           }
         : null;
 

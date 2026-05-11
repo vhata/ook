@@ -154,10 +154,10 @@ async function readBookDir(slug: string): Promise<Book | null> {
   const raw = await fs.readFile(refFile, "utf8");
   const { data } = matter(raw);
 
-  const [hasReview, hasQuotes, hasSummary, lastEdited] = await Promise.all([
+  const [hasReview, hasQuotes, hasProgress, lastEdited] = await Promise.all([
     fileExists(path.join(dir, "review.md")),
     fileExists(path.join(dir, "quotes.md")),
-    fileExists(path.join(dir, "summary.md")),
+    fileExists(path.join(dir, "progress.md")),
     gitLastEdited(booksDir(), refFile),
   ]);
 
@@ -181,7 +181,7 @@ async function readBookDir(slug: string): Promise<Book | null> {
     lastEdited,
     hasReview,
     hasQuotes,
-    hasSummary,
+    hasProgress,
     premise: parseNullableString(data.premise),
     goodreadsId: parseId(data.goodreads_id),
     hardcoverSlug: parseNullableString(data.hardcover_slug),
@@ -428,11 +428,12 @@ export type BookPage = {
   body: string;
   review: string | null;
   quotes: string | null;
-  // Body of `<slug>/summary.md` when the file is present, else null.
-  // Tier-2 content: the per-book page must not render this; only the
-  // deep-notes endpoint (`/api/books/[slug]/notes`) folds it into the
-  // payload as a `## Plot summary` section.
-  summary: string | null;
+  // Body of `<slug>/progress.md` when the file is present, else null.
+  // The running-notes file the reader writes WHILE reading. Tier-2
+  // content: the per-book page must not render this; only the deep-
+  // notes endpoint (`/api/books/[slug]/notes`) folds it into the
+  // payload as a `## Reading notes` section.
+  progress: string | null;
   hardcover: HardcoverBook | null;
   hardcoverReviews: HardcoverReview[] | null;
 };
@@ -451,10 +452,10 @@ export async function getBookBySlug(slug: string): Promise<BookPage | null> {
   const raw = await fs.readFile(refFile, "utf8");
   const { content } = matter(raw);
 
-  const [review, quotes, summary, hardcoverBooks, hardcoverReviews] = await Promise.all([
+  const [review, quotes, progress, hardcoverBooks, hardcoverReviews] = await Promise.all([
     readOptionalFile(path.join(dir, "review.md")),
     readOptionalFile(path.join(dir, "quotes.md")),
-    readOptionalFile(path.join(dir, "summary.md")),
+    readOptionalFile(path.join(dir, "progress.md")),
     loadHardcoverBooks(),
     loadHardcoverReviews(),
   ]);
@@ -464,7 +465,7 @@ export async function getBookBySlug(slug: string): Promise<BookPage | null> {
     body: content.trim(),
     review,
     quotes,
-    summary,
+    progress,
     hardcover: hardcoverBooks.get(slug) ?? null,
     hardcoverReviews: hardcoverReviews.get(slug) ?? null,
   };
