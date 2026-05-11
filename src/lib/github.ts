@@ -28,6 +28,28 @@ export type CommitResult = {
   url: string | null;
 };
 
+// One file inside a multi-file commit. `sha` is not threaded through:
+// the multi-file path builds a fresh tree on top of the current branch
+// head, so there is no per-file optimistic-concurrency check. Callers
+// that need a sha-mismatch failure mode should stick with `commitFile`.
+export type MultiFileWrite = {
+  filePath: string;
+  content: string;
+};
+
+export type MultiFileCommitResult = {
+  // Commit SHA for the single commit that landed all the files.
+  sha: string;
+  // GitHub web URL for the commit when available (GitHub mode); null
+  // for local-fs mode.
+  url: string | null;
+  // Per-file results so callers can echo back to the diff UI. Each
+  // result carries the file path the caller passed in; `sha` is the
+  // post-write blob/content sha (GitHub mode: the blob sha created;
+  // local-fs mode: sha-256 of the new content).
+  files: Array<{ path: string; sha: string }>;
+};
+
 export interface VaultClient {
   getFile(filePath: string): Promise<FileContent | null>;
   commitFile(opts: {
@@ -36,6 +58,15 @@ export interface VaultClient {
     message: string;
     sha: string | null;
   }): Promise<CommitResult>;
+  // Atomically commits a set of files as a single commit. Used by the
+  // batch write path so a multi-patch submit produces one entry in the
+  // vault history rather than one per file. In GitHub mode this goes
+  // through the Git Data API (blobs → tree → commit → updateRef);
+  // local-fs mode writes each file sequentially.
+  commitMultiFile(opts: {
+    files: MultiFileWrite[];
+    message: string;
+  }): Promise<MultiFileCommitResult>;
   exists(filePath: string): Promise<boolean>;
   // Lists files at the given vault-relative directory. Returns relative
   // file paths (no directories). Used by `create_book` to check for slug
@@ -117,6 +148,84 @@ export class GitHubVaultClient implements VaultClient {
     const newSha = res.data.content?.sha ?? "";
     const url = res.data.content?.html_url ?? null;
     return { sha: newSha, url };
+  }
+
+  async commitMultiFile({
+    files,
+    message,
+  }: {
+    files: MultiFileWrite[];
+    message: string;
+  }): Promise<MultiFileCommitResult> {
+    if (files.length === 0) {
+      throw new Error("commitMultiFile: files must be non-empty");
+    }
+
+    // 1. Resolve the current branch head + its tree.
+    const refRes = await this.octokit.rest.git.getRef({
+      owner: this.owner,
+      repo: this.repo,
+      ref: `heads/${this.branch}`,
+    });
+    const parentSha = refRes.data.object.sha;
+    const parentCommit = await this.octokit.rest.git.getCommit({
+      owner: this.owner,
+      repo: this.repo,
+      commit_sha: parentSha,
+    });
+    const baseTreeSha = parentCommit.data.tree.sha;
+
+    // 2. Upload a blob per file. Blobs are content-addressed, so
+    // multiple files with the same content reuse the same blob.
+    const blobs = await Promise.all(
+      files.map(async (f) => {
+        const blob = await this.octokit.rest.git.createBlob({
+          owner: this.owner,
+          repo: this.repo,
+          content: Buffer.from(f.content, "utf8").toString("base64"),
+          encoding: "base64",
+        });
+        return { path: f.filePath, sha: blob.data.sha };
+      }),
+    );
+
+    // 3. Build a tree on top of the parent tree. Each entry is a
+    // file (mode 100644, type blob). Sub-tree paths are honoured by
+    // GitHub — passing "Foo/bar.md" lands the blob at that path.
+    const treeRes = await this.octokit.rest.git.createTree({
+      owner: this.owner,
+      repo: this.repo,
+      base_tree: baseTreeSha,
+      tree: blobs.map((b) => ({
+        path: b.path,
+        mode: "100644",
+        type: "blob",
+        sha: b.sha,
+      })),
+    });
+
+    // 4. Create the commit object.
+    const commitRes = await this.octokit.rest.git.createCommit({
+      owner: this.owner,
+      repo: this.repo,
+      message,
+      tree: treeRes.data.sha,
+      parents: [parentSha],
+    });
+
+    // 5. Fast-forward the branch.
+    await this.octokit.rest.git.updateRef({
+      owner: this.owner,
+      repo: this.repo,
+      ref: `heads/${this.branch}`,
+      sha: commitRes.data.sha,
+    });
+
+    return {
+      sha: commitRes.data.sha,
+      url: commitRes.data.html_url ?? null,
+      files: blobs.map((b) => ({ path: b.path, sha: b.sha })),
+    };
   }
 
   async exists(filePath: string): Promise<boolean> {
@@ -205,6 +314,39 @@ class LocalFsVaultClient implements VaultClient {
     const { createHash } = await import("node:crypto");
     const newSha = createHash("sha256").update(content).digest("hex");
     return { sha: newSha, url: null };
+  }
+
+  async commitMultiFile({
+    files,
+  }: {
+    files: MultiFileWrite[];
+    message: string;
+  }): Promise<MultiFileCommitResult> {
+    if (files.length === 0) {
+      throw new Error("commitMultiFile: files must be non-empty");
+    }
+    // Local-fs mode is the dev path; we don't shell out to git here
+    // because the existing per-file `commitFile` doesn't either.
+    // Sequential writes are good enough — the production atomicity
+    // guarantee lives in the GitHub adapter.
+    const { createHash } = await import("node:crypto");
+    const results: Array<{ path: string; sha: string }> = [];
+    for (const file of files) {
+      const full = this.resolve(file.filePath);
+      // eslint-disable-next-line no-restricted-syntax
+      await fs.mkdir(path.dirname(full), { recursive: true });
+      // eslint-disable-next-line no-restricted-syntax
+      await fs.writeFile(full, file.content, "utf8");
+      const sha = createHash("sha256").update(file.content).digest("hex");
+      results.push({ path: file.filePath, sha });
+    }
+    // No real commit sha in local-fs mode; surface the content hash of
+    // the concatenated file payload as a deterministic-ish stand-in so
+    // tests can assert a stable shape.
+    const batchSha = createHash("sha256")
+      .update(files.map((f) => `${f.filePath}\n${f.content}`).join("\n"))
+      .digest("hex");
+    return { sha: batchSha, url: null, files: results };
   }
 
   async exists(filePath: string): Promise<boolean> {

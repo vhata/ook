@@ -209,7 +209,11 @@ export async function commitPatch(input: CommitPatchInput): Promise<CommitPatchO
   }
 }
 
-function validateRefAfterPatch(rawAfter: string, slug: string): void {
+// Re-validates the load-bearing fields after the patch is applied:
+// title non-empty, status (when set) is a valid BookStatus, authors
+// (when set) remains a string array. Exported so the batch path can
+// validate every patch BEFORE any write hits disk.
+export function validateRefAfterPatch(rawAfter: string, slug: string): void {
   const parsed = parseMarkdownFile(rawAfter);
   const fm = parsed.frontmatter;
   if (typeof fm.title !== "string" || fm.title.length === 0) {
@@ -229,7 +233,11 @@ function validateRefAfterPatch(rawAfter: string, slug: string): void {
   }
 }
 
-async function updateStoreOptimistic(
+// Optimistic store write: project the patched frontmatter onto the
+// existing Book record so subsequent reads don't need the webhook
+// reindex. Exported so the batch path can apply the same update once
+// per slug in the batch.
+export async function updateStoreOptimistic(
   slug: string,
   frontmatter: Record<string, unknown>,
 ): Promise<void> {
