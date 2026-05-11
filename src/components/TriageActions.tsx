@@ -4,6 +4,10 @@ import { useMemo, useState } from "react";
 import type { TbrPile, TbrEntry } from "@/lib/types";
 import { buildTriageBatch, type TriageAction, type TriageActionEntry } from "@/lib/triage/actions";
 
+// Slugs that already have a vault directory. The action builder uses
+// it to upsert frontmatter on existing books instead of trying to mint
+// a new file (which would 500 because of the create-file safety check).
+
 // Owner-only client renderer for the `/triage` manual piles. Replaces
 // the read-only server rendering when the viewer holds a session.
 // Renders the same H2-pile/bullet shape the public render emits, plus
@@ -20,7 +24,14 @@ function rowKey(pile: string, index: number): RowKey {
   return `${pile} ${index}`;
 }
 
-export default function TriageActions({ piles }: { piles: TbrPile[] }) {
+export default function TriageActions({
+  piles,
+  existingSlugs = [],
+}: {
+  piles: TbrPile[];
+  existingSlugs?: string[];
+}) {
+  const existingSlugSet = useMemo(() => new Set(existingSlugs), [existingSlugs]);
   const allRows = useMemo<
     Array<{ key: RowKey; pile: string; index: number; entry: TbrEntry }>
   >(() => {
@@ -58,7 +69,7 @@ export default function TriageActions({ piles }: { piles: TbrPile[] }) {
     setErrorRow(null);
     setBusy(true);
     try {
-      const body = buildTriageBatch([{ pile, entry }], action, today());
+      const body = buildTriageBatch([{ pile, entry }], action, today(), existingSlugSet);
       await postBatch(body);
       setDone((prev) => new Set(prev).add(key));
       setSelected((prev) => {
@@ -89,7 +100,7 @@ export default function TriageActions({ piles }: { piles: TbrPile[] }) {
         submittedKeys.push(row.key);
       }
       if (entries.length === 0) return;
-      const body = buildTriageBatch(entries, bulkAction, today());
+      const body = buildTriageBatch(entries, bulkAction, today(), existingSlugSet);
       await postBatch(body);
       setDone((prev) => {
         const next = new Set(prev);

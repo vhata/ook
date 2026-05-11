@@ -1,7 +1,7 @@
 import { HomeMark } from "@/components/HomeMark";
 import TriageActions from "@/components/TriageActions";
 import { getOwnerSession } from "@/lib/auth/session";
-import { getTriage } from "@/lib/books";
+import { getAllBooks, getTriage } from "@/lib/books";
 import type { Tbr, TbrEntry } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -29,11 +29,22 @@ export const metadata = { title: "Triage" };
 // rendering exactly as before.
 
 export default async function TriagePage() {
-  const [triage, session] = await Promise.all([getTriage(), getOwnerSession()]);
+  const [triage, session, allBooks] = await Promise.all([
+    getTriage(),
+    getOwnerSession(),
+    getAllBooks(),
+  ]);
   const isOwner = !!session;
   const populatedPiles =
     triage && triage.piles.length > 0 ? triage.piles.filter((p) => p.entries.length > 0) : [];
   const hasTriage = populatedPiles.length > 0;
+  // Slugs that already have a vault directory — used by the action
+  // builder to upsert (book-frontmatter patch) instead of mint
+  // (create-file) when a triage entry's title matches an existing
+  // book. Without this the create-file safety check would reject the
+  // action for any book that's already in the vault under another
+  // status.
+  const existingSlugs = allBooks.map((b) => b.slug);
 
   return (
     <main className="mx-auto box-border w-full max-w-[900px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
@@ -50,7 +61,9 @@ export default async function TriagePage() {
         </p>
       </header>
 
-      {hasTriage && isOwner && <TriageActions piles={populatedPiles} />}
+      {hasTriage && isOwner && (
+        <TriageActions piles={populatedPiles} existingSlugs={existingSlugs} />
+      )}
       {hasTriage && !isOwner && triage && <TriageReadOnly triage={triage} />}
 
       {!hasTriage && <EmptyState />}

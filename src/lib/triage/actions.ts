@@ -1,6 +1,7 @@
 import yaml from "js-yaml";
 import type { TbrEntry } from "../types";
 import type { MetaPatch } from "../mcp/meta-patch";
+import type { CommitPatchInput } from "../mcp/patch";
 
 // Wire-format builder for the `/triage` actions surface. Given a list
 // of selected triage entries and an action (promote-tbr / start-reading
@@ -37,9 +38,18 @@ export type TriageActionEntry = {
 };
 
 export type TriageBatchBody = {
-  patches: never[];
+  patches: CommitPatchInput[];
   meta_patches: MetaPatch[];
   message: string;
+};
+
+// Per-entry patches: book-frontmatter patches (when the slug already
+// has a vault directory and the action wants to update status) AND
+// meta patches (always for the triage-bullet removal, sometimes for
+// the new-book mint or the TBR-bullet append).
+export type TriageEntryPatches = {
+  patches: CommitPatchInput[];
+  metaPatches: MetaPatch[];
 };
 
 const TRIAGE_PATH = "_meta/triage.md";
@@ -49,54 +59,107 @@ export function buildTriageBatch(
   entries: TriageActionEntry[],
   action: TriageAction,
   today: string,
+  existingSlugs: ReadonlySet<string> = new Set(),
 ): TriageBatchBody {
   if (entries.length === 0) {
     throw new Error("buildTriageBatch: at least one entry is required");
   }
 
+  const patches: CommitPatchInput[] = [];
   const metaPatches: MetaPatch[] = [];
   for (const { pile, entry } of entries) {
-    metaPatches.push(...buildEntryPatches(pile, entry, action, today));
+    const slug = sanitiseSlug(entry.title);
+    const exists = existingSlugs.has(slug);
+    const result = buildEntryPatches(pile, entry, action, today, exists);
+    patches.push(...result.patches);
+    metaPatches.push(...result.metaPatches);
   }
 
   return {
-    patches: [],
+    patches,
     meta_patches: metaPatches,
     message: buildBatchMessage(entries.length, action),
   };
 }
 
 // Per-entry patch set. Exported for tests; the page-level builder
-// composes these.
+// composes these. When the entry's slug already has a vault directory
+// AND the action wants to update book status (start-reading,
+// mark-finished), the patch lands as a book-frontmatter update instead
+// of a create-file (which would fail the "already exists" safety
+// check). `promote-tbr` is unaffected — it always just appends to the
+// `_meta/tbr.md` pile and never touches per-book frontmatter.
 export function buildEntryPatches(
   pile: string,
   entry: TbrEntry,
   action: TriageAction,
   today: string,
-): MetaPatch[] {
+  existsInVault: boolean,
+): TriageEntryPatches {
   const bullet = renderBullet(entry);
 
   if (action === "promote-tbr") {
-    return [
-      { kind: "remove-bullet", path: TRIAGE_PATH, section: pile, bullet },
-      {
-        kind: "append-bullet",
-        path: TBR_PATH,
-        section: `From Triage (${today})`,
-        bullet,
-      },
-    ];
+    return {
+      patches: [],
+      metaPatches: [
+        { kind: "remove-bullet", path: TRIAGE_PATH, section: pile, bullet },
+        {
+          kind: "append-bullet",
+          path: TBR_PATH,
+          section: `From Triage (${today})`,
+          bullet,
+        },
+      ],
+    };
   }
 
   const slug = sanitiseSlug(entry.title);
-  return [
-    { kind: "remove-bullet", path: TRIAGE_PATH, section: pile, bullet },
-    {
-      kind: "create-file",
-      path: `${slug}/${slug}.md`,
-      content: renderBookFile(entry, action, today),
-    },
-  ];
+  const removeBullet: MetaPatch = {
+    kind: "remove-bullet",
+    path: TRIAGE_PATH,
+    section: pile,
+    bullet,
+  };
+
+  if (existsInVault) {
+    return {
+      patches: [
+        {
+          slug,
+          frontmatter_changes: bookStatusFrontmatter(action, today),
+          commit_message: bookPatchMessage(slug, action),
+        },
+      ],
+      metaPatches: [removeBullet],
+    };
+  }
+
+  return {
+    patches: [],
+    metaPatches: [
+      removeBullet,
+      {
+        kind: "create-file",
+        path: `${slug}/${slug}.md`,
+        content: renderBookFile(entry, action, today),
+      },
+    ],
+  };
+}
+
+function bookStatusFrontmatter(
+  action: Exclude<TriageAction, "promote-tbr">,
+  today: string,
+): Record<string, string | null> {
+  if (action === "start-reading") {
+    return { status: "reading", started: today };
+  }
+  return { status: "finished", finished: today };
+}
+
+function bookPatchMessage(slug: string, action: Exclude<TriageAction, "promote-tbr">): string {
+  const verb = action === "start-reading" ? "started reading" : "marked finished";
+  return `${slug}: ${verb} via triage`;
 }
 
 // Returns the on-disk bullet text for an entry. When `entry.raw` is

@@ -62,48 +62,82 @@ describe("sanitiseSlug", () => {
 
 describe("buildEntryPatches — promote-tbr", () => {
   it("removes from triage.md and appends to a dated From Triage pile in tbr.md", () => {
-    const patches = buildEntryPatches("Maybe", entry, "promote-tbr", "2026-05-10");
-    expect(patches).toHaveLength(2);
-    expect(patches[0]).toEqual({
+    const result = buildEntryPatches("Maybe", entry, "promote-tbr", "2026-05-10", false);
+    expect(result.patches).toEqual([]);
+    expect(result.metaPatches).toHaveLength(2);
+    expect(result.metaPatches[0]).toEqual({
       kind: "remove-bullet",
       path: "_meta/triage.md",
       section: "Maybe",
       bullet: "**The Anomaly** — Hervé Le Tellier. _Plane lands twice (via friend recommendation)_",
     });
-    expect(patches[1]).toEqual({
+    expect(result.metaPatches[1]).toEqual({
       kind: "append-bullet",
       path: "_meta/tbr.md",
       section: "From Triage (2026-05-10)",
       bullet: "**The Anomaly** — Hervé Le Tellier. _Plane lands twice (via friend recommendation)_",
     });
   });
+
+  it("ignores existsInVault — promote-tbr always just appends to the TBR pile", () => {
+    const result = buildEntryPatches("Maybe", entry, "promote-tbr", "2026-05-10", true);
+    expect(result.patches).toEqual([]);
+    expect(result.metaPatches).toHaveLength(2);
+  });
 });
 
 describe("buildEntryPatches — start-reading", () => {
-  it("removes from triage.md and mints a vault directory with status=reading and today's started", () => {
-    const patches = buildEntryPatches("Maybe", entry, "start-reading", "2026-05-10");
-    expect(patches).toHaveLength(2);
-    expect(patches[0].kind).toBe("remove-bullet");
-    expect(patches[1].kind).toBe("create-file");
-    if (patches[1].kind !== "create-file") throw new Error("type narrowing");
-    expect(patches[1].path).toBe("The Anomaly/The Anomaly.md");
-    expect(patches[1].content).toContain("title: The Anomaly");
-    expect(patches[1].content).toContain("authors: [Hervé Le Tellier]");
-    expect(patches[1].content).toContain("status: reading");
-    expect(patches[1].content).toContain('started: "2026-05-10"');
-    expect(patches[1].content).toContain("finished: null");
-    expect(patches[1].content).toContain("source: triage");
+  it("removes from triage.md and mints a vault directory when the slug is new", () => {
+    const result = buildEntryPatches("Maybe", entry, "start-reading", "2026-05-10", false);
+    expect(result.patches).toEqual([]);
+    expect(result.metaPatches).toHaveLength(2);
+    expect(result.metaPatches[0].kind).toBe("remove-bullet");
+    const file = result.metaPatches[1];
+    expect(file.kind).toBe("create-file");
+    if (file.kind !== "create-file") throw new Error("type narrowing");
+    expect(file.path).toBe("The Anomaly/The Anomaly.md");
+    expect(file.content).toContain("title: The Anomaly");
+    expect(file.content).toContain("authors: [Hervé Le Tellier]");
+    expect(file.content).toContain("status: reading");
+    expect(file.content).toContain('started: "2026-05-10"');
+    expect(file.content).toContain("finished: null");
+    expect(file.content).toContain("source: triage");
+  });
+
+  it("upserts an existing book's frontmatter when the slug already lives in the vault", () => {
+    const result = buildEntryPatches("Maybe", entry, "start-reading", "2026-05-10", true);
+    expect(result.metaPatches).toHaveLength(1);
+    expect(result.metaPatches[0].kind).toBe("remove-bullet");
+    expect(result.patches).toHaveLength(1);
+    expect(result.patches[0]).toEqual({
+      slug: "The Anomaly",
+      frontmatter_changes: { status: "reading", started: "2026-05-10" },
+      commit_message: "The Anomaly: started reading via triage",
+    });
   });
 });
 
 describe("buildEntryPatches — mark-finished", () => {
-  it("removes from triage.md and mints a vault directory with status=finished and today's finished", () => {
-    const patches = buildEntryPatches("Maybe", entry, "mark-finished", "2026-05-10");
-    expect(patches[1].kind).toBe("create-file");
-    if (patches[1].kind !== "create-file") throw new Error("type narrowing");
-    expect(patches[1].content).toContain("status: finished");
-    expect(patches[1].content).toContain("started: null");
-    expect(patches[1].content).toContain('finished: "2026-05-10"');
+  it("removes from triage.md and mints a vault directory when the slug is new", () => {
+    const result = buildEntryPatches("Maybe", entry, "mark-finished", "2026-05-10", false);
+    const file = result.metaPatches[1];
+    expect(file.kind).toBe("create-file");
+    if (file.kind !== "create-file") throw new Error("type narrowing");
+    expect(file.content).toContain("status: finished");
+    expect(file.content).toContain("started: null");
+    expect(file.content).toContain('finished: "2026-05-10"');
+  });
+
+  it("upserts an existing book's frontmatter when the slug already lives in the vault", () => {
+    const result = buildEntryPatches("Maybe", entry, "mark-finished", "2026-05-10", true);
+    expect(result.metaPatches).toHaveLength(1);
+    expect(result.metaPatches[0].kind).toBe("remove-bullet");
+    expect(result.patches).toHaveLength(1);
+    expect(result.patches[0]).toEqual({
+      slug: "The Anomaly",
+      frontmatter_changes: { status: "finished", finished: "2026-05-10" },
+      commit_message: "The Anomaly: marked finished via triage",
+    });
   });
 });
 
@@ -124,6 +158,29 @@ describe("buildTriageBatch", () => {
     // Two entries × 2 patches each = 4.
     expect(body.meta_patches).toHaveLength(4);
     expect(body.message).toBe("Triage: 2 promoted to TBR");
+  });
+
+  it("routes mark-finished through book-patch when the slug exists in the vault", () => {
+    const body = buildTriageBatch(
+      [
+        {
+          pile: "Imperial Radch",
+          entry: { title: "Ancillary Justice", author: "Ann Leckie", why: null, added: null },
+        },
+      ],
+      "mark-finished",
+      "2026-05-10",
+      new Set(["Ancillary Justice"]),
+    );
+    expect(body.patches).toHaveLength(1);
+    expect(body.patches[0].slug).toBe("Ancillary Justice");
+    expect(body.patches[0].frontmatter_changes).toEqual({
+      status: "finished",
+      finished: "2026-05-10",
+    });
+    // Only the remove-bullet meta patch survives.
+    expect(body.meta_patches).toHaveLength(1);
+    expect(body.meta_patches[0].kind).toBe("remove-bullet");
   });
 
   it("throws when given an empty selection", () => {
