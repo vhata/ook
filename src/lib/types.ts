@@ -13,6 +13,14 @@ export type Book = {
   status: BookStatus;
   progress: string;
   started: string | null;
+  // Most recent date the reader logged progress on this book (YYYY-MM-DD).
+  // Drives the render-time auto-promotion to `paused`: a reading book
+  // with no progress for > 90 days renders as paused even when the
+  // frontmatter still says `status: reading`. Distinct from `started`
+  // (the date the reader first opened the book) and `finished` (the
+  // date it ended). Null when never logged — falls back to `started`
+  // for the effective-status threshold check.
+  last_progress: string | null;
   finished: string | null;
   rating: number | null;
   wouldReread: boolean | null;
@@ -25,6 +33,12 @@ export type Book = {
   hasReview: boolean;
   hasQuotes: boolean;
   hasSummary: boolean;
+  // Tier-0 back-cover-style prose, always rendered on the per-book
+  // page when present. A sentence or two in non-spoiler register;
+  // written by the user, not AI-generated. Distinct from `summary.md`
+  // (the full plot recap), which now lives at tier 2 alongside deep
+  // notes. Null when the field hasn't been written yet.
+  premise: string | null;
   goodreadsId: string | null;
   hardcoverSlug: string | null;
   storygraphSlug: string | null;

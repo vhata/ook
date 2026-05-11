@@ -79,6 +79,8 @@ export default async function BookPage({ params }: { params: Params }) {
         />
 
         <div className="min-w-0">
+          {book.premise && <Premise text={book.premise} />}
+
           {book.pullquote && (
             <Pullquote text={book.pullquote.text} source={book.pullquote.source} />
           )}
@@ -110,16 +112,6 @@ export default async function BookPage({ params }: { params: Params }) {
               expandedTitle="What others said"
             >
               <ExternalReviews reviews={hardcoverReviews} />
-            </RevealSection>
-          )}
-
-          {book.hasSummary && (
-            <RevealSection
-              storageKey={`summary-revealed:${book.slug}`}
-              buttonLabel="Show synopsis"
-              expandedTitle="Synopsis"
-            >
-              <SummaryPlaceholder />
             </RevealSection>
           )}
 
@@ -427,6 +419,20 @@ function primaryReason(reasons: ConnectionReason[]): string {
   return "";
 }
 
+// Tier-0 back-cover prose. Always rendered when the book has a
+// `premise:` field — one or two sentences, written by the reader, in
+// non-spoiler register. Visually understated (muted text, no border,
+// no chrome) so it reads as a quiet preamble rather than a content
+// block; the user's pullquote and review still own the page's
+// expressive register.
+function Premise({ text }: { text: string }) {
+  return (
+    <p className="font-serif text-ink-soft mt-0 mb-8 max-w-[680px] text-[17px] leading-[1.55]">
+      {text}
+    </p>
+  );
+}
+
 function Pullquote({ text, source }: { text: string; source: string | null }) {
   return (
     <figure className="border-accent bg-accent-soft mt-0 mb-9 rounded-r-md border-l-2 px-6 py-5">
@@ -471,15 +477,6 @@ function ExternalReviews({ reviews }: { reviews: HardcoverReview[] }) {
         From Hardcover
       </p>
     </div>
-  );
-}
-
-function SummaryPlaceholder() {
-  return (
-    <p className="text-ink-soft text-sm italic">
-      A separate synopsis file exists for this book; loading the file in this view isn&rsquo;t wired
-      up yet.
-    </p>
   );
 }
 

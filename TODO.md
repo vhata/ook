@@ -8,34 +8,6 @@ Sections are grouped by readiness: decided plans first, then open verdicts, defe
 
 ## Decided & ready to build
 
-### `/now` — paused state distinct from reading (review 2026-05-11)
-
-The `/now` surface currently shows four books under "Now reading" with started-dates of 1474–2951 days ago — truthful data, but the page misrepresents itself. First-impression problem; biggest priority in the May 2026 review. Fix is a new `paused` status distinct from `abandoned`: "I'll get back to it" vs "I will not."
-
-Schema additions:
-
-- `BookStatus` gains `paused` (distinct from existing `abandoned`).
-- `last_progress: YYYY-MM-DD` frontmatter field on per-book reference notes. Logged when status flips, when a progress note is added, or when the reader re-opens the book.
-
-Threshold rule, applied at render time (no cron):
-
-- `< 14 days` since last progress → **reading**, fresh
-- `14–90 days` → **reading**, no glow but still on `/now`
-- `> 90 days` with no progress → auto-promote to **paused**
-- User-set "set aside" → **paused** (overrides timer)
-- User-set "give up" → **abandoned**, leaves `/now` entirely
-
-Auto-promotion is reversible: logging new progress on a paused book demotes it back to reading.
-
-Render changes on `/now`: two sections separated by a thin rule. Reading cards stay full-width with the accent ring. Paused cards render half-size, no glow, days-ago number small and dim after the author (not above the title). Each paused card carries one CTA: **Pick it back up** (resets `last_progress` to today, demotes to reading) or **Move to shelf** (marks abandoned). Section header for paused: "Set aside" or "Open elsewhere" — softer than the bare status word; the status value and section header don't have to match.
-
-On `/shelf`, paused and abandoned spines should look different (e.g. matte vs glossy spine for paused, broken-spine treatment for abandoned). Track that as part of the `/shelf` polish below.
-
-- **Schema extension**: add `paused` to `BookStatus` in `src/lib/types.ts`; add `last_progress` field; update `_meta/CLAUDE.md` vault-side schema doc. `#schema #vault #status`
-- **Status-classification helper**: pure function `(status, last_progress, today) → effective_status` that applies the 90-day promotion at render time. Always current; reversible by logging new progress. Unit-test the boundary cases. `#feature #logic`
-- **`/now` restructure**: two sections (reading + paused), per-card CTAs that POST single-patch batches to `/api/admin/agent/commit-batch`. Owner-only CTAs (anonymous viewers see the two sections, no buttons). `#feature #now #ui #write-surface`
-- **Days-since-`last_progress` indicator**: small, dim, after the author on paused cards; never above the title. `#polish #now`
-
 ### `/shelf` — width by pages, year separators, status markers (review 2026-05-11)
 
 Resolves the prior "clarify purpose" verdict in favour of keeping `/shelf` as ornament — but making the ornament earn its keep. Highest visual payoff per line of code per the reviewer.
@@ -49,20 +21,6 @@ Resolves the prior "clarify purpose" verdict in favour of keeping `/shelf` as or
 
 - **Tooltip the `SCORE`**: explain the weights inline ("see-also 10 + series 5 + author 2 + 2 shared tags = 19"). Or drop the number entirely if it isn't pulling weight. Floating numbers without legends are design ballast. `#polish #discover #ux`
 - **Dedupe regional-title pairs**: rule — if title similarity > 85% AND see-also bidirectional AND series + N match → collapse into one entry, optionally surfaced as "Same book, different markets." Closes the Philosopher's-vs-Sorcerer's-Stone duplicate at the top of `/discover`. `#feature #discover #dedupe`
-
-### Book summary tier shift — premise visible, full summary opt-in (decided 2026-05-11)
-
-Today: per-book `summary.md` lives at tier 1 — one click reveals the full plot recap inline on the book's page. For finished books, that reveal is too eager; navigating to a book's catalog page makes "what happens in the book" the dominant block, drowning out the user's own reflections (review, quotes, pullquote, rating). The historical content built up while reading is a memory-aid the user values, but it shouldn't be the thing staring back from the public catalog page.
-
-Decision: preserve the content, move it out of the way. No vault rewrites; no destructive transforms.
-
-- **New `premise:` frontmatter field**: a couple of sentences in back-cover style, always-visible at tier 0 alongside title/author/status. Spoiler-bounded by definition (back-cover language is non-spoiler). Written by the user; not AI-generated. Captured through `/admin/backfill` as a new card kind alongside rating, review, would-reread. `#schema #vault #premise`
-- **Demote `summary.md` from tier 1 to tier 2**: the existing reveal-button for summary on per-book pages goes away. The content now arrives only through the existing "show full notes (spoilers)" tier-2 opt-in served by `src/app/api/books/[slug]/notes/route.ts`. The deep-notes payload gains a `## Plot summary` section header so the historical summary reads as one section among the notes rather than a wall of text. Reading-state books and finished-state books behave identically — the rule is status-blind. `#feature #renderer #spoilers`
-- **No content migration**: every existing `summary.md` stays on disk exactly as it is. The change is purely renderer-side. Reversible if the call turns out wrong — flip the tier back, the data was never touched. `#discipline #safety`
-- **`/admin/backfill` adds a premise-prompt card kind**: for finished books with no `premise:` set. One or two sentences, voice-tenet-honouring, batched with the other answers via the existing staged-batch send. `#feature #admin #backfill #premise`
-- **Spoiler tier becomes moot**: the previously-codified `summary.md` tier reconsideration entry (move to tier 2, add `:::spoiler` wraps, frontmatter override) is overtaken by this decision. Already retired from Polish & housekeeping. `#design #spoilers #obsolete`
-
-Implementation order: schema field + renderer tier shift first (a single small change to the per-book page + the deep-notes endpoint), then the `/admin/backfill` premise card. The user can start adding premises before the renderer changes; the field just stays unrendered until the renderer ships.
 
 ### `/stats` — ratings-over-time caption + heatmap fallback (review 2026-05-11)
 

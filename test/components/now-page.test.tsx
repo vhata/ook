@@ -13,6 +13,11 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// last_progress is stamped at module load to the current calendar date
+// so the page's effective-status threshold sees a "fresh" reading book
+// regardless of when the test runs.
+const RECENT_DATE = new Date().toISOString().slice(0, 10);
+
 const baseBook: Book = {
   slug: "piranesi",
   title: "Piranesi",
@@ -20,7 +25,8 @@ const baseBook: Book = {
   series: null,
   status: "reading",
   progress: "",
-  started: "2026-05-06",
+  started: RECENT_DATE,
+  last_progress: RECENT_DATE,
   finished: null,
   rating: null,
   wouldReread: null,
@@ -33,6 +39,7 @@ const baseBook: Book = {
   hasReview: false,
   hasQuotes: false,
   hasSummary: false,
+  premise: null,
   goodreadsId: null,
   hardcoverSlug: null,
   storygraphSlug: null,
@@ -67,14 +74,17 @@ vi.mock("../../src/lib/books", async () => {
     getCurrentlyReading: async () => mockReading,
     getRecentlyFinished: async () => mockFinished,
     getCurrentReadingStreak: async () => mockStreak,
-    // The page also calls getAllBooks + loadHardcoverBooks for the
-    // ETA estimate. Return empty corpus + empty hardcover map so the
-    // ETA path no-ops cleanly (estimateReadingDaysRemaining returns
-    // null when the book has no Hardcover record).
+    // The page calls getAllBooks (for the now-split + ETA estimate)
+    // and loadHardcoverBooks (also for the ETA). Empty hardcover map
+    // makes estimateReadingDaysRemaining no-op cleanly.
     getAllBooks: async () => [...mockReading, ...mockFinished],
     loadHardcoverBooks: async () => new Map(),
   };
 });
+
+vi.mock("../../src/lib/auth/session", () => ({
+  getOwnerSession: async () => null,
+}));
 
 afterEach(() => {
   cleanup();
@@ -144,5 +154,59 @@ describe("/now page", { timeout: 15000 }, () => {
     const { container } = render(tree);
     const text = container.textContent ?? "";
     expect(text).toMatch(/b-ook\.vercel\.app/);
+  });
+
+  it("renders an explicit `paused` book in a `Set aside` section, separate from Now reading", async () => {
+    const stalePausedBook: Book = {
+      ...baseBook,
+      slug: "stale-paused",
+      title: "A Set-Aside Book",
+      authors: ["Quiet Author"],
+      status: "paused",
+      // last_progress in the past so the days-quiet indicator renders.
+      last_progress: "2025-01-01",
+      started: "2025-01-01",
+    };
+    mockReading = [baseBook, stalePausedBook];
+    const NowPage = await importPage();
+    const tree = await NowPage();
+    render(tree);
+
+    // Section header
+    expect(screen.getByText(/Set aside/i)).toBeTruthy();
+    // The paused book renders under the new section.
+    expect(screen.getByText("A Set-Aside Book")).toBeTruthy();
+    expect(screen.getByText(/Quiet Author/)).toBeTruthy();
+  });
+
+  it("auto-promotes a long-stale reading book into the Set aside section", async () => {
+    const longStale: Book = {
+      ...baseBook,
+      slug: "long-stale",
+      title: "Long Quiet Book",
+      authors: ["Forgotten Author"],
+      status: "reading",
+      // 4+ years ago — well past the 90-day pause threshold.
+      last_progress: "2022-01-01",
+      started: "2022-01-01",
+    };
+    mockReading = [longStale];
+    const NowPage = await importPage();
+    const tree = await NowPage();
+    render(tree);
+
+    // The book lives in the paused section now.
+    expect(screen.getByText(/Set aside/i)).toBeTruthy();
+    expect(screen.getByText("Long Quiet Book")).toBeTruthy();
+  });
+
+  it("does not render any 'Pick it back up' button for anonymous viewers", async () => {
+    const paused: Book = { ...baseBook, slug: "p", status: "paused", last_progress: "2025-01-01" };
+    mockReading = [paused];
+    const NowPage = await importPage();
+    const tree = await NowPage();
+    render(tree);
+    expect(screen.queryByRole("button", { name: /pick it back up/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /move to shelf/i })).toBeNull();
   });
 });

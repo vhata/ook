@@ -57,7 +57,8 @@ Schema notes:
 - Special section names "summary", "review", "quotes" map to top-level files (replace overwrites the file). Other names are H2 blocks in the reference notes.
 - Status values: tbr, reading, finished, abandoned, paused.
 - Dates: ISO YYYY-MM-DD.
-- Pullquote lives in frontmatter as \`pullquote: "..."\` (string). Rating lives as \`rating: N\` (integer 1-5).`;
+- Pullquote lives in frontmatter as \`pullquote: "..."\` (string). Rating lives as \`rating: N\` (integer 1-5).
+- Premise is the always-visible tier-0 back-cover blurb. Lives in frontmatter as \`premise: "..."\` (a sentence or two, non-spoiler). The full plot recap stays in the tier-2 \`summary.md\` file.`;
 
 // Exported for test pinning — the finish-flow rule is load-bearing
 // and a future agent.ts refactor must not silently drop it.

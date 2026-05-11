@@ -13,7 +13,7 @@ import type { Book } from "@/lib/types";
 // pure derivation from the in-memory corpus (via `getAllBooks`), no
 // external fetches at request time.
 
-export type BackfillKind = "rate" | "review" | "wouldReread";
+export type BackfillKind = "rate" | "review" | "wouldReread" | "premise";
 
 export type BackfillQuestion = {
   // Discriminant for the renderer. New kinds extend this union; the
@@ -93,6 +93,27 @@ function wouldRereadCandidates(books: Book[]): Candidate[] {
     }));
 }
 
+function premiseCandidates(books: Book[]): Candidate[] {
+  // Finished + no premise (the tier-0 back-cover blurb on per-book
+  // pages). The renderer is status-blind, but the backfill surface
+  // leads with finished books — the cohort with the deepest historical
+  // gap is the Goodreads-import finishes, and prompts on tbr/reading
+  // books would conflict with the start-prompt pattern queued
+  // elsewhere. Reads `b.premise` as null OR whitespace-only —
+  // gray-matter sometimes round-trips an empty value as "" rather than
+  // dropping the key.
+  return books
+    .filter((b) => b.status === "finished" && (b.premise === null || b.premise.trim().length === 0))
+    .map((b) => ({
+      kind: "premise" as const,
+      bookSlug: b.slug,
+      bookTitle: b.title,
+      bookAuthors: b.authors,
+      bookCover: b.cover,
+      prompt: `What's ${b.title} about? A sentence or two of back-cover prose.`,
+    }));
+}
+
 // Fisher–Yates shuffle. Plain Math.random — the user noted in the
 // brief that they're fine with the same set on a fast reload; we
 // don't want to maintain a seedable RNG just for this.
@@ -127,11 +148,16 @@ export function pickQuestions(
   rng: () => number = Math.random,
 ): BackfillQuestion[] {
   // Order matters for interleave. Review goes first because a 4+ star
-  // book without a review is the highest-signal capture opportunity;
-  // rate next (gets the user moving with low-cost yes/no shape); then
-  // wouldReread.
+  // book without a review is the highest-signal capture opportunity.
+  // Premise next: another voice-capture surface, but with a broader
+  // filter (every finished book qualifies), so leading with review
+  // keeps the narrower-filter prompt from being crowded out. Rate
+  // then wouldReread close the order on the low-cost-but-low-voice
+  // gaps. Dedupe-by-slug downstream means a 4-star book without a
+  // review and without a premise prefers the review prompt.
   const pools: Candidate[][] = [
     shuffle(reviewCandidates(books), rng),
+    shuffle(premiseCandidates(books), rng),
     shuffle(rateCandidates(books), rng),
     shuffle(wouldRereadCandidates(books), rng),
   ];

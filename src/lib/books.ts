@@ -169,6 +169,7 @@ async function readBookDir(slug: string): Promise<Book | null> {
     status: parseStatus(data.status),
     progress: typeof data.progress === "string" ? data.progress : "",
     started: parseNullableString(data.started),
+    last_progress: parseNullableString(data.last_progress),
     finished: parseNullableString(data.finished),
     rating: parseNullableNumber(data.rating),
     wouldReread: parseNullableBoolean(data.would_reread),
@@ -181,6 +182,7 @@ async function readBookDir(slug: string): Promise<Book | null> {
     hasReview,
     hasQuotes,
     hasSummary,
+    premise: parseNullableString(data.premise),
     goodreadsId: parseId(data.goodreads_id),
     hardcoverSlug: parseNullableString(data.hardcover_slug),
     storygraphSlug: parseNullableString(data.storygraph_slug),
@@ -426,6 +428,11 @@ export type BookPage = {
   body: string;
   review: string | null;
   quotes: string | null;
+  // Body of `<slug>/summary.md` when the file is present, else null.
+  // Tier-2 content: the per-book page must not render this; only the
+  // deep-notes endpoint (`/api/books/[slug]/notes`) folds it into the
+  // payload as a `## Plot summary` section.
+  summary: string | null;
   hardcover: HardcoverBook | null;
   hardcoverReviews: HardcoverReview[] | null;
 };
@@ -444,9 +451,10 @@ export async function getBookBySlug(slug: string): Promise<BookPage | null> {
   const raw = await fs.readFile(refFile, "utf8");
   const { content } = matter(raw);
 
-  const [review, quotes, hardcoverBooks, hardcoverReviews] = await Promise.all([
+  const [review, quotes, summary, hardcoverBooks, hardcoverReviews] = await Promise.all([
     readOptionalFile(path.join(dir, "review.md")),
     readOptionalFile(path.join(dir, "quotes.md")),
+    readOptionalFile(path.join(dir, "summary.md")),
     loadHardcoverBooks(),
     loadHardcoverReviews(),
   ]);
@@ -456,6 +464,7 @@ export async function getBookBySlug(slug: string): Promise<BookPage | null> {
     body: content.trim(),
     review,
     quotes,
+    summary,
     hardcover: hardcoverBooks.get(slug) ?? null,
     hardcoverReviews: hardcoverReviews.get(slug) ?? null,
   };

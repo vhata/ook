@@ -11,6 +11,7 @@ function book(partial: Partial<Book> & { slug: string; title: string }): Book {
     status: "tbr",
     progress: "",
     started: null,
+    last_progress: null,
     finished: null,
     rating: null,
     wouldReread: null,
@@ -23,6 +24,7 @@ function book(partial: Partial<Book> & { slug: string; title: string }): Book {
     hasReview: false,
     hasQuotes: false,
     hasSummary: false,
+    premise: null,
     goodreadsId: null,
     hardcoverSlug: null,
     storygraphSlug: null,
@@ -39,9 +41,20 @@ function book(partial: Partial<Book> & { slug: string; title: string }): Book {
 // books within each kind.
 const stableRng = () => 0;
 
+// Helper: a book builder that defaults `premise` to a non-empty value
+// so the premise-candidate pool stays out of the way of tests pinning
+// other kinds. Tests that want to exercise the premise pool override
+// `premise: null` explicitly.
+function bookWithPremise(partial: Partial<Book> & { slug: string; title: string }): Book {
+  return book({
+    premise: "An always-set blurb so this book isn't a premise candidate.",
+    ...partial,
+  });
+}
+
 describe("pickQuestions", () => {
   it("includes a rate question for a finished book without a rating", () => {
-    const books = [book({ slug: "a", title: "Aaa", status: "finished", rating: null })];
+    const books = [bookWithPremise({ slug: "a", title: "Aaa", status: "finished", rating: null })];
     const result = pickQuestions(books, 3, stableRng);
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({ kind: "rate", bookSlug: "a", bookTitle: "Aaa" });
@@ -50,7 +63,13 @@ describe("pickQuestions", () => {
 
   it("includes a review question for a 4-star finished book without a review", () => {
     const books = [
-      book({ slug: "b", title: "Bbb", status: "finished", rating: 4, hasReview: false }),
+      bookWithPremise({
+        slug: "b",
+        title: "Bbb",
+        status: "finished",
+        rating: 4,
+        hasReview: false,
+      }),
     ];
     const result = pickQuestions(books, 3, stableRng);
     expect(result).toHaveLength(1);
@@ -60,7 +79,7 @@ describe("pickQuestions", () => {
 
   it("includes a wouldReread question for a 5-star finished book where wouldReread is null", () => {
     const books = [
-      book({
+      bookWithPremise({
         slug: "c",
         title: "Ccc",
         status: "finished",
@@ -162,7 +181,7 @@ describe("pickQuestions", () => {
 
   it("skips review prompts when the book already has a review", () => {
     const books = [
-      book({
+      bookWithPremise({
         slug: "haveReview",
         title: "Have",
         status: "finished",
@@ -181,17 +200,19 @@ describe("pickQuestions", () => {
 
   it("returns 3 questions of the right kinds for the mixed-fixture brief", () => {
     // Brief case: a book with no rating; a book with rating=4 and no
-    // review.md; a book with rating=5 and wouldReread=null.
+    // review.md; a book with rating=5 and wouldReread=null. All three
+    // have premise set so the premise pool doesn't compete with the
+    // kinds the test pins.
     const books: Book[] = [
-      book({ slug: "norating", title: "NoRating", status: "finished", rating: null }),
-      book({
+      bookWithPremise({ slug: "norating", title: "NoRating", status: "finished", rating: null }),
+      bookWithPremise({
         slug: "noreview",
         title: "NoReview",
         status: "finished",
         rating: 4,
         hasReview: false,
       }),
-      book({
+      bookWithPremise({
         slug: "noreread",
         title: "NoReread",
         status: "finished",
@@ -206,5 +227,95 @@ describe("pickQuestions", () => {
     expect(kinds.has("rate")).toBe(true);
     expect(kinds.has("review")).toBe(true);
     expect(kinds.has("wouldReread")).toBe(true);
+  });
+
+  // Premise candidate behaviour. The brief: prompt finished books with
+  // no premise set, status-blind for renderer purposes but keep the
+  // backfill surface to finished-only so we don't conflict with the
+  // queued start-prompt pattern for tbr → reading transitions.
+
+  it("fires a premise card for a finished book with no premise", () => {
+    const books = [
+      book({
+        slug: "needsPremise",
+        title: "NeedsPremise",
+        status: "finished",
+        rating: 4,
+        hasReview: true, // block review-kind so we isolate premise
+        wouldReread: true, // block wouldReread
+        premise: null,
+      }),
+    ];
+    const result = pickQuestions(books, 3, stableRng);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ kind: "premise", bookSlug: "needsPremise" });
+    expect(result[0].prompt.toLowerCase()).toContain("back-cover");
+  });
+
+  it("treats a whitespace-only premise as missing and offers the card", () => {
+    // gray-matter sometimes round-trips an empty value as "" or "  "
+    // rather than dropping the key — both shapes must qualify as
+    // "no premise" so the question still fires.
+    const books = [
+      book({
+        slug: "emptyPremise",
+        title: "EmptyPremise",
+        status: "finished",
+        rating: 4,
+        hasReview: true,
+        wouldReread: true,
+        premise: "   ",
+      }),
+    ];
+    const result = pickQuestions(books, 3, stableRng);
+    expect(result.map((r) => r.kind)).toContain("premise");
+  });
+
+  it("does not fire a premise card when the book already has a premise", () => {
+    const books = [
+      book({
+        slug: "hasPremise",
+        title: "HasPremise",
+        status: "finished",
+        rating: 4,
+        hasReview: true,
+        wouldReread: true,
+        premise: "A retired engineer wakes up on a strange island.",
+      }),
+    ];
+    const result = pickQuestions(books, 3, stableRng);
+    expect(result).toHaveLength(0);
+  });
+
+  it("does not fire a premise card on tbr / reading / abandoned books", () => {
+    // The backfill surface is finished-only; the renderer is the
+    // status-blind half of the contract.
+    const books: Book[] = [
+      book({ slug: "tbr", title: "T", status: "tbr", premise: null }),
+      book({ slug: "reading", title: "R", status: "reading", premise: null }),
+      book({ slug: "abandoned", title: "A", status: "abandoned", premise: null }),
+    ];
+    const result = pickQuestions(books, 5, stableRng);
+    expect(result.filter((r) => r.kind === "premise")).toHaveLength(0);
+  });
+
+  it("dedupes by slug — a book missing both rating AND premise gets just one card", () => {
+    // Round-robin interleaves review → premise → rate → wouldReread,
+    // so the first hit for this slug is `premise` (review pool empty),
+    // and the slug-dedupe blocks the later `rate` candidate.
+    const books = [
+      book({
+        slug: "both",
+        title: "Both",
+        status: "finished",
+        rating: null,
+        hasReview: true,
+        wouldReread: true,
+        premise: null,
+      }),
+    ];
+    const result = pickQuestions(books, 5, stableRng);
+    const slugs = result.map((r) => r.bookSlug);
+    expect(slugs).toEqual(["both"]);
   });
 });

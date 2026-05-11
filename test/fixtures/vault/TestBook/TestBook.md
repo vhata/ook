@@ -19,6 +19,7 @@ goodreads_id: 12345
 hardcover_slug: test-book
 storygraph_slug: test-book-sg
 bookwyrm_url: https://bookwyrm.social/book/9001/test-book
+premise: A back-cover blurb in a sentence or two.
 ---
 
 ## Notes

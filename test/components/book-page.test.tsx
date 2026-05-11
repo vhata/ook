@@ -41,6 +41,7 @@ const baseBook: Book = {
   status: "finished",
   progress: "",
   started: "2026-04-01",
+  last_progress: null,
   finished: "2026-04-12",
   rating: 5,
   wouldReread: true,
@@ -53,6 +54,7 @@ const baseBook: Book = {
   hasReview: true,
   hasQuotes: true,
   hasSummary: false,
+  premise: null,
   goodreadsId: null,
   hardcoverSlug: null,
   storygraphSlug: null,
@@ -75,6 +77,7 @@ vi.mock("../../src/lib/books", async () => {
             quotes: "> A quote.",
             hardcover: null,
             hardcoverReviews: null,
+            summary: null,
           }
         : null,
     findBingoYearForBook: async () => null,
@@ -124,6 +127,54 @@ describe("BookPage server component", { timeout: 15000 }, () => {
     expect(screen.getByRole("button", { name: /show full notes/i })).toBeTruthy();
   });
 
+  it("does not render a synopsis / summary reveal button (summary is tier-2 now)", async () => {
+    // Pin the removal of the old tier-1 summary RevealSection. The
+    // synopsis content arrives only through the deep-notes payload,
+    // prefixed with `## Plot summary` — no separate reveal button on
+    // the page.
+    const BookPage = await importPage();
+    const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+    render(tree);
+    expect(screen.queryByRole("button", { name: /show synopsis/i })).toBeNull();
+  });
+
+  it("renders the tier-0 premise paragraph when book.premise is set", async () => {
+    const lib = await import("../../src/lib/books");
+    const original = lib.getBookBySlug;
+    (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
+      slug === "piranesi"
+        ? {
+            book: { ...baseBook, premise: "A man lives in an endless house of statues." },
+            body: "",
+            review: null,
+            quotes: null,
+            hardcover: null,
+            hardcoverReviews: null,
+            summary: null,
+          }
+        : null;
+    try {
+      const BookPage = await importPage();
+      const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      render(tree);
+      expect(screen.getByText("A man lives in an endless house of statues.")).toBeTruthy();
+    } finally {
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
+    }
+  });
+
+  it("omits the premise paragraph entirely when book.premise is null", async () => {
+    // baseBook.premise is null by default — assert no stray premise
+    // text leaks into the DOM. Cheap presence check: there's no
+    // element carrying the known premise string.
+    const BookPage = await importPage();
+    const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+    const { container } = render(tree);
+    expect(container.textContent ?? "").not.toContain(
+      "A man lives in an endless house of statues.",
+    );
+  });
+
   it("throws NEXT_NOT_FOUND for an unknown slug", async () => {
     const BookPage = await importPage();
     await expect(BookPage({ params: Promise.resolve({ slug: "does-not-exist" }) })).rejects.toThrow(
@@ -146,6 +197,7 @@ describe("BookPage server component", { timeout: 15000 }, () => {
             quotes: null,
             hardcover: null,
             hardcoverReviews: null,
+            summary: null,
           }
         : null;
 
@@ -186,6 +238,7 @@ describe("BookPage server component", { timeout: 15000 }, () => {
                 createdAt: "2024-01-01T00:00:00",
               },
             ],
+            summary: null,
           }
         : null;
 
@@ -220,6 +273,7 @@ describe("BookPage server component", { timeout: 15000 }, () => {
                 createdAt: "2024-01-01T00:00:00",
               },
             ],
+            summary: null,
           }
         : null;
 

@@ -264,6 +264,7 @@ function defaultBook(slug: string): Book {
     status: "tbr",
     progress: "",
     started: null,
+    last_progress: null,
     finished: null,
     rating: null,
     wouldReread: null,
@@ -276,6 +277,7 @@ function defaultBook(slug: string): Book {
     hasReview: false,
     hasQuotes: false,
     hasSummary: false,
+    premise: null,
     goodreadsId: null,
     hardcoverSlug: null,
     storygraphSlug: null,
@@ -304,6 +306,8 @@ function projectFrontmatterToBook(
   if (typeof fm.progress === "string") patch.progress = fm.progress;
   if (typeof fm.started === "string" || fm.started === null)
     patch.started = (fm.started as string | null) ?? null;
+  if (typeof fm.last_progress === "string" || fm.last_progress === null)
+    patch.last_progress = (fm.last_progress as string | null) ?? null;
   if (typeof fm.finished === "string" || fm.finished === null)
     patch.finished = (fm.finished as string | null) ?? null;
   if (typeof fm.rating === "number" || fm.rating === null)
@@ -316,6 +320,8 @@ function projectFrontmatterToBook(
     patch.bingoSquares = fm.bingo_squares as string[];
   if (typeof fm.cover === "string" || fm.cover === null)
     patch.cover = (fm.cover as string | null) ?? null;
+  if (typeof fm.premise === "string" || fm.premise === null)
+    patch.premise = (fm.premise as string | null) ?? null;
   // ... external IDs
   if (typeof fm.goodreads_id === "string" || typeof fm.goodreads_id === "number")
     patch.goodreadsId = String(fm.goodreads_id);

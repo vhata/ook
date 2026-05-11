@@ -90,6 +90,12 @@ const FIELDS: FieldDef[] = [
     },
   },
   {
+    name: "premise",
+    kind: "string",
+    note: "Tier-0 back-cover blurb. Always rendered when set.",
+    pluck: (b) => b.premise,
+  },
+  {
     name: "see_also",
     kind: "array",
     pluck: (b) => b.seeAlso,
@@ -123,7 +129,7 @@ const FIELDS: FieldDef[] = [
   {
     name: "summary.md",
     kind: "boolean",
-    note: "Tier-1 synopsis source on the per-book page.",
+    note: "Tier-2 plot recap folded into the deep-notes payload.",
     pluck: (b) => b.hasSummary,
     populated: (v) => v === true,
   },

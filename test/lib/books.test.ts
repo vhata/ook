@@ -330,6 +330,7 @@ describe("externalLinks", () => {
       status: "tbr",
       progress: "",
       started: null,
+      last_progress: null,
       finished: null,
       rating: null,
       wouldReread: null,
@@ -342,6 +343,7 @@ describe("externalLinks", () => {
       hasReview: false,
       hasQuotes: false,
       hasSummary: false,
+      premise: null,
       goodreadsId: null,
       hardcoverSlug: null,
       storygraphSlug: null,
@@ -392,6 +394,7 @@ describe("bookStuck", () => {
       status: "finished",
       progress: "",
       started: null,
+      last_progress: null,
       finished: null,
       rating: 4.5,
       wouldReread: null,
@@ -404,6 +407,7 @@ describe("bookStuck", () => {
       hasReview: true,
       hasQuotes: true,
       hasSummary: false,
+      premise: null,
       goodreadsId: null,
       hardcoverSlug: null,
       storygraphSlug: null,
@@ -819,6 +823,54 @@ describe("YAML date frontmatter", () => {
   });
 });
 
+describe("premise frontmatter", () => {
+  it("parses a present `premise:` value", async () => {
+    const books = await getAllBooks();
+    const test = books.find((b) => b.slug === "TestBook");
+    expect(test?.premise).toBe("A back-cover blurb in a sentence or two.");
+  });
+
+  it("returns null when `premise:` is absent from frontmatter", async () => {
+    const books = await getAllBooks();
+    const priv = books.find((b) => b.slug === "PrivateBook");
+    expect(priv?.premise).toBeNull();
+  });
+
+  it("treats an empty `premise: ''` as null (parseNullableString contract)", async () => {
+    // Sets up a transient single-book vault so the existing fixture
+    // slug-listings (`["PrivateBook", "TestBook"]`) stay intact. Asserts
+    // that both `premise: ""` and a bare `premise:` (YAML null) project
+    // to `null` on the Book record.
+    const os = await import("node:os");
+    const fsMod = await import("node:fs/promises");
+    const pathMod = await import("node:path");
+    const tmpRoot = await fsMod.mkdtemp(pathMod.join(os.tmpdir(), "ook-premise-"));
+    const emptyDir = pathMod.join(tmpRoot, "EmptyPremiseBook");
+    await fsMod.mkdir(emptyDir, { recursive: true });
+    await fsMod.writeFile(
+      pathMod.join(emptyDir, "EmptyPremiseBook.md"),
+      '---\ntitle: Empty\npremise: ""\n---\nbody\n',
+    );
+    const blankDir = pathMod.join(tmpRoot, "BlankPremiseBook");
+    await fsMod.mkdir(blankDir, { recursive: true });
+    await fsMod.writeFile(
+      pathMod.join(blankDir, "BlankPremiseBook.md"),
+      "---\ntitle: Blank\npremise:\n---\nbody\n",
+    );
+
+    vi.stubEnv("BOOKS_DIR", tmpRoot);
+    try {
+      const empty = await getBookBySlug("EmptyPremiseBook");
+      const blank = await getBookBySlug("BlankPremiseBook");
+      expect(empty?.book.premise).toBeNull();
+      expect(blank?.book.premise).toBeNull();
+    } finally {
+      vi.stubEnv("BOOKS_DIR", FIXTURE_VAULT);
+      await fsMod.rm(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("getYearStats — pages-derived fields", () => {
   it("populates longestBook from the Hardcover cache for paged finishes", async () => {
     const stats = await getYearStats(2026);
@@ -872,6 +924,7 @@ describe("computeYearPagesTotal", () => {
       status: "finished",
       progress: "",
       started: null,
+      last_progress: null,
       finished: null,
       rating: null,
       wouldReread: null,
@@ -884,6 +937,7 @@ describe("computeYearPagesTotal", () => {
       hasReview: false,
       hasQuotes: false,
       hasSummary: false,
+      premise: null,
       goodreadsId: null,
       hardcoverSlug: null,
       storygraphSlug: null,
@@ -967,6 +1021,7 @@ describe("computeReadingPace", () => {
       status: "finished",
       progress: "",
       started: null,
+      last_progress: null,
       finished: null,
       rating: null,
       wouldReread: null,
@@ -979,6 +1034,7 @@ describe("computeReadingPace", () => {
       hasReview: false,
       hasQuotes: false,
       hasSummary: false,
+      premise: null,
       goodreadsId: null,
       hardcoverSlug: null,
       storygraphSlug: null,
@@ -1065,6 +1121,7 @@ describe("estimateReadingDaysRemaining", () => {
       status: "reading",
       progress: "",
       started: null,
+      last_progress: null,
       finished: null,
       rating: null,
       wouldReread: null,
@@ -1077,6 +1134,7 @@ describe("estimateReadingDaysRemaining", () => {
       hasReview: false,
       hasQuotes: false,
       hasSummary: false,
+      premise: null,
       goodreadsId: null,
       hardcoverSlug: null,
       storygraphSlug: null,
