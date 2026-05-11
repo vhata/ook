@@ -15,6 +15,7 @@ import {
   decideRatingPush,
   normalizeDate,
   snapshotForCache,
+  stableStringify,
   statusIdFor,
   vaultStateMatchesCache,
 } from "../../scripts/lib/hardcover-sync.mjs";
@@ -282,5 +283,37 @@ describe("decideAction — insert vs update vs skip-no-change", () => {
     const vault = { ...baseVault, started: null, finished: null };
     const r = decideAction({ vault, remote: null, hardcoverBookId: 42 });
     expect(r.reads).toBeNull();
+  });
+});
+
+describe("stableStringify", () => {
+  // The cache-write skip relies on this being deterministic: two
+  // equivalent objects with different key insertion orders MUST
+  // produce identical strings, otherwise we'd write churn commits
+  // every time the script's in-memory key order differs from the
+  // on-disk file's order.
+  it("emits identical strings for the same object regardless of key order", () => {
+    const a = { a: 1, b: 2 };
+    const b = { b: 2, a: 1 };
+    expect(stableStringify(a)).toBe(stableStringify(b));
+  });
+
+  it("recurses into nested objects deterministically", () => {
+    const a = { outer: { z: 1, a: 2 }, list: [{ x: 1, y: 2 }] };
+    const b = { list: [{ y: 2, x: 1 }], outer: { a: 2, z: 1 } };
+    expect(stableStringify(a)).toBe(stableStringify(b));
+  });
+
+  it("preserves array order", () => {
+    expect(stableStringify([3, 1, 2])).toBe("[3,1,2]");
+    expect(stableStringify([1, 2, 3])).toBe("[1,2,3]");
+    expect(stableStringify([3, 1, 2])).not.toBe(stableStringify([1, 2, 3]));
+  });
+
+  it("handles primitives + null", () => {
+    expect(stableStringify(null)).toBe("null");
+    expect(stableStringify(42)).toBe("42");
+    expect(stableStringify("hello")).toBe('"hello"');
+    expect(stableStringify(true)).toBe("true");
   });
 });

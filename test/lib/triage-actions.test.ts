@@ -160,6 +160,11 @@ describe("buildTriageBatch", () => {
     expect(body.message).toBe("Triage: 2 promoted to TBR");
   });
 
+  it("names the book in the commit message for single-entry batches", () => {
+    const body = buildTriageBatch([{ pile: "Maybe", entry }], "mark-finished", "2026-05-10");
+    expect(body.message).toBe("Triage: The Anomaly marked finished");
+  });
+
   it("routes mark-finished through book-patch when the slug exists in the vault", () => {
     const body = buildTriageBatch(
       [

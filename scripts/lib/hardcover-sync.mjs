@@ -274,3 +274,27 @@ export function snapshotForCache(vault) {
     finished: normalizeDate(vault.finished),
   };
 }
+
+/**
+ * Deterministic JSON serialiser. Used by the sync-state cache writer
+ * to decide whether anything material changed: if the new entries
+ * stringify to the same string as the existing entries, skip the
+ * write entirely so the auto-hygiene workflow doesn't produce a no-op
+ * commit that just bumps the `updated` timestamp.
+ *
+ * Sorts object keys at every depth so two equivalent objects with
+ * different key insertion orders produce identical strings; arrays
+ * stay in their natural order.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function stableStringify(value) {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  const keys = Object.keys(value).sort();
+  const parts = keys.map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`);
+  return `{${parts.join(",")}}`;
+}

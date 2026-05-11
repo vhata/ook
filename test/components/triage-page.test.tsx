@@ -193,6 +193,6 @@ describe("/triage — authed owner", () => {
       kind: "append-bullet",
       path: "_meta/tbr.md",
     });
-    expect(body.message).toBe("Triage: 1 promoted to TBR");
+    expect(body.message).toBe("Triage: Black Prism promoted to TBR");
   });
 });

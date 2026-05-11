@@ -60,7 +60,12 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
-import { decideAction, snapshotForCache, vaultStateMatchesCache } from "./lib/hardcover-sync.mjs";
+import {
+  decideAction,
+  snapshotForCache,
+  stableStringify,
+  vaultStateMatchesCache,
+} from "./lib/hardcover-sync.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const VAULT = path.resolve(
@@ -327,13 +332,28 @@ async function main() {
           process.stderr.write(`  error: ${e instanceof Error ? e.message : String(e)}\n`);
         }
       }
-      // Persist the sync-state cache (skip-no-change cases above also
-      // updated it in-memory).
+      // Persist the sync-state cache, but only when the entries
+      // actually changed. Bumping just the `updated` timestamp on
+      // every run produces a no-op commit through the auto-hygiene
+      // workflow ("updated 03:34 → updated 03:35" and nothing else).
+      // Compare the new entries against what's on disk; skip the
+      // write entirely when nothing material moved.
+      const existing = await fs
+        .readFile(SYNC_STATE_FILE, "utf8")
+        .then((s) => JSON.parse(s))
+        .catch(() => null);
+      const newEntries = syncState.entries ?? {};
+      const existingEntries = existing?.entries ?? {};
+      const entriesEqual = stableStringify(newEntries) === stableStringify(existingEntries);
+      if (entriesEqual) {
+        process.stderr.write(`sync-state unchanged; skipping write to ${SYNC_STATE_FILE}\n`);
+        return;
+      }
       await fs.mkdir(path.dirname(SYNC_STATE_FILE), { recursive: true });
       const out = {
         updated: new Date().toISOString(),
         generator: "scripts/sync-hardcover-status.mjs",
-        entries: syncState.entries ?? {},
+        entries: newEntries,
       };
       await fs.writeFile(SYNC_STATE_FILE, JSON.stringify(out, null, 2) + "\n", "utf8");
       process.stderr.write(`wrote ${SYNC_STATE_FILE}\n`);

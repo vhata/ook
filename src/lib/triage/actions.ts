@@ -78,7 +78,7 @@ export function buildTriageBatch(
   return {
     patches,
     meta_patches: metaPatches,
-    message: buildBatchMessage(entries.length, action),
+    message: buildBatchMessage(entries, action),
   };
 }
 
@@ -186,14 +186,21 @@ export function sanitiseSlug(title: string): string {
     .trim();
 }
 
-function buildBatchMessage(count: number, action: TriageAction): string {
+function buildBatchMessage(entries: TriageActionEntry[], action: TriageAction): string {
   const verb =
     action === "promote-tbr"
       ? "promoted to TBR"
       : action === "start-reading"
         ? "started reading"
         : "marked finished";
-  return `Triage: ${count} ${verb}`;
+  // Single-entry batches name the book so the audit log is scannable
+  // at a glance; multi-entry batches stay count-prefixed because
+  // listing every title would blow past most commit-message width
+  // budgets.
+  if (entries.length === 1) {
+    return `Triage: ${entries[0].entry.title} ${verb}`;
+  }
+  return `Triage: ${entries.length} ${verb}`;
 }
 
 // Frontmatter for a freshly-minted book directory. Same vault style as
