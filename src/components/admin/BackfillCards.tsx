@@ -39,6 +39,8 @@ type Answers = {
   rating?: number;
   reviewText?: string;
   wouldReread?: boolean;
+  // Index into `BackfillQuestion.candidates` for the pullquote kind.
+  pullquoteIndex?: number;
 };
 
 type BatchCommit = { path: string; url: string | null };
@@ -448,6 +450,37 @@ function BackfillInput({
       />
     );
   }
+  if (question.kind === "pullquote") {
+    const candidates = question.candidates ?? [];
+    return (
+      <div className="space-y-2">
+        {candidates.map((c, i) => {
+          const active = answer?.pullquoteIndex === i;
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onUpdate({ pullquoteIndex: i })}
+              disabled={disabled}
+              aria-label={`Pick candidate ${i + 1}`}
+              className={
+                active
+                  ? "border-accent bg-accent-soft text-ink block w-full rounded border p-3 text-left font-serif text-[14px] leading-[1.5]"
+                  : "border-rule text-ink-soft hover:border-accent hover:text-ink block w-full rounded border p-3 text-left font-serif text-[14px] leading-[1.5] disabled:opacity-50"
+              }
+            >
+              <span className="text-ink italic">&ldquo;{c.text}&rdquo;</span>
+              {c.source && (
+                <span className="text-ink-soft mt-1 block text-[12px] not-italic">
+                  — {c.source}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
   // wouldReread
   return (
     <div className="flex items-center gap-2">
@@ -492,6 +525,12 @@ export function canAnswer(q: BackfillQuestion, answer: Answers | undefined): boo
   if (q.kind === "rate") return typeof answer.rating === "number";
   if (q.kind === "review") return (answer.reviewText ?? "").trim().length > 0;
   if (q.kind === "wouldReread") return typeof answer.wouldReread === "boolean";
+  if (q.kind === "pullquote") {
+    const idx = answer.pullquoteIndex;
+    if (typeof idx !== "number") return false;
+    const candidates = q.candidates ?? [];
+    return idx >= 0 && idx < candidates.length;
+  }
   return false;
 }
 
@@ -499,6 +538,8 @@ export function canAnswer(q: BackfillQuestion, answer: Answers | undefined): boo
 // Each kind maps to a single small change:
 //   - rate → frontmatter rating: N
 //   - wouldReread → frontmatter would_reread: bool
+//   - pullquote → frontmatter pullquote: { text, source } from the
+//     chosen candidate
 //   - review → file-backed section "review" with action "replace"
 //     (the section schema treats the special "review" name as a
 //     write to <slug>/review.md — see src/lib/mcp/book-paths.ts).
@@ -525,6 +566,17 @@ export function buildPatch(
       slug,
       frontmatter_changes: { would_reread: answer!.wouldReread! },
       commit_message: `Mark would_reread=${answer!.wouldReread} for ${q.bookTitle}`,
+    };
+  }
+  if (q.kind === "pullquote") {
+    const idx = answer!.pullquoteIndex!;
+    const candidate = (q.candidates ?? [])[idx];
+    const pullquote: { text: string; source?: string } = { text: candidate.text };
+    if (candidate.source) pullquote.source = candidate.source;
+    return {
+      slug,
+      frontmatter_changes: { pullquote },
+      commit_message: `Add pullquote for ${q.bookTitle}`,
     };
   }
   // review

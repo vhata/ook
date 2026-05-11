@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { pickQuestions, type BackfillKind } from "../../src/lib/admin/backfill";
+import {
+  pickQuestions,
+  pullquoteCandidates,
+  type BackfillKind,
+} from "../../src/lib/admin/backfill";
 import type { Book } from "../../src/lib/types";
 
 // Builder for a Book with sensible defaults — tests override only the
@@ -235,5 +239,130 @@ describe("pickQuestions", () => {
     const slugs = result.map((r) => r.bookSlug);
     expect(slugs).toEqual(["both"]);
     expect(result[0].kind).toBe("review");
+  });
+});
+
+describe("pullquoteCandidates", () => {
+  const SAMPLE_QUOTES = `# Quotes
+
+> The Beauty of the House is immeasurable; its Kindness infinite.
+
+— Opening line
+
+> Another reasonably-long passage that ends with a clear terminal mark.
+`;
+
+  function fakeReader(map: Record<string, string>): (slug: string) => Promise<string | null> {
+    return async (slug) => map[slug] ?? null;
+  }
+
+  it("returns one candidate per qualifying book with scored quotes", async () => {
+    const books = [
+      book({
+        slug: "piranesi",
+        title: "Piranesi",
+        status: "finished",
+        hasQuotes: true,
+        pullquote: null,
+      }),
+    ];
+    const out = await pullquoteCandidates(books, fakeReader({ piranesi: SAMPLE_QUOTES }));
+    expect(out).toHaveLength(1);
+    const q = out[0];
+    expect(q.kind).toBe("pullquote");
+    expect(q.bookSlug).toBe("piranesi");
+    expect(q.candidates).toBeDefined();
+    expect((q.candidates ?? []).length).toBeGreaterThan(0);
+    expect((q.candidates ?? [])[0].text).toContain("Beauty of the House");
+  });
+
+  it("skips books that already have a pullquote", async () => {
+    const books = [
+      book({
+        slug: "piranesi",
+        title: "Piranesi",
+        status: "finished",
+        hasQuotes: true,
+        pullquote: { text: "Already set", source: null },
+      }),
+    ];
+    const out = await pullquoteCandidates(books, fakeReader({ piranesi: SAMPLE_QUOTES }));
+    expect(out).toEqual([]);
+  });
+
+  it("skips books without quotes.md (hasQuotes: false)", async () => {
+    const books = [
+      book({
+        slug: "piranesi",
+        title: "Piranesi",
+        status: "finished",
+        hasQuotes: false,
+        pullquote: null,
+      }),
+    ];
+    const out = await pullquoteCandidates(books, fakeReader({}));
+    expect(out).toEqual([]);
+  });
+
+  it("skips non-finished books", async () => {
+    const books = [
+      book({
+        slug: "piranesi",
+        title: "Piranesi",
+        status: "reading",
+        hasQuotes: true,
+        pullquote: null,
+      }),
+    ];
+    const out = await pullquoteCandidates(books, fakeReader({ piranesi: SAMPLE_QUOTES }));
+    expect(out).toEqual([]);
+  });
+
+  it("skips books whose quotes.md has no scorable lines (all too short)", async () => {
+    const books = [
+      book({
+        slug: "tiny",
+        title: "Tiny",
+        status: "finished",
+        hasQuotes: true,
+        pullquote: null,
+      }),
+    ];
+    const out = await pullquoteCandidates(books, fakeReader({ tiny: "> brief.\n\n> hi." }));
+    expect(out).toEqual([]);
+  });
+});
+
+describe("pickQuestions — pullquote interleave", () => {
+  it("interleaves the pullquote pool ahead of the other kinds", () => {
+    const books = [
+      book({
+        slug: "rateMe",
+        title: "RateMe",
+        status: "finished",
+        rating: null,
+      }),
+    ];
+    const pullquotePool = [
+      {
+        kind: "pullquote" as const,
+        bookSlug: "piranesi",
+        bookTitle: "Piranesi",
+        bookAuthors: ["Susanna Clarke"],
+        bookCover: null,
+        prompt: "...",
+        candidates: [
+          {
+            text: "The Beauty of the House is immeasurable; its Kindness infinite.",
+            source: "Opening line",
+            score: 100,
+          },
+        ],
+      },
+    ];
+    const result = pickQuestions(books, 2, stableRng, pullquotePool);
+    // Pullquote leads the round-robin.
+    expect(result[0].kind).toBe("pullquote");
+    expect(result[0].bookSlug).toBe("piranesi");
   });
 });

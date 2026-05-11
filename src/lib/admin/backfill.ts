@@ -1,6 +1,9 @@
 import { cache } from "react";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { getAllBooks } from "@/lib/books";
 import type { Book } from "@/lib/types";
+import { topCandidates, type PullquoteCandidate } from "@/lib/admin/pullquote-suggester";
 
 // Gap-finder for /admin/backfill. Picks a handful of small "fill this
 // in" questions per visit — drawn from the corpus of finished books
@@ -11,9 +14,11 @@ import type { Book } from "@/lib/types";
 //
 // Same offline-clean discipline as the rest of the admin surfaces:
 // pure derivation from the in-memory corpus (via `getAllBooks`), no
-// external fetches at request time.
+// external fetches at request time. The `pullquote` kind is the
+// exception — it reads each candidate book's quotes.md off disk to
+// score candidate lines, but the read is local fs only.
 
-export type BackfillKind = "rate" | "review" | "wouldReread";
+export type BackfillKind = "rate" | "review" | "wouldReread" | "pullquote";
 
 export type BackfillQuestion = {
   // Discriminant for the renderer. New kinds extend this union; the
@@ -31,6 +36,10 @@ export type BackfillQuestion = {
   // it's useful context for the prompt (e.g. the existing rating for
   // a wouldReread question). Null when irrelevant.
   context?: number | null;
+  // Pre-computed candidate quotes (only set when `kind === "pullquote"`).
+  // The card renders these as numbered picker buttons; one tap stages
+  // a `pullquote: { text, source }` frontmatter patch.
+  candidates?: PullquoteCandidate[];
 };
 
 // One "candidate" pool per kind. The kind-builders below run over the
@@ -93,6 +102,38 @@ function wouldRereadCandidates(books: Book[]): Candidate[] {
     }));
 }
 
+// Finished books with a quotes.md AND no pullquote yet. Each candidate
+// carries up to three suggested lines from quotes.md, pre-scored by
+// `topCandidates`; the card renders them as numbered picker buttons.
+// Async because we read each candidate book's quotes.md off disk —
+// the only fs read in the backfill candidate-building pass.
+//
+// Exported for tests. Pass a custom `readQuotes` to drive coverage
+// without spawning the filesystem.
+export async function pullquoteCandidates(
+  books: Book[],
+  readQuotes: (slug: string) => Promise<string | null>,
+): Promise<Candidate[]> {
+  const out: Candidate[] = [];
+  for (const b of books) {
+    if (b.status !== "finished" || b.pullquote !== null || !b.hasQuotes) continue;
+    const body = await readQuotes(b.slug);
+    if (!body) continue;
+    const cands = topCandidates(body, 3);
+    if (cands.length === 0) continue;
+    out.push({
+      kind: "pullquote" as const,
+      bookSlug: b.slug,
+      bookTitle: b.title,
+      bookAuthors: b.authors,
+      bookCover: b.cover,
+      prompt: `${b.title} has ${cands.length} pullquote candidate${cands.length === 1 ? "" : "s"} — pick one?`,
+      candidates: cands,
+    });
+  }
+  return out;
+}
+
 // Fisher–Yates shuffle. Plain Math.random — the user noted in the
 // brief that they're fine with the same set on a fast reload; we
 // don't want to maintain a seedable RNG just for this.
@@ -125,13 +166,18 @@ export function pickQuestions(
   books: Book[],
   count: number,
   rng: () => number = Math.random,
+  pullquotePool: Candidate[] = [],
 ): BackfillQuestion[] {
-  // Order matters for interleave. Review goes first because a 4+ star
-  // book without a review is the highest-signal capture opportunity.
-  // Rate then wouldReread close the order on the low-cost-but-low-voice
-  // gaps. Dedupe-by-slug downstream means a 4-star book without a
-  // review prefers the review prompt over the rate prompt.
+  // Order matters for interleave. Pullquote-pick goes first when
+  // present — it's the highest-voice surface (the reader committed a
+  // line to quotes.md, picking one for the headline is pure curation).
+  // Review next because a 4+ star book without a review is the next
+  // highest-signal capture opportunity. Rate then wouldReread close
+  // the order on the low-cost-but-low-voice gaps. Dedupe-by-slug
+  // downstream means a 4-star book that qualifies for several kinds
+  // prefers the earlier-listed one.
   const pools: Candidate[][] = [
+    shuffle(pullquotePool, rng),
     shuffle(reviewCandidates(books), rng),
     shuffle(rateCandidates(books), rng),
     shuffle(wouldRereadCandidates(books), rng),
@@ -166,5 +212,23 @@ export function pickQuestions(
 // the typical page calls it once per request anyway.
 export const getBackfillQuestions = cache(async (count: number): Promise<BackfillQuestion[]> => {
   const books = await getAllBooks();
-  return pickQuestions(books, count);
+  const pullquotePool = await pullquoteCandidates(books, defaultReadQuotes);
+  return pickQuestions(books, count, undefined, pullquotePool);
 });
+
+// Inline fs reader for the pullquote candidate builder. Matches the
+// resolution `getBookBySlug` uses in `src/lib/books.ts` so dev and
+// prod see the same vault layout.
+async function defaultReadQuotes(slug: string): Promise<string | null> {
+  const dir =
+    process.env.BOOKS_DIR ??
+    process.env.NEXT_PUBLIC_BOOKS_DIR ??
+    path.join(process.cwd(), ".vault");
+  const file = path.join(dir, slug, "quotes.md");
+  try {
+    return await fs.readFile(file, "utf8");
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw e;
+  }
+}

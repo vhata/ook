@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 function q(
-  kind: "rate" | "review" | "wouldReread",
+  kind: "rate" | "review" | "wouldReread" | "pullquote",
   overrides: Partial<BackfillQuestion> = {},
 ): BackfillQuestion {
   return {
@@ -31,6 +31,7 @@ function q(
     bookCover: overrides.bookCover ?? null,
     prompt: overrides.prompt ?? `test ${kind} prompt`,
     context: overrides.context,
+    candidates: overrides.candidates,
   };
 }
 
@@ -51,6 +52,20 @@ describe("canAnswer", () => {
     expect(canAnswer(q("wouldReread"), {})).toBe(false);
     expect(canAnswer(q("wouldReread"), { wouldReread: true })).toBe(true);
     expect(canAnswer(q("wouldReread"), { wouldReread: false })).toBe(true);
+  });
+
+  it("requires a pullquoteIndex within the candidates range for pullquote questions", () => {
+    const pq = q("pullquote", {
+      candidates: [
+        { text: "Quote one.", source: null, score: 90 },
+        { text: "Quote two.", source: "Ch. 2", score: 80 },
+      ],
+    });
+    expect(canAnswer(pq, {})).toBe(false);
+    expect(canAnswer(pq, { pullquoteIndex: 0 })).toBe(true);
+    expect(canAnswer(pq, { pullquoteIndex: 1 })).toBe(true);
+    expect(canAnswer(pq, { pullquoteIndex: 2 })).toBe(false);
+    expect(canAnswer(pq, { pullquoteIndex: -1 })).toBe(false);
   });
 });
 
@@ -93,6 +108,37 @@ describe("buildPatch — wire format", () => {
   it("trims surrounding whitespace from the review body", () => {
     const patch = buildPatch(q("review"), { reviewText: "   \n  Loved it.  \n" });
     expect(patch?.section_changes?.review.content).toBe("Loved it.\n");
+  });
+
+  it("builds a frontmatter pullquote patch from the chosen candidate", () => {
+    const pq = q("pullquote", {
+      bookSlug: "piranesi",
+      bookTitle: "Piranesi",
+      candidates: [
+        { text: "The Beauty of the House is immeasurable.", source: "Opening line", score: 100 },
+        { text: "Second candidate at a reasonable length.", source: null, score: 75 },
+      ],
+    });
+    const patch = buildPatch(pq, { pullquoteIndex: 0 });
+    expect(patch).toEqual({
+      slug: "piranesi",
+      frontmatter_changes: {
+        pullquote: { text: "The Beauty of the House is immeasurable.", source: "Opening line" },
+      },
+      commit_message: "Add pullquote for Piranesi",
+    });
+  });
+
+  it("omits the pullquote.source field when the candidate has no attribution", () => {
+    const pq = q("pullquote", {
+      candidates: [
+        { text: "An attribution-less quote at a fine length.", source: null, score: 80 },
+      ],
+    });
+    const patch = buildPatch(pq, { pullquoteIndex: 0 });
+    expect(patch?.frontmatter_changes?.pullquote).toEqual({
+      text: "An attribution-less quote at a fine length.",
+    });
   });
 
   it("returns null when the answer is missing or unanswerable", () => {
