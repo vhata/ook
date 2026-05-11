@@ -36,24 +36,6 @@ Decision: stage answers client-side; a single "Send all" button at the bottom co
 - **Shared batch endpoint**: same `/api/admin/agent/commit-batch` as `/triage` bulk. The two surfaces share the wire format. `#feature #admin #write-surface #batch`
 - **Audit hint** (defer to first use): tag a batch commit's trailer with `batch-size=N` so `/admin/audit` can render a "5 answers" chip. Not blocking on the first cut. `#polish #audit`
 
-### Cover-URL backfill (codified 2026-05-10)
-
-Source notes:
-
-- Vault `cover:` field is a URL — no binaries in git, never has been. Empty/null today on 269 of 280 reference files (only 5 hand-picked). Most of the corpus renders the procedural foxing-color tile from `src/lib/foxing.ts`.
-- Manual picker exists: `bin/book covers <slug>` opens an Open Library edition grid; `bin/book cover <slug> <url>` sets a URL. Fine for one-offs, doesn't scale to clearing 269 blanks.
-- Hardcover cache at `_meta/hardcover-books.json` is keyed by `goodreads_id` and stores rating / readers / pages / year — but no cover URL today. Hardcover's GraphQL `Book.image.url` (and `default_cover_edition.image.url` as fallback) is one query field away.
-- Matches the established offline-clean pattern: external API touched only at operator-initiated `make` time, cache committed to the vault, build never reaches outward.
-
-Plan, in order:
-
-- **Extend `scripts/backfill-hardcover-books.mjs`** to fetch and store `image_url` (and a `default_cover_image_url` fallback) alongside the existing fields in `_meta/hardcover-books.json`. One query-field change, one re-run of `make vault-hardcover-books`. `#feature #covers #hardcover`
-- **New `scripts/backfill-covers.mjs`** (operator-run via `make vault-covers`): pure cache-to-frontmatter, no network. Reads `_meta/hardcover-books.json`, writes `image_url` into each matching book's `cover:` line, anchored on `goodreads_id`. Per-field skip — never overwrites an existing value. Mirrors the shape of `scripts/backfill-hardcover-ids.mjs`. `#feature #covers #vault`
-- **Open Library fallback** in the same script: for books with empty `cover:` and no Hardcover cache hit, query Open Library by ISBN13 → ISBN10 → title+author, accept the first non-placeholder cover. Rate-limited (≥ 100ms between requests). Same prompt-to-apply discipline as the other backfills. `#feature #covers #open-library`
-- **Manual override survives**: `bin/book cover <slug> <url>` keeps working; the auto-backfill never touches a populated field, so hand-picked covers and corrections survive re-runs. `#discipline #covers`
-
-Expected outcome: most of the 269 currently-blank books pick up a real cover URL in one operator session. The residual (media-list entries without an ID, hand-built records) stays on the procedural fallback or waits for a manual pick. Doesn't displace the existing "Cover-picker improvements" entry under Site / render — that one's about the manual picker's edge cases (ISBN13 fallback in the picker, Google Books candidates, language/region prefs), which remain valuable for the residual.
-
 ### Kindle reading-session import (codified 2026-05-10) — awaiting takeout
 
 Source notes (don't re-research):
@@ -80,18 +62,6 @@ The value: **one-shot recovery of behavioural data we can't reconstruct later.**
 - **A. Give it verbs.** Add filters (tag / decade / rating bucket), banded year groups with a label between groups, a "spines you haven't visited in a year" callout panel, click-a-chip-to-dim-everything-else interaction. Becomes a way of _wandering_ the corpus rather than just looking at it. `#feature #shelf #navigation`
 - **B. Keep as ornament, but make it earn the visual.** Land the deferred `pages` schema field, then scale spine height by `sqrt(pages)` for authentic shelf rhythm (already separately captured under Visual & experience). Don't add verbs — accept that `/shelf` is for the "look at all I've read" moment, nothing more. `#polish #shelf #pages`
 - **C. Retire.** Drop the route, remove the footer + Controls links. Series, tags, log, and stats already cover catalog wandering; the shelf doesn't add a navigation axis. Cheap to undo if the decision flips. `#prune #shelf`
-
-### Makefile coverage and organization (codified 2026-05-10)
-
-Coverage: two operator-runnable scripts (`promote-goodreads.mjs`, `import-triage.mjs`) were missing Makefile entries — landed as `vault-promote-goodreads` and `vault-import-triage` on 2026-05-10. Going forward, any new operator-runnable script in `scripts/` should land with a Makefile entry in the same commit. Prebuild scripts (`fetch-vault.mjs`, `build-index.mjs`) stay invocation-less by design — they're called from `package.json` lifecycle hooks, not by the user.
-
-Organization: as the vault target count grows, the flat `make help` listing is starting to crowd. GNU Make doesn't have true subcommands; closest options:
-
-- **A. Section comments + section-aware `help`.** Keep one Makefile; add `## --- vault ---` style separator comments; teach the `help` target's awk to render those as bold dividers. Cheapest move, no structural change. `#tooling #makefile`
-- **B. Sub-Makefiles**: split into `make/vault.mk`, `make/deploy.mk`, included from the root. Targets remain `vault-*` etc. at the user's invocation. More files; lower risk of one-Makefile rot at higher target counts. `#tooling #makefile`
-- **C. Subcommand pattern** (`make vault TARGET=lint`): GNU Make has no real subcommands. This works mechanically but loses tab-completion and flat `make help`. Rejected. `#rejected #makefile`
-
-Leaning A — the file is still short enough that the dividers buy clarity without the spread of B.
 
 ## Deferred by design
 
