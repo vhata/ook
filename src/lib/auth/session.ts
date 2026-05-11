@@ -1,7 +1,13 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { cookies } from "next/headers";
 import { authConfig } from "./config";
 import type { Session } from "./types";
+
+// `next/headers` is imported lazily inside `getOwnerSession` rather
+// than at module top: middleware/proxy code paths import this module
+// for `verifySession` and `SESSION_COOKIE_NAME`, and `next/headers` is
+// not loadable in the middleware runtime. A static top-level import
+// crashes module load there, taking the proxy with it and returning
+// 500s for every matched route before any handler runs.
 
 // Cookie-based sessions, signed with HMAC-SHA256. No KV lookup on
 // every request — the cookie carries the full session payload, signed
@@ -87,6 +93,7 @@ export function newSession(username: string): { token: string; expiresAt: number
 // existing call sites all wrap it in try/catch — preserve that
 // behaviour at the helper boundary).
 export async function getOwnerSession(): Promise<Session | null> {
+  const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   try {
