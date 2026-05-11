@@ -15,13 +15,29 @@
 
 .PHONY: help install dev build check format lint typecheck test e2e clean \
 	vault-lint vault-backfill vault-series-rosters vault-hardcover-books \
-	vault-hardcover-reviews vault-hardcover-ids vault-import-kindle \
-	vault-import-triage vault-promote-goodreads \
+	vault-hardcover-reviews vault-hardcover-ids vault-covers \
+	vault-import-kindle vault-import-triage vault-promote-goodreads \
 	vault-hardcover-sync deploy-status deploy-logs
 
+# `help` reads its own Makefile twice: once to pick up `## --- name ---`
+# section headers as bold dividers, once to render each target line.
+# Section markers are emitted as a blank line + bold uppercase header +
+# blank line; target lines stay in their existing two-column shape.
+# `awk` walks the file in order so dividers appear above the targets
+# that follow them.
 help: ## Show this help
-	@grep -E '^[a-zA-Z][a-zA-Z0-9_-]*:.*?##' $(MAKEFILE_LIST) \
-		| awk -F ':.*?##' '{printf "  \033[1m%-28s\033[0m %s\n", $$1, $$2}'
+	@awk -F ':.*?##' ' \
+		/^## --- .* ---$$/ { \
+			gsub(/^## --- | ---$$/, "", $$0); \
+			printf "\n  \033[1m%s\033[0m\n\n", toupper($$0); \
+			next; \
+		} \
+		/^[a-zA-Z][a-zA-Z0-9_-]*:.*?##/ { \
+			printf "  \033[1m%-28s\033[0m %s\n", $$1, $$2; \
+		} \
+	' $(MAKEFILE_LIST)
+
+## --- core ---
 
 install: ## Install dependencies
 	pnpm install
@@ -53,7 +69,7 @@ e2e: ## End-to-end tests
 clean: ## Remove build output
 	rm -rf .next dist build .vite coverage
 
-# Project-specific targets below this line.
+## --- vault ---
 
 vault-lint: ## Audit vault frontmatter (read-only)
 	node scripts/vault-lint.mjs
@@ -84,6 +100,9 @@ vault-hardcover-reviews: ## Fetch top short Hardcover reviews per book; write _m
 vault-hardcover-ids: ## Copy hardcover_slug + hardcover_id from the cache into per-book frontmatter
 	@node scripts/backfill-hardcover-ids.mjs
 
+vault-covers: ## Populate empty per-book cover: URLs from the Hardcover cache, with Open Library fallback
+	@node scripts/backfill-covers.mjs
+
 vault-import-kindle: ## Parse a Kindle My Clippings.txt and append matched highlights into per-book quotes.md (FILE=path)
 	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)")
 
@@ -95,6 +114,8 @@ vault-promote-goodreads: ## Mint per-book vault directories from _meta/goodreads
 
 vault-hardcover-sync: ## Push vault status/rating/dates to Hardcover via insert_user_book mutations
 	@node scripts/sync-hardcover-status.mjs
+
+## --- deploy ---
 
 deploy-status: ## Recent Vercel deploys for this project (status, env, age)
 	@npx -y vercel@latest ls 2>&1 | head -16

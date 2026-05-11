@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Looks up each vault book on Hardcover (by goodreads_id) and caches the
 // canonical metadata — rating, ratings_count, reviews_count, users_count,
-// pages, release_year — keyed by vault slug. Writes the result to
-// `_meta/hardcover-books.json` for the per-book renderer to consume.
+// pages, release_year, image_url — keyed by vault slug. Writes the result
+// to `_meta/hardcover-books.json` for the per-book renderer to consume,
+// and for `scripts/backfill-covers.mjs` to drive per-book `cover:`
+// frontmatter writes from.
 //
 // Designed to run on the operator's machine. The build is offline-clean;
 // the cache is the data. Same shape as `backfill-series-rosters.mjs`.
@@ -26,6 +28,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import matter from "gray-matter";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
@@ -44,7 +47,15 @@ const ENDPOINT = "https://api.hardcover.app/v1/graphql";
 const CACHE_FILE = path.join(VAULT, "_meta", "hardcover-books.json");
 const GOODREADS_PLATFORM_ID = 1;
 
-await main();
+// Only run when invoked as a script (node scripts/...). When imported as
+// a module — for unit tests of the pure helpers — skip the auto-run so
+// we don't blow up on missing HARDCOVER_TOKEN or attempt a real fetch.
+const isMain =
+  typeof process.argv[1] === "string" &&
+  fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+if (isMain) {
+  await main();
+}
 
 async function main() {
   if (!TOKEN) {
@@ -176,6 +187,14 @@ async function fetchByGoodreads(goodreadsId) {
           users_count
           users_read_count
           release_year
+          image {
+            url
+          }
+          default_cover_edition {
+            image {
+              url
+            }
+          }
         }
       }
     }
@@ -203,9 +222,21 @@ async function fetchByGoodreads(goodreadsId) {
   return json;
 }
 
-function transform(raw, candidate) {
+export function transform(raw, candidate) {
   const book = raw?.data?.book_mappings?.[0]?.book;
   if (!book) return null;
+  // Cover URL prefers `book.image.url` (the canonical edition's image as
+  // Hardcover ranks it); falls back to `default_cover_edition.image.url`
+  // when the book-level image is null. Empty strings are normalised to
+  // null so `backfill-covers.mjs` can treat "no cover" uniformly.
+  const primary = book.image?.url;
+  const fallback = book.default_cover_edition?.image?.url;
+  const imageUrl =
+    typeof primary === "string" && primary.length > 0
+      ? primary
+      : typeof fallback === "string" && fallback.length > 0
+        ? fallback
+        : null;
   return {
     goodreadsId: candidate.goodreadsId,
     hardcoverId: book.id ?? null,
@@ -218,6 +249,7 @@ function transform(raw, candidate) {
     users_count: book.users_count ?? 0,
     users_read_count: book.users_read_count ?? 0,
     release_year: book.release_year ?? null,
+    image_url: imageUrl,
   };
 }
 
