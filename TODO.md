@@ -8,6 +8,53 @@ Sections are grouped by readiness: decided plans first, then open verdicts, defe
 
 ## Decided & ready to build
 
+### `/now` — paused state distinct from reading (review 2026-05-11)
+
+The `/now` surface currently shows four books under "Now reading" with started-dates of 1474–2951 days ago — truthful data, but the page misrepresents itself. First-impression problem; biggest priority in the May 2026 review. Fix is a new `paused` status distinct from `abandoned`: "I'll get back to it" vs "I will not."
+
+Schema additions:
+
+- `BookStatus` gains `paused` (distinct from existing `abandoned`).
+- `last_progress: YYYY-MM-DD` frontmatter field on per-book reference notes. Logged when status flips, when a progress note is added, or when the reader re-opens the book.
+
+Threshold rule, applied at render time (no cron):
+
+- `< 14 days` since last progress → **reading**, fresh
+- `14–90 days` → **reading**, no glow but still on `/now`
+- `> 90 days` with no progress → auto-promote to **paused**
+- User-set "set aside" → **paused** (overrides timer)
+- User-set "give up" → **abandoned**, leaves `/now` entirely
+
+Auto-promotion is reversible: logging new progress on a paused book demotes it back to reading.
+
+Render changes on `/now`: two sections separated by a thin rule. Reading cards stay full-width with the accent ring. Paused cards render half-size, no glow, days-ago number small and dim after the author (not above the title). Each paused card carries one CTA: **Pick it back up** (resets `last_progress` to today, demotes to reading) or **Move to shelf** (marks abandoned). Section header for paused: "Set aside" or "Open elsewhere" — softer than the bare status word; the status value and section header don't have to match.
+
+On `/shelf`, paused and abandoned spines should look different (e.g. matte vs glossy spine for paused, broken-spine treatment for abandoned). Track that as part of the `/shelf` polish below.
+
+- **Schema extension**: add `paused` to `BookStatus` in `src/lib/types.ts`; add `last_progress` field; update `_meta/CLAUDE.md` vault-side schema doc. `#schema #vault #status`
+- **Status-classification helper**: pure function `(status, last_progress, today) → effective_status` that applies the 90-day promotion at render time. Always current; reversible by logging new progress. Unit-test the boundary cases. `#feature #logic`
+- **`/now` restructure**: two sections (reading + paused), per-card CTAs that POST single-patch batches to `/api/admin/agent/commit-batch`. Owner-only CTAs (anonymous viewers see the two sections, no buttons). `#feature #now #ui #write-surface`
+- **Days-since-`last_progress` indicator**: small, dim, after the author on paused cards; never above the title. `#polish #now`
+
+### `/shelf` — width by pages, year separators, status markers (review 2026-05-11)
+
+Resolves the prior "clarify purpose" verdict in favour of keeping `/shelf` as ornament — but making the ornament earn its keep. Highest visual payoff per line of code per the reviewer.
+
+- **Page-count-driven spine width**: `width = clamp(24, round(pages / 12), 72)` px. Real shelves have wild variance; uniform widths look web-y. Requires `pages` frontmatter; falls back to 32px when null so deploy is safe before the schema lands across the corpus. `#feature #shelf #pages`
+- **Year separators**: at 190+ spines the eye can't find year boundaries. 2px gap + a tiny year tick on the bottom rail at every year change. Keep the timeline metaphor — don't break to a new row. `#feature #shelf #visual`
+- **Bingo + currently-reading markers**: 2px accent stripe along the top edge of the spine for books on the active bingo card; a small bookmark tongue above the shelf line for currently-reading. `#feature #shelf #visual`
+- **Paused / abandoned styling**: paired with the `/now` paused state above. Paused spine is matte (no highlight); abandoned spine renders a broken-spine treatment. Both still on the shelf — `/shelf` is the archive. `#feature #shelf #visual`
+
+### `/discover` — score tooltip + regional-title dedupe (review 2026-05-11)
+
+- **Tooltip the `SCORE`**: explain the weights inline ("see-also 10 + series 5 + author 2 + 2 shared tags = 19"). Or drop the number entirely if it isn't pulling weight. Floating numbers without legends are design ballast. `#polish #discover #ux`
+- **Dedupe regional-title pairs**: rule — if title similarity > 85% AND see-also bidirectional AND series + N match → collapse into one entry, optionally surfaced as "Same book, different markets." Closes the Philosopher's-vs-Sorcerer's-Stone duplicate at the top of `/discover`. `#feature #discover #dedupe`
+
+### `/stats` — ratings-over-time caption + heatmap fallback (review 2026-05-11)
+
+- **Ratings-over-time lean-in caption** (decided 2026-05-11): keep the existing rolling-average chart but add a self-aware caption — "a record of taste calibration" or similar. Lean into the editorial honesty that the post-2018 ~4.8 average reflects "I only log books I expect to love." The reviewer's alternative (re-frame as stacked bars per year) is **not** the chosen path. `#polish #stats #editorial`
+- **Reading-days heatmap low-data fallback**: at `< 20` events for the year, render a horizontal timeline strip — a line across the year with dots per event, sized by book length. At `≥ 20` events, switch to the calendar heatmap as today. Fixes the empty-grid that reads as a bug on `/stats/2026`. `#feature #stats #visual`
+
 ### `/triage` — bulk multi-action (deferred from 2026-05-10 redesign)
 
 Single-action bulk shipped: a checkbox selection + a single dropdown (Promote to TBR / Start reading / Mark finished) applied uniformly across the selected rows in one batched commit. The remaining `nice-to-have` is heterogeneous-bulk: per-row action selection so a single submit can promote three rows, start reading two, and finish one. The batch endpoint already accepts a heterogeneous `meta_patches` list (different `kind`s per entry); the UX change is a per-row action selector rather than a single global dropdown. Decide whether the friction is worth it after a few days of real use of the single-action bulk.
@@ -30,16 +77,6 @@ The value: **one-shot recovery of behavioural data we can't reconstruct later.**
 - **Inferred `started` backfill for date-blind finishes**: Goodreads-imported books often have a `finished` but no `started`. The first session timestamp for an ASIN gives a real start. Optional `scripts/backfill-started-from-sessions.mjs` that suggests started-dates per book and prompts to apply, never overrides an existing value. `#feature #vault #dates`
 - **Historical reach on `/stats` heatmaps**: the year-day heatmap currently renders from-vault-era only. Fold session-day data into the heatmap source so years prior to the vault's first commit can render too — properly back-fills the historical view of "when did I actually read." `#feature #stats #historical`
 - **Unlinked-Kindle-activity footnote**: sessions for sendtokindle / personal-document books can't link to a vault entry. Render an "unlinked Kindle activity: ~Nh across M sessions" footnote on `/stats` (or per-year) rather than silently dropping them — the data is honest about the gap. `#caveat #stats`
-
-## Open verdicts
-
-### `/shelf` — clarify purpose (codified 2026-05-10)
-
-`/shelf` reads today as an observation surface, not a working one — a person who navigates there isn't sure what to do once they arrive. Every finished book rendered as a 32px × 220px SVG spine, hash-coloured from first tag/author, four sort options (finish date / author / rating / title). ~7000px-wide horizontal strip at the current corpus size. No filter, search, banding, or aggregation. Pure visual flourish; clicks through to the per-book page.
-
-- **A. Give it verbs.** Add filters (tag / decade / rating bucket), banded year groups with a label between groups, a "spines you haven't visited in a year" callout panel, click-a-chip-to-dim-everything-else interaction. Becomes a way of _wandering_ the corpus rather than just looking at it. `#feature #shelf #navigation`
-- **B. Keep as ornament, but make it earn the visual.** Land the deferred `pages` schema field, then scale spine height by `sqrt(pages)` for authentic shelf rhythm (already separately captured under Visual & experience). Don't add verbs — accept that `/shelf` is for the "look at all I've read" moment, nothing more. `#polish #shelf #pages`
-- **C. Retire.** Drop the route, remove the footer + Controls links. Series, tags, log, and stats already cover catalog wandering; the shelf doesn't add a navigation axis. Cheap to undo if the decision flips. `#prune #shelf`
 
 ## Deferred by design
 
@@ -119,6 +156,11 @@ Source notes:
 - Bingo cover dedup at promote time. When `bin/book` auto-promotes a bingo entry to a vault directory, the bingo file's `cover:` line for that square becomes redundant (the renderer prefers the new directory's frontmatter). Strip it during promotion to keep the dedup automatic. Currently the duplicate sits there until the user runs the cleanup script by hand. `#polish #vault`
 - Bingo `done:` YAML cleanup (vault-side). Render now derives done-ness from the bound book's status, so the per-square `done:` field is dead weight. Either strip it from `_meta/bingo-YYYY.md` or have `bin/book` keep it stripped going forward. `#polish #vault #bingo`
 - `summary.md` tier reconsideration. Per the existing convention `summary.md` is a "full-spoiler plot summary," but the tiered model puts it at tier 1 (one click). For books like Ra where the summary really is a full plot dump, that's too eager a reveal. Options: move the full-spoiler content into the body (tier 2) and reserve `summary.md` for synopses; OR add a per-section `:::spoiler` wrap; OR allow a frontmatter `summary_tier: 2` override (we said no overrides — revisit). `#design #spoilers`
+- `/tags` cloud size ratio cap — at `fantasy: 129` the cloud renders ~3× the size of `scifi`, drowning out everything below it. Cap the visual size ratio at ~2× regardless of count. Typographic taste over data fidelity. (review 2026-05-11) `#polish #tags`
+- `/shelf` author legibility — author names under spines are near-invisible at default zoom. Either bump them ~1px or drop them entirely and reserve the author for hover/tap. Half-legible is the worst of both. (review 2026-05-11) `#polish #shelf`
+- `/shelf` spine text direction — currently bottom-to-top (head tilts left). Try the US/UK trade convention (top-to-bottom, head tilts right) and see how it feels for an Anglophone reader. (review 2026-05-11) `#polish #shelf`
+- `/shelf` chrome — the faint outline box around the strip reads web-y. Either drop the box entirely and let the spines float, or commit to a real shelf edge (1px highlight on top + 2px shadow on bottom). (review 2026-05-11) `#polish #shelf`
+- `/series` left-rail italics — italicise series with zero finished entries so "shelved but not started" reads differently from "in progress" at a glance. (review 2026-05-11 micro) `#polish #series`
 
 ## Brainstormed inventory
 
