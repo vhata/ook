@@ -44,6 +44,7 @@ const baseBook: Book = {
   hardcoverSlug: null,
   storygraphSlug: null,
   bookwyrmUrl: null,
+  amazonAsin: null,
   source: "manual",
   hideExternalReviews: false,
   pages: null,

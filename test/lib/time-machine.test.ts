@@ -36,6 +36,7 @@ function book(overrides: Partial<Book>): Book {
     hardcoverSlug: null,
     storygraphSlug: null,
     bookwyrmUrl: null,
+    amazonAsin: null,
     source: null,
     hideExternalReviews: false,
     pages: null,

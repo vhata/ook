@@ -136,6 +136,7 @@ function book(overrides: Partial<Book> & { slug: string }): Book {
     hardcoverSlug: null,
     storygraphSlug: null,
     bookwyrmUrl: null,
+    amazonAsin: null,
     source: null,
     hideExternalReviews: false,
     ...overrides,

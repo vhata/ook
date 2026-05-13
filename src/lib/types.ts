@@ -48,6 +48,12 @@ export type Book = {
   hardcoverSlug: string | null;
   storygraphSlug: string | null;
   bookwyrmUrl: string | null;
+  // Amazon Standard Identification Number for the Kindle edition the
+  // reader owns. Used to look up reading-session data in
+  // `_meta/kindle-sessions.json` (sourced from an Amazon takeout). Null
+  // when no Kindle edition is tracked. Not a public-facing link — Amazon
+  // is intentionally absent from the external-links row.
+  amazonAsin: string | null;
   // Where this book record came from. "goodreads" — imported from
   // the user's Goodreads CSV (likely has personal reading history
   // attached). "media-list" — word-of-mouth recommendation. "manual"
@@ -67,6 +73,17 @@ export type Book = {
 };
 
 export type BookSource = "goodreads" | "media-list" | "manual";
+
+// Summary of Kindle reading-session data for one book, derived from
+// `_meta/kindle-sessions.json` (Amazon takeout). Loaded by
+// `loadKindleSessions()` and looked up by ASIN.
+export type KindleStats = {
+  sessions: number;
+  totalSeconds: number;
+  firstStart: string;
+  lastEnd: string;
+  distinctDays: number;
+};
 
 export type ExternalLink = {
   label: string;

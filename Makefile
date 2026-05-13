@@ -17,7 +17,8 @@
 	vault-lint vault-backfill vault-series-rosters vault-hardcover-books \
 	vault-hardcover-reviews vault-hardcover-ids vault-covers \
 	vault-premises vault-pages vault-wikiquotes \
-	vault-rename-summary-to-progress vault-import-kindle vault-import-triage \
+	vault-rename-summary-to-progress vault-import-kindle \
+	vault-import-kindle-sessions vault-backfill-asin vault-import-triage \
 	vault-promote-goodreads vault-hardcover-sync deploy-status deploy-logs
 
 # `help` reads its own Makefile twice: once to pick up `## --- name ---`
@@ -118,6 +119,12 @@ vault-rename-summary-to-progress: ## One-shot vault migration — rename every <
 
 vault-import-kindle: ## Parse a Kindle My Clippings.txt and append matched highlights into per-book quotes.md (FILE=path)
 	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)")
+
+vault-import-kindle-sessions: ## Ingest an Amazon-takeout reading-session CSV + ownership shards into _meta/kindle-sessions.json (TAKEOUT=path)
+	@node scripts/import-kindle-sessions.mjs $(if $(TAKEOUT),--takeout "$(TAKEOUT)")
+
+vault-backfill-asin: ## Stamp amazon_asin: frontmatter on vault books that match a Kindle-sessions cache entry by title
+	@node scripts/backfill-asin-from-sessions.mjs
 
 vault-import-triage: ## Build/extend _meta/triage.md from a CSV (CSV=path; prompts to apply when interactive)
 	@node scripts/import-triage.mjs $(if $(CSV),"$(CSV)")

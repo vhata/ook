@@ -59,6 +59,7 @@ const baseBook: Book = {
   hardcoverSlug: null,
   storygraphSlug: null,
   bookwyrmUrl: null,
+  amazonAsin: null,
   source: "manual",
   hideExternalReviews: false,
   pages: null,
@@ -78,6 +79,7 @@ vi.mock("../../src/lib/books", async () => {
             quotes: "> A quote.",
             hardcover: null,
             hardcoverReviews: null,
+            kindleStats: null,
             progress: null,
           }
         : null,
@@ -151,6 +153,7 @@ describe("BookPage server component", { timeout: 15000 }, () => {
             quotes: null,
             hardcover: null,
             hardcoverReviews: null,
+            kindleStats: null,
             progress: null,
           }
         : null;
@@ -198,6 +201,7 @@ describe("BookPage server component", { timeout: 15000 }, () => {
             quotes: null,
             hardcover: null,
             hardcoverReviews: null,
+            kindleStats: null,
             progress: null,
           }
         : null;
@@ -240,6 +244,7 @@ describe("BookPage server component", { timeout: 15000 }, () => {
               },
             ],
             progress: null,
+            kindleStats: null,
           }
         : null;
 
@@ -275,6 +280,7 @@ describe("BookPage server component", { timeout: 15000 }, () => {
               },
             ],
             progress: null,
+            kindleStats: null,
           }
         : null;
 

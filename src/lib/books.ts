@@ -16,6 +16,7 @@ import type {
   ExternalLink,
   HardcoverBook,
   HardcoverReview,
+  KindleStats,
   LogEntry,
   LongestBook,
   Pullquote,
@@ -189,6 +190,7 @@ async function readBookDir(slug: string): Promise<Book | null> {
     hardcoverSlug: parseNullableString(data.hardcover_slug),
     storygraphSlug: parseNullableString(data.storygraph_slug),
     bookwyrmUrl: parseNullableString(data.bookwyrm_url),
+    amazonAsin: parseNullableString(data.amazon_asin),
     source: parseSource(data.source),
     hideExternalReviews: data.hide_external_reviews === true,
     pages: parseNullableNumber(data.pages),
@@ -439,6 +441,7 @@ export type BookPage = {
   progress: string | null;
   hardcover: HardcoverBook | null;
   hardcoverReviews: HardcoverReview[] | null;
+  kindleStats: KindleStats | null;
 };
 
 export async function getBookBySlug(slug: string): Promise<BookPage | null> {
@@ -455,13 +458,15 @@ export async function getBookBySlug(slug: string): Promise<BookPage | null> {
   const raw = await fs.readFile(refFile, "utf8");
   const { content } = matter(raw);
 
-  const [review, quotes, progress, hardcoverBooks, hardcoverReviews] = await Promise.all([
-    readOptionalFile(path.join(dir, "review.md")),
-    readOptionalFile(path.join(dir, "quotes.md")),
-    readOptionalFile(path.join(dir, "progress.md")),
-    loadHardcoverBooks(),
-    loadHardcoverReviews(),
-  ]);
+  const [review, quotes, progress, hardcoverBooks, hardcoverReviews, kindleSessions] =
+    await Promise.all([
+      readOptionalFile(path.join(dir, "review.md")),
+      readOptionalFile(path.join(dir, "quotes.md")),
+      readOptionalFile(path.join(dir, "progress.md")),
+      loadHardcoverBooks(),
+      loadHardcoverReviews(),
+      loadKindleSessions(),
+    ]);
 
   return {
     book,
@@ -471,6 +476,7 @@ export async function getBookBySlug(slug: string): Promise<BookPage | null> {
     progress,
     hardcover: hardcoverBooks.get(slug) ?? null,
     hardcoverReviews: hardcoverReviews.get(slug) ?? null,
+    kindleStats: book.amazonAsin ? (kindleSessions.get(book.amazonAsin) ?? null) : null,
   };
 }
 
@@ -985,6 +991,55 @@ export const loadHardcoverReviews = cache(async (): Promise<Map<string, Hardcove
       }))
       .filter((r) => r.body.length > 0);
     if (reviews.length > 0) out.set(slug, reviews);
+  }
+  return out;
+});
+
+// Per-book Kindle reading-session summary, derived from
+// `<vault>/_meta/kindle-sessions.json` (populated by
+// `scripts/import-kindle-sessions.mjs` from an Amazon takeout). The
+// cache file is the per-ASIN summary — pre-aggregated at import time
+// so raw session data (multi-megabyte) never enters git. React `cache()`
+// so the JSON parse happens once per request.
+type KindleSessionsFile = {
+  books?: Record<
+    string,
+    {
+      title?: string | null;
+      sessions?: number;
+      totalSeconds?: number;
+      firstStart?: string;
+      lastEnd?: string;
+      distinctDays?: number;
+    }
+  >;
+};
+
+export const loadKindleSessions = cache(async (): Promise<Map<string, KindleStats>> => {
+  const file = path.join(booksDir(), META_DIR, "kindle-sessions.json");
+  let raw: string;
+  try {
+    raw = await fs.readFile(file, "utf8");
+  } catch {
+    return new Map();
+  }
+  let parsed: KindleSessionsFile;
+  try {
+    parsed = JSON.parse(raw) as KindleSessionsFile;
+  } catch {
+    return new Map();
+  }
+  const out = new Map<string, KindleStats>();
+  for (const [asin, entry] of Object.entries(parsed.books ?? {})) {
+    if (!entry || typeof entry.sessions !== "number" || entry.sessions === 0) continue;
+    if (typeof entry.firstStart !== "string" || typeof entry.lastEnd !== "string") continue;
+    out.set(asin, {
+      sessions: entry.sessions,
+      totalSeconds: typeof entry.totalSeconds === "number" ? entry.totalSeconds : 0,
+      firstStart: entry.firstStart,
+      lastEnd: entry.lastEnd,
+      distinctDays: typeof entry.distinctDays === "number" ? entry.distinctDays : 0,
+    });
   }
   return out;
 });

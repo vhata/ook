@@ -282,6 +282,7 @@ function defaultBook(slug: string): Book {
     hardcoverSlug: null,
     storygraphSlug: null,
     bookwyrmUrl: null,
+    amazonAsin: null,
     source: null,
     hideExternalReviews: false,
     pages: null,
@@ -329,6 +330,7 @@ function projectFrontmatterToBook(
   if (typeof fm.hardcover_slug === "string") patch.hardcoverSlug = fm.hardcover_slug;
   if (typeof fm.storygraph_slug === "string") patch.storygraphSlug = fm.storygraph_slug;
   if (typeof fm.bookwyrm_url === "string") patch.bookwyrmUrl = fm.bookwyrm_url;
+  if (typeof fm.amazon_asin === "string") patch.amazonAsin = fm.amazon_asin;
   // Touch base so the linter doesn't complain about an unused param —
   // `base` is conceptually here because future expansion may need to
   // diff against the existing record.

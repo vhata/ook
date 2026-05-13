@@ -28,6 +28,7 @@ import type {
   ConnectionReason,
   HardcoverBook,
   HardcoverReview,
+  KindleStats,
 } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +53,7 @@ export default async function BookPage({ params }: { params: Params }) {
 
   if (!page) notFound();
 
-  const { book, review, quotes, hardcover, hardcoverReviews } = page;
+  const { book, review, quotes, hardcover, hardcoverReviews, kindleStats } = page;
 
   const [allBooks, bingoYear, similar, ownerSession] = await Promise.all([
     getAllBooks(),
@@ -69,7 +70,13 @@ export default async function BookPage({ params }: { params: Params }) {
     <main className="mx-auto box-border w-full max-w-[1140px] px-6 py-12 sm:px-14 sm:pt-10 sm:pb-20">
       <HomeMark />
 
-      <BookHeader book={book} bingoYear={bingoYear} hardcover={hardcover} isOwner={isOwner} />
+      <BookHeader
+        book={book}
+        bingoYear={bingoYear}
+        hardcover={hardcover}
+        kindleStats={kindleStats}
+        isOwner={isOwner}
+      />
 
       <div className="grid grid-cols-1 gap-9 md:grid-cols-[180px_1fr]">
         <Toc
@@ -126,11 +133,13 @@ function BookHeader({
   book,
   bingoYear,
   hardcover,
+  kindleStats,
   isOwner,
 }: {
   book: Book;
   bingoYear: number | null;
   hardcover: HardcoverBook | null;
+  kindleStats: KindleStats | null;
   isOwner: boolean;
 }) {
   return (
@@ -209,6 +218,7 @@ function BookHeader({
         )}
         <ExternalLinkRow book={book} />
         <HardcoverStats hardcover={hardcover} />
+        <KindleSessionStats stats={kindleStats} />
         <ShareRow slug={book.slug} />
         <div className="mt-3">
           {/* Owner-only edit affordance — seeds /admin with the book
@@ -224,6 +234,31 @@ function BookHeader({
         </div>
       </div>
     </header>
+  );
+}
+
+// Discreet line surfacing Kindle reading-session data when the book
+// has an `amazon_asin:` and the takeout cache covers it. Same visual
+// register as HardcoverStats — small, dim, italic-feeling. Hidden
+// entirely when there's no data, so books read elsewhere are silent
+// rather than awkward.
+function KindleSessionStats({ stats }: { stats: KindleStats | null }) {
+  if (!stats) return null;
+  const hours = stats.totalSeconds / 3600;
+  const hoursDisplay = hours >= 10 ? Math.round(hours).toString() : hours.toFixed(1);
+  const sessionWord = stats.sessions === 1 ? "session" : "sessions";
+  const dayWord = stats.distinctDays === 1 ? "day" : "days";
+  return (
+    <div className="text-ink-soft mt-3 flex flex-wrap items-center gap-2 text-[12px]">
+      <span>
+        Read across {stats.sessions.toLocaleString("en-US")} {sessionWord} over{" "}
+        {stats.distinctDays.toLocaleString("en-US")} {dayWord}
+      </span>
+      <span className="text-ink-dim">·</span>
+      <span>~{hoursDisplay}h total</span>
+      <span className="text-ink-dim">·</span>
+      <span className="text-ink-dim">on Kindle</span>
+    </div>
   );
 }
 
