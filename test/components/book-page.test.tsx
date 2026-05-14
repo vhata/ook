@@ -456,6 +456,87 @@ describe("BookPage server component", { timeout: 15000 }, () => {
     }
   });
 
+  it("renders a human-readable date range on the Kindle-session line", async () => {
+    // Pin three shapes of the range suffix:
+    //   - cross-year range → year shown on both endpoints
+    //   - in-year range → no year (kept compact)
+    //   - single calendar day → one date, no arrow
+    const currentYear = new Date().getUTCFullYear();
+    const lib = await import("../../src/lib/books");
+    const original = lib.getBookBySlug;
+    const withKindle = (firstStart: string, lastEnd: string) => async (slug: string) =>
+      slug === "piranesi"
+        ? {
+            book: baseBook,
+            body: "",
+            review: null,
+            quotes: null,
+            hardcover: null,
+            hardcoverReviews: null,
+            kindleStats: {
+              sessions: 14,
+              totalSeconds: 28800,
+              firstStart,
+              lastEnd,
+              distinctDays: 23,
+            },
+            progress: null,
+          }
+        : null;
+
+    try {
+      // Cross-year: year shown on both sides.
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = withKindle(
+        "2024-12-30T12:00:00Z",
+        "2025-01-05T12:00:00Z",
+      );
+      let BookPage = await importPage();
+      let tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      let { container } = render(tree);
+      let text = container.textContent ?? "";
+      expect(text).toContain("on Kindle");
+      expect(text).toContain("Dec 30, 2024");
+      expect(text).toContain("Jan 5, 2025");
+      expect(text).toContain("→");
+      // The old YYYY-MM-DD form should no longer appear.
+      expect(text).not.toContain("2024-12-30");
+      expect(text).not.toContain("2025-01-05");
+      cleanup();
+
+      // In-year (current year): no year on either side.
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = withKindle(
+        `${currentYear}-04-02T12:00:00Z`,
+        `${currentYear}-04-24T12:00:00Z`,
+      );
+      BookPage = await importPage();
+      tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      ({ container } = render(tree));
+      text = container.textContent ?? "";
+      expect(text).toContain("Apr 2 → Apr 24");
+      expect(text).not.toContain(`Apr 2, ${currentYear}`);
+      cleanup();
+
+      // Single calendar day: one date, no arrow on the range span.
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = withKindle(
+        `${currentYear}-03-15T08:00:00Z`,
+        `${currentYear}-03-15T22:30:00Z`,
+      );
+      BookPage = await importPage();
+      tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      ({ container } = render(tree));
+      text = container.textContent ?? "";
+      expect(text).toContain("Mar 15");
+      // No arrow on this row's tail — find the span via a stable
+      // neighbour ("on Kindle") and check what follows it.
+      const onKindleIdx = text.indexOf("on Kindle");
+      expect(onKindleIdx).toBeGreaterThan(-1);
+      const tail = text.slice(onKindleIdx);
+      expect(tail).not.toContain("→");
+    } finally {
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
+    }
+  });
+
   it("renders the Share row with QR + postcard links", async () => {
     const BookPage = await importPage();
     const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });

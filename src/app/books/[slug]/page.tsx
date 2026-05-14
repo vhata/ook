@@ -299,6 +299,42 @@ function BookDates({ book }: { book: Book }) {
   );
 }
 
+// Human-readable date range for the Kindle-session line. `firstStart`
+// and `lastEnd` are ISO timestamps (Amazon takeout uses UTC); the
+// `YYYY-MM-DD` prefix is the calendar day in UTC, which is the
+// projection used throughout the codebase. Single-day reads render
+// one date. The year is dropped on each endpoint when it matches
+// `currentYear`, so the common case (this year's reading) stays
+// compact; cross-year ranges include the year on both sides for
+// clarity. Returns null when either timestamp is unparseable rather
+// than rendering "Invalid Date".
+function formatKindleRange(
+  firstStart: string,
+  lastEnd: string,
+  currentYear: number,
+): string | null {
+  const first = new Date(firstStart);
+  const last = new Date(lastEnd);
+  if (Number.isNaN(first.getTime()) || Number.isNaN(last.getTime())) return null;
+  const firstYear = first.getUTCFullYear();
+  const lastYear = last.getUTCFullYear();
+  // Show the year on both endpoints when either side is outside the
+  // current year — keeps the common in-year case compact while making
+  // any cross-year context explicit.
+  const showYear = firstYear !== currentYear || lastYear !== currentYear;
+  const fmt = (date: Date): string =>
+    date.toLocaleDateString("en", {
+      month: "short",
+      day: "numeric",
+      year: showYear ? "numeric" : undefined,
+      timeZone: "UTC",
+    });
+  const firstDay = firstStart.slice(0, 10);
+  const lastDay = lastEnd.slice(0, 10);
+  if (firstDay === lastDay) return fmt(first);
+  return `${fmt(first)} → ${fmt(last)}`;
+}
+
 // Discreet line surfacing Kindle reading-session data when the book
 // has an `amazon_asin:` and the takeout cache covers it. Same visual
 // register as HardcoverStats — small, dim, italic-feeling. Hidden
@@ -310,9 +346,8 @@ function KindleSessionStats({ stats }: { stats: KindleStats | null }) {
   const hoursDisplay = hours >= 10 ? Math.round(hours).toString() : hours.toFixed(1);
   const sessionWord = stats.sessions === 1 ? "session" : "sessions";
   const dayWord = stats.distinctDays === 1 ? "day" : "days";
-  const firstDate = stats.firstStart.slice(0, 10);
-  const lastDate = stats.lastEnd.slice(0, 10);
-  const isSingleDay = firstDate === lastDate;
+  const currentYear = new Date().getUTCFullYear();
+  const range = formatKindleRange(stats.firstStart, stats.lastEnd, currentYear);
   return (
     <div className="text-ink-soft mt-3 flex flex-wrap items-center gap-2 text-[12px]">
       <span>
@@ -322,11 +357,13 @@ function KindleSessionStats({ stats }: { stats: KindleStats | null }) {
       <span className="text-ink-dim">·</span>
       <span>~{hoursDisplay}h total</span>
       <span className="text-ink-dim">·</span>
-      <span className="text-ink-dim font-mono">
-        {isSingleDay ? firstDate : `${firstDate} → ${lastDate}`}
-      </span>
-      <span className="text-ink-dim">·</span>
       <span className="text-ink-dim">on Kindle</span>
+      {range && (
+        <>
+          <span className="text-ink-dim">·</span>
+          <span className="text-ink-dim">{range}</span>
+        </>
+      )}
     </div>
   );
 }
