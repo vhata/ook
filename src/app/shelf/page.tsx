@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { HomeMark } from "@/components/HomeMark";
 import { getAllBooks, getBingo, getCurrentBingoYear } from "@/lib/books";
-import {
-  SPINE_FALLBACK_WIDTH,
-  SPINE_MAX_WIDTH,
-  SPINE_MIN_WIDTH,
-  buildShelfItems,
-  computeSpineWidth,
-} from "@/lib/shelf";
+import { buildShelfItems, computeSpineWidth } from "@/lib/shelf";
 import type { Book } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -308,17 +302,12 @@ function abbreviate(s: string, max: number): string {
   return `${s.slice(0, max - 1)}…`;
 }
 
-// A small legend under the shelf that explains the size scale and the
-// markers, so the spine variance reads as intentional rather than
-// arbitrary. Set in the same uppercase-tracking register as the sort
-// links.
+// A small legend under the shelf that explains the visual markers
+// (the accent strip and the bookmark tongue). Set in the same
+// uppercase-tracking register as the sort links.
 function WidthLegend() {
   return (
     <div className="text-ink-soft mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] tracking-[0.14em] uppercase">
-      <span>
-        Width by pages · {SPINE_MIN_WIDTH}–{SPINE_MAX_WIDTH} px · fallback {SPINE_FALLBACK_WIDTH} px
-      </span>
-      <span className="text-ink-dim">·</span>
       <span className="inline-flex items-center gap-1">
         <span
           aria-hidden
