@@ -93,8 +93,15 @@ function sortBooks(books: Book[], sort: string): Book[] {
     out.sort((a, b) => a.title.localeCompare(b.title));
   } else {
     // finished (default): newest finish first. Currently-reading books
-    // (no finished date) sort to the front.
-    out.sort((a, b) => (b.finished ?? "9999-99-99").localeCompare(a.finished ?? "9999-99-99"));
+    // sort to the very front (most-recent interpretation); finished
+    // books with no recorded date sort to the very end (we have no
+    // signal where to place them, so they bottom out rather than
+    // pollute the front via the old "9999" sentinel).
+    const key = (b: Book): string => {
+      if (b.status === "reading") return "9999-99-99";
+      return b.finished ?? "";
+    };
+    out.sort((a, b) => key(b).localeCompare(key(a)) || a.title.localeCompare(b.title));
   }
   return out;
 }
