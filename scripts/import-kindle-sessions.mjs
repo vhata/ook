@@ -27,6 +27,7 @@ import os from "node:os";
 import path from "node:path";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 import {
+  buildDailyCounts,
   buildSessionsCache,
   parseOwnershipShards,
   parseSessionsCsv,
@@ -70,12 +71,16 @@ async function main() {
   );
 
   const cache = buildSessionsCache(sessions, ownership);
+  const dailyCounts = buildDailyCounts(sessions);
   const summary = summariseCache(cache);
   process.stderr.write(
     `\ncache: ${summary.asins} ASINs · ${summary.asinsWithTitle} owned · ${summary.totalSessions} sessions · ~${summary.totalHours}h total\n`,
   );
   process.stderr.write(
-    `unlinked: ${summary.unlinkedSessions} sessions · ~${summary.unlinkedHours}h (sendtokindle / personal docs / no ASIN match)\n\n`,
+    `unlinked: ${summary.unlinkedSessions} sessions · ~${summary.unlinkedHours}h (sendtokindle / personal docs / no ASIN match)\n`,
+  );
+  process.stderr.write(
+    `daily counts: ${Object.keys(dailyCounts).length} distinct reading days\n\n`,
   );
 
   const payload = {
@@ -89,6 +94,7 @@ async function main() {
       skippedSessionsMalformed: skippedMalformed,
     },
     books: cache,
+    dailyCounts,
   };
   const serialised = `${JSON.stringify(payload, null, 2)}\n`;
 

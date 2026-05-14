@@ -799,11 +799,17 @@ export async function getAllSeries(): Promise<SeriesGroup[]> {
 // Years (descending) that have at least one book event — finished, started,
 // or both. Powers the `/stats` index and any year-picker UI.
 export async function getStatsYears(): Promise<number[]> {
-  const books = await getAllBooks();
+  const [books, kindleDays] = await Promise.all([getAllBooks(), loadKindleDailyCounts()]);
   const years = new Set<number>();
   for (const b of books) {
     if (b.finished) years.add(Number(b.finished.slice(0, 4)));
     if (b.started) years.add(Number(b.started.slice(0, 4)));
+  }
+  // Years with Kindle reading-day data but no vault frontmatter dates
+  // (pre-vault-era reading). The heatmap will render those years from
+  // session data alone.
+  for (const date of kindleDays.keys()) {
+    years.add(Number(date.slice(0, 4)));
   }
   return [...years].filter((y) => Number.isFinite(y)).sort((a, b) => b - a);
 }
@@ -1013,6 +1019,10 @@ type KindleSessionsFile = {
       distinctDays?: number;
     }
   >;
+  // Per-day session count across the whole takeout. Powers the
+  // `/stats` heatmap historical-reach so years prior to the vault's
+  // first commit render proper reading-day data. Added 2026-05-13.
+  dailyCounts?: Record<string, number>;
 };
 
 export const loadKindleSessions = cache(async (): Promise<Map<string, KindleStats>> => {
@@ -1082,6 +1092,35 @@ export const getUnlinkedKindleActivity = cache(
     return { sessions, totalSeconds };
   },
 );
+
+// Per-day Kindle session counts derived from `_meta/kindle-sessions.json`.
+// Keys are YYYY-MM-DD, values are session counts on that date. Used by
+// `getStatsYears()` to surface years that have only Kindle data and by
+// `getYearActivity()` to fold per-day reading into the heatmap.
+// Returns an empty map when the cache is absent or has no daily-count
+// projection (older cache files predating the field).
+export const loadKindleDailyCounts = cache(async (): Promise<Map<string, number>> => {
+  const file = path.join(booksDir(), META_DIR, "kindle-sessions.json");
+  let raw: string;
+  try {
+    raw = await fs.readFile(file, "utf8");
+  } catch {
+    return new Map();
+  }
+  let parsed: KindleSessionsFile;
+  try {
+    parsed = JSON.parse(raw) as KindleSessionsFile;
+  } catch {
+    return new Map();
+  }
+  const out = new Map<string, number>();
+  for (const [date, count] of Object.entries(parsed.dailyCounts ?? {})) {
+    if (typeof count === "number" && count > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      out.set(date, count);
+    }
+  }
+  return out;
+});
 
 export const loadHardcoverBooks = cache(async (): Promise<Map<string, HardcoverBook>> => {
   const file = path.join(booksDir(), META_DIR, "hardcover-books.json");
@@ -1688,7 +1727,11 @@ export async function getOnThisDay(today: Date = new Date()): Promise<LogEntry[]
 // (started + finished + manual log) on that day. Powers the heatmap on
 // `/stats/[year]`.
 export async function getYearActivity(year: number): Promise<DayActivity[]> {
-  const [books, manual] = await Promise.all([getAllBooks(), getManualLogEntries()]);
+  const [books, manual, kindleDays] = await Promise.all([
+    getAllBooks(),
+    getManualLogEntries(),
+    loadKindleDailyCounts(),
+  ]);
   const counts = new Map<string, number>();
   const bump = (date: string | null) => {
     if (!date) return;
@@ -1700,6 +1743,16 @@ export async function getYearActivity(year: number): Promise<DayActivity[]> {
     bump(b.finished);
   }
   for (const m of manual) bump(m.date);
+  // Each day with Kindle sessions adds +1 to its cell — counting
+  // "reading-day-or-not" rather than raw session count so the heatmap
+  // composes well with the other event sources (a finish-day with one
+  // session reads as +2, not +(1 + per-session-count) which would
+  // dwarf the other signals).
+  for (const date of kindleDays.keys()) {
+    if (date.startsWith(`${year}-`)) {
+      counts.set(date, (counts.get(date) ?? 0) + 1);
+    }
+  }
 
   const days: DayActivity[] = [];
   const start = Date.UTC(year, 0, 1);

@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - .mjs lib lives outside the TS project graph
 import {
+  buildDailyCounts,
   buildSessionsCache,
   parseOwnershipShards,
   parseSessionsCsv,
@@ -417,5 +418,61 @@ describe("summariseCache", () => {
       unlinkedSessions: 0,
       unlinkedHours: 0,
     });
+  });
+});
+
+describe("buildDailyCounts", () => {
+  function session(start: string) {
+    return {
+      asin: "B00X",
+      start,
+      end: start.replace(
+        /\d{2}:/,
+        (h) => `${(parseInt(h.slice(0, 2), 10) + 1).toString().padStart(2, "0")}:`,
+      ),
+      durationSeconds: 3600,
+      pageFlips: 0,
+      device: "K",
+      contentType: "E-Book",
+    };
+  }
+
+  it("counts one entry per session, keyed by YYYY-MM-DD", () => {
+    const out = buildDailyCounts([
+      session("2024-01-01T10:00:00Z"),
+      session("2024-01-01T20:00:00Z"),
+      session("2024-01-02T10:00:00Z"),
+    ]);
+    expect(out).toEqual({ "2024-01-01": 2, "2024-01-02": 1 });
+  });
+
+  it("sorts keys lexicographically so the JSON output is diff-friendly", () => {
+    const out = buildDailyCounts([
+      session("2024-12-01T10:00:00Z"),
+      session("2024-01-01T10:00:00Z"),
+      session("2024-06-01T10:00:00Z"),
+    ]);
+    expect(Object.keys(out)).toEqual(["2024-01-01", "2024-06-01", "2024-12-01"]);
+  });
+
+  it("drops sessions with malformed (too-short) start strings", () => {
+    const out = buildDailyCounts([
+      session("2024-01-01T10:00:00Z"),
+      { ...session("2024-01-01T10:00:00Z"), start: "short" },
+    ]);
+    expect(out).toEqual({ "2024-01-01": 1 });
+  });
+
+  it("returns an empty map for no sessions", () => {
+    expect(buildDailyCounts([])).toEqual({});
+  });
+
+  it("aggregates across ASINs — the day map is global, not per-book", () => {
+    const out = buildDailyCounts([
+      { ...session("2024-01-01T10:00:00Z"), asin: "B001" },
+      { ...session("2024-01-01T11:00:00Z"), asin: "B002" },
+      { ...session("2024-01-01T12:00:00Z"), asin: "B003" },
+    ]);
+    expect(out).toEqual({ "2024-01-01": 3 });
   });
 });

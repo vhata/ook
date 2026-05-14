@@ -252,6 +252,36 @@ export function buildSessionsCache(sessions, ownership) {
 }
 
 /**
+ * Build a per-day session-count map for the whole takeout — sessions
+ * counted once per (start-date) regardless of which ASIN they belong
+ * to. Powers the `/stats` heatmap historical-reach feature: years
+ * prior to the vault's first commit can render proper reading-day
+ * data, not an empty grid.
+ *
+ * Sessions with malformed start timestamps are silently dropped (the
+ * upstream parser already filters these; belt-and-braces).
+ *
+ * Keys are sorted lexicographically so the cache stays diff-friendly
+ * across re-runs.
+ *
+ * @param {ReturnType<typeof parseSessionsCsv>["sessions"]} sessions
+ * @returns {Record<string, number>}
+ */
+export function buildDailyCounts(sessions) {
+  const counts = new Map();
+  for (const s of sessions) {
+    if (typeof s.start !== "string" || s.start.length < 10) continue;
+    const date = s.start.slice(0, 10);
+    counts.set(date, (counts.get(date) ?? 0) + 1);
+  }
+  const out = {};
+  for (const date of [...counts.keys()].sort()) {
+    out[date] = counts.get(date);
+  }
+  return out;
+}
+
+/**
  * Compact summary numbers over a built cache. Used both in the script's
  * stderr summary and in tests so the report format stays pinned.
  *
