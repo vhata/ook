@@ -50,11 +50,38 @@ function daysBetween(anchor: string, today: Date): number | null {
   return Math.max(0, Math.round((todayMs - anchorMs) / DAY_MS));
 }
 
+// Pick the most-recent anchor across `last_progress`, `started`, and an
+// optional Kindle-session `lastEnd` timestamp. The Kindle cache is the
+// most durable activity signal we have for books read on Kindle —
+// every page turn writes a session, even when `last_progress` never
+// gets edited and `started` is years old.
+//
+// Each candidate is normalised to a YYYY-MM-DD prefix before comparing,
+// so a bare-date `started` ("2023-05-13") and a full-ISO Kindle anchor
+// ("2026-05-10T04:01:42Z") sort and compare cleanly. The return value
+// is the date portion, ready for `daysBetween` to parse.
+function latestAnchor(
+  last_progress: string | null | undefined,
+  started: string | null | undefined,
+  kindleLastEnd: string | null | undefined,
+): string | null {
+  const candidates: string[] = [];
+  const push = (v: string | null | undefined) => {
+    if (typeof v === "string" && v.length >= 10) candidates.push(v.slice(0, 10));
+  };
+  push(last_progress);
+  push(started);
+  push(kindleLastEnd);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((a, b) => (a > b ? a : b));
+}
+
 export function effectiveStatus(
   status: BookStatus,
   last_progress: string | null | undefined,
   today: Date,
   started?: string | null,
+  kindleLastEnd?: string | null,
 ): BookStatus {
   // User-set values that aren't `reading` pass through. Explicit
   // `paused` wins over the timer; explicit `abandoned` / `finished` /
@@ -62,8 +89,9 @@ export function effectiveStatus(
   if (status !== "reading") return status;
 
   // For a `reading` book, fall through to the threshold check using
-  // `last_progress` (preferred) or `started` (fallback) as the anchor.
-  const anchor = last_progress ?? started ?? null;
+  // the most-recent activity signal across last_progress, started, and
+  // any Kindle session lastEnd.
+  const anchor = latestAnchor(last_progress, started, kindleLastEnd);
   if (!anchor) return "paused";
 
   const daysSince = daysBetween(anchor, today);
@@ -83,9 +111,10 @@ export function isFreshReading(
   last_progress: string | null | undefined,
   today: Date,
   started?: string | null,
+  kindleLastEnd?: string | null,
 ): boolean {
   if (status !== "reading") return false;
-  const anchor = last_progress ?? started ?? null;
+  const anchor = latestAnchor(last_progress, started, kindleLastEnd);
   if (!anchor) return false;
   const daysSince = daysBetween(anchor, today);
   if (daysSince === null) return false;
@@ -98,31 +127,40 @@ export function isFreshReading(
 // the threshold rule. Books with any other stored status are dropped.
 // Reading list ordering preserves input order; paused list orders by
 // most-recently-active first (longer-untouched cards sink).
-export function splitNowBooks(books: Book[], today: Date): { reading: Book[]; paused: Book[] } {
+export function splitNowBooks(
+  books: Book[],
+  today: Date,
+  kindleLastEndByAsin?: Map<string, string>,
+): { reading: Book[]; paused: Book[] } {
+  const lookup = (book: Book): string | null => {
+    if (!kindleLastEndByAsin || !book.amazonAsin) return null;
+    return kindleLastEndByAsin.get(book.amazonAsin) ?? null;
+  };
   const reading: Book[] = [];
   const paused: Book[] = [];
   for (const book of books) {
     if (book.status !== "reading" && book.status !== "paused") continue;
-    const eff = effectiveStatus(book.status, book.last_progress, today, book.started);
+    const eff = effectiveStatus(book.status, book.last_progress, today, book.started, lookup(book));
     if (eff === "reading") reading.push(book);
     else if (eff === "paused") paused.push(book);
   }
   paused.sort((a, b) => {
-    const aDays = daysSinceLastProgress(a.last_progress, today, a.started) ?? Infinity;
-    const bDays = daysSinceLastProgress(b.last_progress, today, b.started) ?? Infinity;
+    const aDays = daysSinceLastProgress(a.last_progress, today, a.started, lookup(a)) ?? Infinity;
+    const bDays = daysSinceLastProgress(b.last_progress, today, b.started, lookup(b)) ?? Infinity;
     return aDays - bDays;
   });
   return { reading, paused };
 }
 
-// Days since the last_progress anchor (or `started` fallback), for the
-// "X days ago" indicator on paused cards. Null when no anchor exists.
+// Days since the most-recent activity anchor, for the "X days ago"
+// indicator on paused cards. Null when no anchor exists.
 export function daysSinceLastProgress(
   last_progress: string | null | undefined,
   today: Date,
   started?: string | null,
+  kindleLastEnd?: string | null,
 ): number | null {
-  const anchor = last_progress ?? started ?? null;
+  const anchor = latestAnchor(last_progress, started, kindleLastEnd);
   if (!anchor) return null;
   return daysBetween(anchor, today);
 }

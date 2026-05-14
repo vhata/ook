@@ -285,14 +285,18 @@ export const getAllBooks = cache(async (): Promise<Book[]> => {
 // Books the reader is *effectively* reading right now — the raw
 // `status: reading` filter alone would surface books flipped to
 // reading years ago and never closed out. Applies `effectiveStatus()`
-// so a stale `reading` book (no progress in > 90 days) auto-promotes
+// so a stale `reading` book (no progress in > 90 days, considering
+// last_progress, started, AND Kindle session lastEnd) auto-promotes
 // to paused and drops off the home-page card. Paused books live on
 // `/now` under the "Set aside" section, not on the home page.
 export async function getCurrentlyReading(today: Date = new Date()): Promise<Book[]> {
-  const all = await getAllBooks();
+  const [all, kindle] = await Promise.all([getAllBooks(), loadKindleSessions()]);
   return all.filter((b) => {
     if (b.status !== "reading") return false;
-    return effectiveStatus(b.status, b.last_progress, today, b.started) === "reading";
+    const kindleLastEnd = b.amazonAsin ? (kindle.get(b.amazonAsin)?.lastEnd ?? null) : null;
+    return (
+      effectiveStatus(b.status, b.last_progress, today, b.started, kindleLastEnd) === "reading"
+    );
   });
 }
 

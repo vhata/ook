@@ -62,6 +62,24 @@ describe("effectiveStatus", () => {
   it("reading with an unparseable last_progress returns the stored status untouched", () => {
     expect(effectiveStatus("reading", "not-a-date", TODAY)).toBe("reading");
   });
+
+  it("kindleLastEnd overrides a stale started date when more recent", () => {
+    // started 3 years ago, but Kindle session 3 days ago — book is active.
+    const stale = daysAgo(1095);
+    const fresh = `${daysAgo(3)}T04:01:42Z`;
+    expect(effectiveStatus("reading", null, TODAY, stale, fresh)).toBe("reading");
+  });
+
+  it("kindleLastEnd alone (no last_progress, no started) anchors a reading book", () => {
+    const fresh = `${daysAgo(2)}T10:00:00Z`;
+    expect(effectiveStatus("reading", null, TODAY, null, fresh)).toBe("reading");
+  });
+
+  it("a stale kindleLastEnd does not rescue a stale book", () => {
+    const stale = daysAgo(200);
+    const alsoStale = `${daysAgo(180)}T10:00:00Z`;
+    expect(effectiveStatus("reading", null, TODAY, stale, alsoStale)).toBe("paused");
+  });
 });
 
 describe("isFreshReading", () => {

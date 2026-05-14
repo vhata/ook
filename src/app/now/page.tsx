@@ -8,6 +8,7 @@ import {
   getCurrentReadingStreak,
   getRecentlyFinished,
   loadHardcoverBooks,
+  loadKindleSessions,
 } from "@/lib/books";
 import { getOwnerSession } from "@/lib/auth/session";
 import { daysSinceLastProgress, isFreshReading, splitNowBooks } from "@/lib/status";
@@ -47,15 +48,20 @@ export default async function NowPage() {
   const today = new Date();
   const todayMs = today.getTime();
 
-  const [allBooks, recent, streak, hardcover, session] = await Promise.all([
+  const [allBooks, recent, streak, hardcover, kindle, session] = await Promise.all([
     getAllBooks(),
     getRecentlyFinished(1),
     getCurrentReadingStreak(today),
     loadHardcoverBooks(),
+    loadKindleSessions(),
     getOwnerSession(),
   ]);
   const isOwner = session !== null;
-  const { reading, paused } = splitNowBooks(allBooks, today);
+  const kindleLastEndByAsin = new Map<string, string>();
+  for (const [asin, s] of kindle) kindleLastEndByAsin.set(asin, s.lastEnd);
+  const kindleLastEndForBook = (b: Book): string | null =>
+    b.amazonAsin ? (kindleLastEndByAsin.get(b.amazonAsin) ?? null) : null;
+  const { reading, paused } = splitNowBooks(allBooks, today, kindleLastEndByAsin);
   const lastFinished = recent[0] ?? null;
 
   return (
@@ -82,7 +88,13 @@ export default async function NowPage() {
                 book={b}
                 daysIn={daysInForBook(b.started, todayMs)}
                 etaDays={estimateReadingDaysRemaining(b, hardcover, allBooks, today)}
-                fresh={isFreshReading(b.status, b.last_progress, today, b.started)}
+                fresh={isFreshReading(
+                  b.status,
+                  b.last_progress,
+                  today,
+                  b.started,
+                  kindleLastEndForBook(b),
+                )}
               />
             ))}
           </div>
@@ -99,7 +111,12 @@ export default async function NowPage() {
               <PausedBook
                 key={b.slug}
                 book={b}
-                daysSince={daysSinceLastProgress(b.last_progress, today, b.started)}
+                daysSince={daysSinceLastProgress(
+                  b.last_progress,
+                  today,
+                  b.started,
+                  kindleLastEndForBook(b),
+                )}
                 isOwner={isOwner}
               />
             ))}

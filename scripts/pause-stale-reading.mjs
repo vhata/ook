@@ -35,6 +35,7 @@ import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 
 const DEFAULT_THRESHOLD_DAYS = 90;
 const DAY_MS = 86400000;
+const KINDLE_CACHE_REL = path.join("_meta", "kindle-sessions.json");
 
 const argv = parseArgs(process.argv.slice(2));
 const VAULT = path.resolve(
@@ -65,10 +66,13 @@ async function main() {
     .sort();
   if (SLUG_FILTER) slugs = slugs.filter((s) => s === SLUG_FILTER);
 
+  const kindleLastEndByAsin = await readKindleLastEnds(path.join(VAULT, KINDLE_CACHE_REL));
+
   const today = new Date();
   process.stderr.write(`vault: ${VAULT}\n`);
   process.stderr.write(`books: ${slugs.length}\n`);
-  process.stderr.write(`threshold: ${THRESHOLD_DAYS} days since last_progress / started\n`);
+  process.stderr.write(`kindle anchors: ${kindleLastEndByAsin.size} ASINs with session data\n`);
+  process.stderr.write(`threshold: ${THRESHOLD_DAYS} days since latest activity anchor\n`);
   process.stderr.write(`mode: ${APPLY ? "APPLY" : "dry-run"}\n\n`);
 
   const counts = {
@@ -93,7 +97,15 @@ async function main() {
       continue;
     }
 
-    const anchor = stringOrNull(data.last_progress) ?? stringOrNull(data.started);
+    const kindleLastEnd =
+      typeof data.amazon_asin === "string"
+        ? (kindleLastEndByAsin.get(data.amazon_asin) ?? null)
+        : null;
+    const anchor = latestAnchor(
+      stringOrNull(data.last_progress),
+      stringOrNull(data.started),
+      kindleLastEnd,
+    );
     const daysSince = anchor ? daysBetween(anchor, today) : null;
     const isStale = daysSince === null || daysSince > THRESHOLD_DAYS;
 
@@ -146,6 +158,44 @@ function stringOrNull(value) {
     return value.toISOString().slice(0, 10);
   }
   return null;
+}
+
+// Most-recent activity anchor across last_progress, started, and the
+// Kindle session lastEnd. Each candidate is normalised to a YYYY-MM-DD
+// prefix so a bare-date `started` and a full-ISO Kindle anchor compare
+// cleanly. Mirrors `latestAnchor` in src/lib/status.ts.
+export function latestAnchor(last_progress, started, kindleLastEnd) {
+  const candidates = [];
+  const push = (v) => {
+    if (typeof v === "string" && v.length >= 10) candidates.push(v.slice(0, 10));
+  };
+  push(last_progress);
+  push(started);
+  push(kindleLastEnd);
+  if (candidates.length === 0) return null;
+  return candidates.reduce((a, b) => (a > b ? a : b));
+}
+
+async function readKindleLastEnds(cachePath) {
+  const out = new Map();
+  let raw;
+  try {
+    raw = await fs.readFile(cachePath, "utf8");
+  } catch {
+    return out;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return out;
+  }
+  for (const [asin, record] of Object.entries(parsed?.books ?? {})) {
+    if (record && typeof record.lastEnd === "string" && record.lastEnd.length > 0) {
+      out.set(asin, record.lastEnd);
+    }
+  }
+  return out;
 }
 
 // Whole-day difference between a YYYY-MM-DD anchor and today (UTC).
