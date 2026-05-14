@@ -45,6 +45,42 @@ export default async function StatsYearPage({ params }: { params: Params }) {
   const finishedThisYear = allBooks
     .filter((b) => b.status === "finished" && b.finished?.startsWith(`${year}-`))
     .sort((a, b) => (a.finished ?? "").localeCompare(b.finished ?? ""));
+  // Sibling subsets used by Topline / RatingHistogram / TopList tooltips
+  // so every count surfaces the underlying titles via title= hover even
+  // when no filtered-list route exists to drill into.
+  const abandonedThisYear = allBooks.filter(
+    (b) => b.status === "abandoned" && b.finished?.startsWith(`${year}-`),
+  );
+  const startedThisYear = allBooks.filter((b) => b.started?.startsWith(`${year}-`));
+  const wouldRereadThisYear = finishedThisYear.filter((b) => b.wouldReread === true);
+  const ratedThisYear = finishedThisYear.filter((b) => b.rating !== null);
+  // Buckets keyed by 1..5 (half-stars round to nearest whole), matching
+  // the histogram's rounding rule in getYearStats().
+  const ratedByBucket = new Map<number, Book[]>();
+  for (const b of ratedThisYear) {
+    if (b.rating === null) continue;
+    const bucket = Math.max(1, Math.min(5, Math.round(b.rating)));
+    const arr = ratedByBucket.get(bucket) ?? [];
+    arr.push(b);
+    ratedByBucket.set(bucket, arr);
+  }
+  // Tag → titles and author → titles for the right-column lists.
+  const tagToBooks = new Map<string, Book[]>();
+  for (const b of finishedThisYear) {
+    for (const t of b.tags) {
+      const arr = tagToBooks.get(t) ?? [];
+      arr.push(b);
+      tagToBooks.set(t, arr);
+    }
+  }
+  const authorToBooks = new Map<string, Book[]>();
+  for (const b of finishedThisYear) {
+    for (const a of b.authors) {
+      const arr = authorToBooks.get(a) ?? [];
+      arr.push(b);
+      authorToBooks.set(a, arr);
+    }
+  }
   const todayMs = new Date().getTime();
 
   return (
@@ -57,7 +93,14 @@ export default async function StatsYearPage({ params }: { params: Params }) {
         <EmptyYear year={year} />
       ) : (
         <>
-          <Topline stats={stats} />
+          <Topline
+            stats={stats}
+            finished={finishedThisYear}
+            abandoned={abandonedThisYear}
+            started={startedThisYear}
+            wouldReread={wouldRereadThisYear}
+            rated={ratedThisYear}
+          />
           {stats.paceProjection && <PaceProjection stats={stats} />}
           {totalEvents > 0 &&
             (totalEvents < HEATMAP_MIN_EVENTS ? (
@@ -70,12 +113,18 @@ export default async function StatsYearPage({ params }: { params: Params }) {
           {stats.pagesByMonth.some((p) => p > 0) && (
             <PagesPerMonth pagesByMonth={stats.pagesByMonth} />
           )}
-          {stats.rated > 0 && <RatingHistogram stats={stats} />}
+          {stats.rated > 0 && <RatingHistogram stats={stats} ratedByBucket={ratedByBucket} />}
           <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-2">
             <TopList
               title="Top tags"
               empty="No tagged books finished."
-              rows={stats.topTags.map((t) => ({ key: t.tag, label: t.tag, count: t.count }))}
+              rows={stats.topTags.map((t) => ({
+                key: t.tag,
+                label: t.tag,
+                count: t.count,
+                href: `/tags/${encodeURIComponent(t.tag)}`,
+                tooltip: titlesTooltip(tagToBooks.get(t.tag) ?? []),
+              }))}
             />
             <TopList
               title="Most read authors"
@@ -84,6 +133,7 @@ export default async function StatsYearPage({ params }: { params: Params }) {
                 key: a.author,
                 label: a.author,
                 count: a.count,
+                tooltip: titlesTooltip(authorToBooks.get(a.author) ?? []),
               }))}
             />
           </div>
@@ -94,6 +144,18 @@ export default async function StatsYearPage({ params }: { params: Params }) {
       )}
     </main>
   );
+}
+
+// Build a newline-separated `title=` tooltip from a book list. Native
+// title attributes can't be styled, but they render plain-text with line
+// breaks on every browser we care about. Trims to ~12 entries with a
+// "… and N more" tail so a year of 80 finishes doesn't fill the screen.
+function titlesTooltip(books: Book[]): string {
+  if (books.length === 0) return "";
+  const max = 12;
+  const head = books.slice(0, max).map((b) => `· ${b.title}`);
+  const tail = books.length > max ? [`… and ${books.length - max} more`] : [];
+  return [...head, ...tail].join("\n");
 }
 
 function Header({ year, years }: { year: number; years: number[] }) {
@@ -147,13 +209,44 @@ function EmptyYear({ year }: { year: number }) {
   );
 }
 
-function Topline({ stats }: { stats: YearStats }) {
-  const items: Array<{ label: string; value: string; hint?: string }> = [
-    { label: "Finished", value: String(stats.finished) },
+function Topline({
+  stats,
+  finished,
+  abandoned,
+  started,
+  wouldReread,
+  rated,
+}: {
+  stats: YearStats;
+  finished: Book[];
+  abandoned: Book[];
+  started: Book[];
+  wouldReread: Book[];
+  rated: Book[];
+}) {
+  // Each tile carries a tooltip listing the underlying titles, and an
+  // optional href when a clean drill-in target exists (today only the
+  // longest book has one — a per-book page). The rest piggy-back on the
+  // native title-attribute tooltip; the user gets "what's in this number"
+  // on hover, the rule from feedback_ook_clickable_info.md.
+  type Item = {
+    label: string;
+    value: string;
+    hint?: string;
+    tooltip?: string;
+    href?: string;
+  };
+  const items: Item[] = [
+    {
+      label: "Finished",
+      value: String(stats.finished),
+      tooltip: titlesTooltip(finished),
+    },
     {
       label: "Avg rating",
       value: stats.averageRating !== null ? stats.averageRating.toFixed(2) : "—",
       hint: stats.rated > 0 ? `over ${stats.rated} rated` : undefined,
+      tooltip: rated.length > 0 ? titlesTooltip(rated) : undefined,
     },
   ];
   if (stats.totalPages !== null) {
@@ -162,17 +255,27 @@ function Topline({ stats }: { stats: YearStats }) {
       label: "Pages",
       value: stats.totalPages.toLocaleString("en-US"),
       hint: `from ${withPages} of ${total} books with page data`,
+      tooltip: titlesTooltip(finished.filter((b) => b.pages !== null && b.pages > 0)),
     });
   }
-  items.push({ label: "Started", value: String(stats.startedInYear) });
+  items.push({
+    label: "Started",
+    value: String(stats.startedInYear),
+    tooltip: titlesTooltip(started),
+  });
   if (stats.abandoned > 0) {
-    items.push({ label: "Abandoned", value: String(stats.abandoned) });
+    items.push({
+      label: "Abandoned",
+      value: String(stats.abandoned),
+      tooltip: titlesTooltip(abandoned),
+    });
   }
   if (stats.wouldReread > 0) {
     items.push({
       label: "Would reread",
       value: String(stats.wouldReread),
       hint: `of ${stats.finished}`,
+      tooltip: titlesTooltip(wouldReread),
     });
   }
   if (stats.longestBook) {
@@ -181,32 +284,47 @@ function Topline({ stats }: { stats: YearStats }) {
       label: "Longest",
       value: lb.pages.toLocaleString("en-US"),
       hint: lb.authors.length > 0 ? `${lb.title} · ${lb.authors.join(", ")}` : lb.title,
+      href: `/books/${encodeURIComponent(lb.slug)}`,
     });
   }
   return (
     <section className="bg-surface border-rule grid grid-cols-2 rounded border sm:grid-cols-3 md:grid-cols-5">
-      {items.map((item, i) => (
-        <div
-          key={item.label}
-          className={
-            "border-rule p-4 md:p-5 " +
-            (i % 5 < 4 ? "md:border-r " : "") +
-            (i < items.length - 2 ? "border-b sm:border-b-0 " : "")
-          }
-        >
-          <div className="text-ink-soft mb-1.5 text-[10px] tracking-[0.14em] uppercase md:text-[11px]">
-            {item.label}
-          </div>
-          <div className="font-serif text-ink mb-0.5 text-[22px] leading-none font-medium tracking-[-0.015em] md:text-[28px]">
-            {item.value}
-          </div>
-          {item.hint && (
-            <div className="text-ink-soft truncate text-[11px] md:text-xs" title={item.hint}>
-              {item.hint}
+      {items.map((item, i) => {
+        const cellClass =
+          "border-rule p-4 md:p-5 " +
+          (i % 5 < 4 ? "md:border-r " : "") +
+          (i < items.length - 2 ? "border-b sm:border-b-0 " : "");
+        const inner = (
+          <>
+            <div className="text-ink-soft mb-1.5 text-[10px] tracking-[0.14em] uppercase md:text-[11px]">
+              {item.label}
             </div>
-          )}
-        </div>
-      ))}
+            <div className="font-serif text-ink mb-0.5 text-[22px] leading-none font-medium tracking-[-0.015em] md:text-[28px]">
+              {item.value}
+            </div>
+            {item.hint && (
+              <div className="text-ink-soft truncate text-[11px] md:text-xs">{item.hint}</div>
+            )}
+          </>
+        );
+        if (item.href) {
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              title={item.tooltip || item.hint}
+              className={`${cellClass} hover:bg-surface-mute block transition-colors`}
+            >
+              {inner}
+            </Link>
+          );
+        }
+        return (
+          <div key={item.label} className={cellClass} title={item.tooltip}>
+            {inner}
+          </div>
+        );
+      })}
     </section>
   );
 }
@@ -705,7 +823,13 @@ function WeekendSplit({ activity }: { activity: DayActivity[] }) {
   );
 }
 
-function RatingHistogram({ stats }: { stats: YearStats }) {
+function RatingHistogram({
+  stats,
+  ratedByBucket,
+}: {
+  stats: YearStats;
+  ratedByBucket: Map<number, Book[]>;
+}) {
   const max = Math.max(1, ...stats.ratingDistribution.map((b) => b.count));
   return (
     <section className="mt-12">
@@ -714,17 +838,25 @@ function RatingHistogram({ stats }: { stats: YearStats }) {
       </h2>
       <div className="bg-surface border-rule space-y-3 rounded border p-5">
         {stats.ratingDistribution.map((b) => (
-          <RatingBar key={b.rating} bucket={b} max={max} />
+          <RatingBar
+            key={b.rating}
+            bucket={b}
+            max={max}
+            books={ratedByBucket.get(b.rating) ?? []}
+          />
         ))}
       </div>
     </section>
   );
 }
 
-function RatingBar({ bucket, max }: { bucket: RatingBucket; max: number }) {
+function RatingBar({ bucket, max, books }: { bucket: RatingBucket; max: number; books: Book[] }) {
   const pct = max > 0 ? (bucket.count / max) * 100 : 0;
+  // The whole row carries the tooltip — hovering the stars, the bar, or
+  // the count surfaces the titles in that bucket.
+  const tooltip = books.length > 0 ? titlesTooltip(books) : undefined;
   return (
-    <div className="grid grid-cols-[64px_1fr_32px] items-center gap-3">
+    <div className="grid grid-cols-[64px_1fr_32px] items-center gap-3" title={tooltip}>
       <div className="text-star font-mono text-[13px]">
         {"★".repeat(bucket.rating)}
         <span className="text-ink-dim">{"★".repeat(5 - bucket.rating)}</span>
@@ -788,9 +920,14 @@ function TopList({
   empty,
 }: {
   title: string;
-  rows: Array<{ key: string; label: string; count: number }>;
+  rows: Array<{ key: string; label: string; count: number; href?: string; tooltip?: string }>;
   empty: string;
 }) {
+  // Each row either links somewhere (tags do, to `/tags/[tag]`) or carries
+  // a tooltip listing the underlying titles (authors do — there's no
+  // `/authors/[author]` route). Links inherit text colour and gain a
+  // subtle hover-underline rather than the full-accent paint reserved
+  // for navigational primaries.
   return (
     <section>
       <h2 className="font-serif text-ink m-0 mb-4 text-[20px] leading-tight font-medium tracking-[-0.012em]">
@@ -800,15 +937,34 @@ function TopList({
         <div className="text-ink-soft text-[13px] italic">{empty}</div>
       ) : (
         <ol className="m-0 list-none space-y-1.5 p-0">
-          {rows.map((r) => (
-            <li
-              key={r.key}
-              className="border-rule flex items-baseline justify-between border-b pb-1.5 text-[14px]"
-            >
-              <span className="text-ink truncate">{r.label}</span>
-              <span className="text-ink-soft ml-3 font-mono text-[12px]">{r.count}</span>
-            </li>
-          ))}
+          {rows.map((r) => {
+            const inner = (
+              <>
+                <span className="text-ink truncate">{r.label}</span>
+                <span className="text-ink-soft ml-3 font-mono text-[12px]">{r.count}</span>
+              </>
+            );
+            const liClass =
+              "border-rule flex items-baseline justify-between border-b pb-1.5 text-[14px]";
+            if (r.href) {
+              return (
+                <li key={r.key}>
+                  <Link
+                    href={r.href}
+                    title={r.tooltip}
+                    className={`${liClass} decoration-rule hover:decoration-accent underline-offset-[3px] hover:underline`}
+                  >
+                    {inner}
+                  </Link>
+                </li>
+              );
+            }
+            return (
+              <li key={r.key} className={liClass} title={r.tooltip}>
+                {inner}
+              </li>
+            );
+          })}
         </ol>
       )}
     </section>

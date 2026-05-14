@@ -86,9 +86,17 @@ export default async function StatsIndex() {
               >
                 {y.year}
               </Link>
-              <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
+              {/* The "N finished" count also drills into that year's page —
+                  the heading is already a link, but a user who lands on
+                  the count first should be able to click straight through.
+                  Subtle hover-only underline; no accent paint on the
+                  surrounding tracking-uppercase text. */}
+              <Link
+                href={`/stats/${y.year}`}
+                className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase decoration-rule hover:decoration-accent underline-offset-[3px] hover:underline"
+              >
                 {y.finishedCount} finished
-              </span>
+              </Link>
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Bookend label="First" book={y.first} />
@@ -101,7 +109,10 @@ export default async function StatsIndex() {
       </ol>
 
       {unlinkedKindle && (
-        <p className="text-ink-dim border-rule mt-10 border-t pt-4 text-[12px] italic">
+        <p
+          className="text-ink-dim border-rule mt-10 border-t pt-4 text-[12px] italic"
+          title={`These are Kindle reading sessions that don't tie to any vault book — chiefly send-to-Kindle personal documents (PDFs, articles) and Amazon sample previews, where the ASIN never appears in the ownership records. The time is real, the page is honest about not being able to attribute it.`}
+        >
           Plus an unlinked {unlinkedKindle.sessions.toLocaleString("en-US")} Kindle session
           {unlinkedKindle.sessions === 1 ? "" : "s"}
           {" (~"}
@@ -116,6 +127,29 @@ export default async function StatsIndex() {
 function formatUnlinkedHours(totalSeconds: number): string {
   const hours = totalSeconds / 3600;
   return hours >= 10 ? Math.round(hours).toString() : hours.toFixed(1);
+}
+
+// Tooltip text for the rating-over-time summary strip. Lists the titles
+// that anchor the worst- and best-rated ends of the range — the bare
+// "1.0–5.0" numbers leave the reader without a referent.
+function ratingsSummaryTooltip(dots: RatedDot[], worst: number, best: number): string {
+  const worstTitles = dots.filter((d) => d.rating === worst).map((d) => `· ${d.title}`);
+  const bestTitles = dots.filter((d) => d.rating === best).map((d) => `· ${d.title}`);
+  const lines: string[] = [];
+  if (worstTitles.length > 0) {
+    const cap = 4;
+    const head = worstTitles.slice(0, cap);
+    const tail = worstTitles.length > cap ? [`… and ${worstTitles.length - cap} more`] : [];
+    lines.push(`Lowest (${worst.toFixed(1)}):`, ...head, ...tail);
+  }
+  if (bestTitles.length > 0) {
+    if (lines.length > 0) lines.push("");
+    const cap = 6;
+    const head = bestTitles.slice(0, cap);
+    const tail = bestTitles.length > cap ? [`… and ${bestTitles.length - cap} more`] : [];
+    lines.push(`Highest (${best.toFixed(1)}):`, ...head, ...tail);
+  }
+  return lines.join("\n");
 }
 
 type RatedDot = {
@@ -181,7 +215,13 @@ function RatingOverTime({ dots }: { dots: RatedDot[] }) {
         <h2 className="font-serif text-ink m-0 text-[22px] leading-tight font-medium tracking-[-0.012em]">
           Ratings, over time
         </h2>
-        <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
+        {/* Tooltip surfaces the worst- and best-rated titles so the
+            range numbers in the strip aren't naked — the reader can see
+            which books anchor each end of the scale. */}
+        <span
+          className="text-ink-soft text-[11px] tracking-[0.14em] uppercase"
+          title={ratingsSummaryTooltip(dots, worstRating, bestRating)}
+        >
           {dots.length} rated · avg {avgRating.toFixed(2)} · {worstRating.toFixed(1)}–
           {bestRating.toFixed(1)}
         </span>
