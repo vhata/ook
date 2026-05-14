@@ -27,7 +27,13 @@ import { useState } from "react";
 type PendingAction = "pick-up" | "move-to-shelf";
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Local-time date, not UTC — clicking "pick it back up" at 8:30 PM PDT
+  // should set last_progress to today's date, not tomorrow's.
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 export function PausedCardActions({ slug, title }: { slug: string; title: string }) {

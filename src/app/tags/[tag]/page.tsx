@@ -28,7 +28,16 @@ export default async function TagPage({ params }: { params: Params }) {
       <HomeMark />
 
       <header className="border-rule mb-11 border-b pb-6">
-        <div className="text-ink-soft mb-3 text-[11px] tracking-[0.18em] uppercase">Tag</div>
+        <div className="text-ink-soft mb-3 flex items-center gap-3 text-[11px] tracking-[0.18em] uppercase">
+          <Link
+            href="/tags"
+            className="hover:text-ink decoration-rule hover:decoration-accent underline underline-offset-[3px]"
+          >
+            ← all tags
+          </Link>
+          <span className="text-ink-dim">·</span>
+          <span>Tag</span>
+        </div>
         <h1 className="font-serif m-0 text-[44px] leading-none font-medium tracking-[-0.025em] sm:text-[56px]">
           {tag}
         </h1>

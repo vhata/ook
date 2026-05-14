@@ -248,6 +248,9 @@ function KindleSessionStats({ stats }: { stats: KindleStats | null }) {
   const hoursDisplay = hours >= 10 ? Math.round(hours).toString() : hours.toFixed(1);
   const sessionWord = stats.sessions === 1 ? "session" : "sessions";
   const dayWord = stats.distinctDays === 1 ? "day" : "days";
+  const firstDate = stats.firstStart.slice(0, 10);
+  const lastDate = stats.lastEnd.slice(0, 10);
+  const isSingleDay = firstDate === lastDate;
   return (
     <div className="text-ink-soft mt-3 flex flex-wrap items-center gap-2 text-[12px]">
       <span>
@@ -256,6 +259,10 @@ function KindleSessionStats({ stats }: { stats: KindleStats | null }) {
       </span>
       <span className="text-ink-dim">·</span>
       <span>~{hoursDisplay}h total</span>
+      <span className="text-ink-dim">·</span>
+      <span className="text-ink-dim font-mono">
+        {isSingleDay ? firstDate : `${firstDate} → ${lastDate}`}
+      </span>
       <span className="text-ink-dim">·</span>
       <span className="text-ink-dim">on Kindle</span>
     </div>

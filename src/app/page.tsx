@@ -209,9 +209,23 @@ function StatsStrip({
   const total = bingo ? bingo.squares.filter((s) => !s.free).length : 0;
   return (
     <section className="bg-surface border-rule mb-10 grid grid-cols-3 rounded border md:mb-12">
-      <Stat label="Reading" longLabel="Currently reading" value={String(reading)} />
-      <Stat label="Finished" longLabel="Recently finished" value={String(finished)} />
-      <Stat label="Bingo" value={bingo ? `${done} / ${total}` : "—"} />
+      <Stat
+        label="Reading"
+        longLabel="Currently reading"
+        value={String(reading)}
+        href={reading > 0 ? "/now" : undefined}
+      />
+      <Stat
+        label="Finished"
+        longLabel="Recently finished"
+        value={String(finished)}
+        href={finished > 0 ? "/shelf?sort=finished" : undefined}
+      />
+      <Stat
+        label="Bingo"
+        value={bingo ? `${done} / ${total}` : "—"}
+        href={bingo ? "#bingo" : undefined}
+      />
     </section>
   );
 }
@@ -222,15 +236,20 @@ function Stat({
   value,
   hint,
   accent,
+  href,
 }: {
   label: string;
   longLabel?: string;
   value: string;
   hint?: string;
   accent?: boolean;
+  href?: string;
 }) {
-  return (
-    <div className="border-rule border-r p-4 last:border-r-0 md:p-5 [&:nth-child(2)]:border-r-0 md:[&:nth-child(2)]:border-r [&:nth-child(2)]:border-b-0 [&:nth-child(1)]:border-b [&:nth-child(2)]:border-b">
+  // Click target is the whole tile, no recolouring of the value text. The
+  // affordance reveals itself on hover via the accent border, matching
+  // the subtle inline-link style used elsewhere on the site.
+  const inner = (
+    <>
       <div className="text-ink-soft mb-1.5 text-[10px] tracking-[0.14em] uppercase md:text-[11px]">
         <span className="md:hidden">{label}</span>
         <span className="hidden md:inline">{longLabel ?? label}</span>
@@ -241,7 +260,17 @@ function Stat({
         {value}
       </div>
       {hint && <div className="text-ink-soft text-[11px] md:text-xs">{hint}</div>}
-    </div>
+    </>
+  );
+  const tileClass =
+    "border-rule border-r p-4 last:border-r-0 md:p-5 [&:nth-child(2)]:border-r-0 md:[&:nth-child(2)]:border-r [&:nth-child(2)]:border-b-0 [&:nth-child(1)]:border-b [&:nth-child(2)]:border-b";
+  if (!href) {
+    return <div className={tileClass}>{inner}</div>;
+  }
+  return (
+    <Link href={href} className={`${tileClass} hover:bg-surface-mute block transition-colors`}>
+      {inner}
+    </Link>
   );
 }
 

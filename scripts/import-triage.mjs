@@ -188,8 +188,15 @@ async function main() {
       "\n",
   );
 
-  // Render the markdown. Frontmatter mirrors tbr.md style.
-  const today = new Date().toISOString().slice(0, 10);
+  // Render the markdown. Frontmatter mirrors tbr.md style. Local-time
+  // date so an evening run doesn't stamp tomorrow's UTC date.
+  const today = (() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  })();
   const lines = [];
   lines.push("---");
   lines.push(`title: Triage`);

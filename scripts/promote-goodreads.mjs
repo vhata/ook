@@ -284,7 +284,13 @@ async function readIfExists(filePath) {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  // Local-time date, not UTC — operator running this at 8:30 PM PDT
+  // should stamp today's date, not tomorrow's.
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 // Parse only the YAML frontmatter portion of a markdown file, between
