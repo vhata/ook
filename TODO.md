@@ -95,7 +95,6 @@ Companion rule: inline-link styling stays subtle — links inherit surrounding t
 
 Specific surfaces to audit + fix:
 
-- **Home page stats line.** "N reading · M finished · X/Y bingo" needs each piece clickable: reading → `/now`, finished → `/log` or `/shelf?sort=finished`, bingo → the year's bingo grid (probably an in-page anchor since the grid is already on the home page below). `#polish #home #clickable-info`
 - **Per-book Kindle-session line.** Currently "Read across N sessions over D days · ~Xh total · on Kindle". Add the period — first session date → last session date (already in `KindleStats.firstStart` / `.lastEnd`). Or hover the line for a tooltip listing the months that had activity. `#polish #per-book #clickable-info`
 - **/stats and /stats/[year] number-rows.** Every "Finished: 12" / "Started: 8" / "Top tag: scifi (5)" entry should link to the underlying list of books. Today they're text-only. `#polish #stats #clickable-info`
 - **Tag co-occurrence pairings.** "Strongest pairings" on `/tags/[tag]` lists pairs but doesn't link to the intersection. Need an `/tags/[tag]+[other-tag]` view (or `/tags/[tag]?and=other-tag`) that lists books carrying both. Boolean AND first; OR later if needed. `#feature #tags #clickable-info`

@@ -210,18 +210,8 @@ function StatsStrip({
   const total = bingo ? bingo.squares.filter((s) => !s.free).length : 0;
   return (
     <section className="bg-surface border-rule mb-10 grid grid-cols-3 rounded border md:mb-12">
-      <Stat
-        label="Reading"
-        longLabel="Currently reading"
-        value={String(reading)}
-        href={reading > 0 ? "#currently-reading" : undefined}
-      />
-      <Stat
-        label="Finished"
-        longLabel="Recently finished"
-        value={String(finished)}
-        href={finished > 0 ? "#recently-finished" : undefined}
-      />
+      <Stat label="Reading" longLabel="Currently reading" value={String(reading)} href="/now" />
+      <Stat label="Finished" longLabel="Recently finished" value={String(finished)} href="/log" />
       <Stat
         label="Bingo"
         value={bingo ? `${done} / ${total}` : "—"}
