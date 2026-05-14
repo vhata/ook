@@ -217,6 +217,7 @@ function BookHeader({
           </div>
         )}
         <ExternalLinkRow book={book} />
+        <BookDates book={book} />
         <HardcoverStats hardcover={hardcover} />
         <KindleSessionStats stats={kindleStats} />
         <ShareRow slug={book.slug} />
@@ -234,6 +235,67 @@ function BookHeader({
         </div>
       </div>
     </header>
+  );
+}
+
+// Reading dates — honest about gaps. The reader's vault often has a
+// `status: finished` book without a `started` and/or `finished` date
+// (Goodreads imports, hand-stubbed entries, books finished long
+// before the vault existed). Hiding the row silently when both are
+// null leaves no signal that we know the book is finished but not
+// when; showing "date unknown" puts that on the page.
+//
+// Rendered only for statuses where the dates matter as a record of
+// the read: finished, paused, abandoned. `reading` books carry the
+// "in-flight" mood elsewhere (the accent glow on /now, the streak
+// counter); `tbr` books have no reading-history register to surface.
+function BookDates({ book }: { book: Book }) {
+  if (book.status !== "finished" && book.status !== "paused" && book.status !== "abandoned") {
+    return null;
+  }
+  const endVerb = book.status === "finished" ? "finished" : book.status;
+  const startKnown = book.started !== null;
+  const endKnown = book.finished !== null;
+
+  let body: React.ReactNode;
+  if (!startKnown && !endKnown) {
+    body = <span className="text-ink-dim italic">dates unknown</span>;
+  } else if (startKnown && endKnown) {
+    body = (
+      <>
+        <span>
+          started <span className="text-ink-dim font-mono">{book.started}</span>
+        </span>
+        <span className="text-ink-dim">·</span>
+        <span>
+          {endVerb} <span className="text-ink-dim font-mono">{book.finished}</span>
+        </span>
+      </>
+    );
+  } else if (startKnown) {
+    body = (
+      <>
+        <span>
+          started <span className="text-ink-dim font-mono">{book.started}</span>
+        </span>
+        <span className="text-ink-dim">·</span>
+        <span className="text-ink-dim italic">{endVerb} date unknown</span>
+      </>
+    );
+  } else {
+    body = (
+      <>
+        <span className="text-ink-dim italic">start date unknown</span>
+        <span className="text-ink-dim">·</span>
+        <span>
+          {endVerb} <span className="text-ink-dim font-mono">{book.finished}</span>
+        </span>
+      </>
+    );
+  }
+
+  return (
+    <div className="text-ink-soft mt-3 flex flex-wrap items-center gap-2 text-[12px]">{body}</div>
   );
 }
 

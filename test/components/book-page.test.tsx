@@ -107,7 +107,9 @@ describe("BookPage server component", { timeout: 15000 }, () => {
     // figure when source is null (the figure renders no source line,
     // but the author shows up elsewhere) — match >= 1 occurrence.
     expect(screen.getAllByText("Susanna Clarke").length).toBeGreaterThan(0);
-    expect(screen.getByText("finished")).toBeTruthy();
+    // The word "finished" appears in the status strip AND in the
+    // reading-dates row ("finished 2026-04-12"); match >= 1 occurrence.
+    expect(screen.getAllByText(/finished/).length).toBeGreaterThan(0);
     // Rating shown as filled stars (5 of 5).
     expect(screen.getAllByText(/★/).length).toBeGreaterThan(0);
   });
@@ -289,6 +291,166 @@ describe("BookPage server component", { timeout: 15000 }, () => {
       const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
       render(tree);
       expect(screen.queryByRole("button", { name: /what others said/i })).toBeNull();
+    } finally {
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
+    }
+  });
+
+  it("renders both reading dates when started and finished are present", async () => {
+    // baseBook has started=2026-04-01 and finished=2026-04-12.
+    const BookPage = await importPage();
+    const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+    const { container } = render(tree);
+    const text = container.textContent ?? "";
+    expect(text).toContain("started");
+    expect(text).toContain("2026-04-01");
+    expect(text).toContain("finished");
+    expect(text).toContain("2026-04-12");
+    expect(text).not.toContain("date unknown");
+    expect(text).not.toContain("dates unknown");
+  });
+
+  it("calls out the missing finish date when started is known but finished is null", async () => {
+    const lib = await import("../../src/lib/books");
+    const original = lib.getBookBySlug;
+    (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
+      slug === "piranesi"
+        ? {
+            book: { ...baseBook, finished: null },
+            body: "",
+            review: null,
+            quotes: null,
+            hardcover: null,
+            hardcoverReviews: null,
+            kindleStats: null,
+            progress: null,
+          }
+        : null;
+    try {
+      const BookPage = await importPage();
+      const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      const { container } = render(tree);
+      const text = container.textContent ?? "";
+      expect(text).toContain("started");
+      expect(text).toContain("2026-04-01");
+      expect(text).toContain("finished date unknown");
+    } finally {
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
+    }
+  });
+
+  it("calls out the missing start date when finished is known but started is null", async () => {
+    const lib = await import("../../src/lib/books");
+    const original = lib.getBookBySlug;
+    (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
+      slug === "piranesi"
+        ? {
+            book: { ...baseBook, started: null },
+            body: "",
+            review: null,
+            quotes: null,
+            hardcover: null,
+            hardcoverReviews: null,
+            kindleStats: null,
+            progress: null,
+          }
+        : null;
+    try {
+      const BookPage = await importPage();
+      const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      const { container } = render(tree);
+      const text = container.textContent ?? "";
+      expect(text).toContain("start date unknown");
+      expect(text).toContain("finished");
+      expect(text).toContain("2026-04-12");
+    } finally {
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
+    }
+  });
+
+  it("collapses to 'dates unknown' when both started and finished are null on a finished book", async () => {
+    const lib = await import("../../src/lib/books");
+    const original = lib.getBookBySlug;
+    (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
+      slug === "piranesi"
+        ? {
+            book: { ...baseBook, started: null, finished: null },
+            body: "",
+            review: null,
+            quotes: null,
+            hardcover: null,
+            hardcoverReviews: null,
+            kindleStats: null,
+            progress: null,
+          }
+        : null;
+    try {
+      const BookPage = await importPage();
+      const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      const { container } = render(tree);
+      const text = container.textContent ?? "";
+      expect(text).toContain("dates unknown");
+    } finally {
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
+    }
+  });
+
+  it("does not render the reading-dates row for reading or tbr books", async () => {
+    const lib = await import("../../src/lib/books");
+    const original = lib.getBookBySlug;
+    (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
+      slug === "piranesi"
+        ? {
+            book: { ...baseBook, status: "reading", finished: null },
+            body: "",
+            review: null,
+            quotes: null,
+            hardcover: null,
+            hardcoverReviews: null,
+            kindleStats: null,
+            progress: null,
+          }
+        : null;
+    try {
+      const BookPage = await importPage();
+      const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      const { container } = render(tree);
+      const text = container.textContent ?? "";
+      // The verb "started" appears only in the dates row; if the row
+      // is suppressed we should not see it. (Goodreads-id-driven
+      // outbound rows don't carry the word.)
+      expect(text).not.toContain("date unknown");
+      expect(text).not.toContain("dates unknown");
+      // Reading books have a "started" date in baseBook, but the row
+      // is suppressed entirely — assert no literal "started 2026-04-01".
+      expect(text).not.toContain("started 2026-04-01");
+    } finally {
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
+    }
+  });
+
+  it("uses the 'paused' verb on paused books with unknown end date", async () => {
+    const lib = await import("../../src/lib/books");
+    const original = lib.getBookBySlug;
+    (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
+      slug === "piranesi"
+        ? {
+            book: { ...baseBook, status: "paused", finished: null },
+            body: "",
+            review: null,
+            quotes: null,
+            hardcover: null,
+            hardcoverReviews: null,
+            kindleStats: null,
+            progress: null,
+          }
+        : null;
+    try {
+      const BookPage = await importPage();
+      const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      const { container } = render(tree);
+      const text = container.textContent ?? "";
+      expect(text).toContain("paused date unknown");
     } finally {
       (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
     }

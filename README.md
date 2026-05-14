@@ -14,7 +14,7 @@ If you're a reader, you might find some of the shapes interesting. If you're a d
 
 ## What you'll see
 
-**Books.** Each book page leads with the basics: title, author, status, rating, when I finished it, which bingo square it claimed, what tags I gave it. Below that come the synopsis, my review, and my favourite quotes, all behind a click so the page stays clean until you ask. Spoiler-heavy notes ("deep notes") only load if you really opt in. They're never on the initial page, so search engines can't index them. Where the book exists on Goodreads, Hardcover, Storygraph, or Bookwyrm, there's an outbound link row and a line showing the Hardcover community's average rating and reader count.
+**Books.** Each book page leads with the basics: title, author, status, rating, when I started and finished it (or an honest "date unknown" when I don't have one on record), which bingo square it claimed, what tags I gave it. Below that come the synopsis, my review, and my favourite quotes, all behind a click so the page stays clean until you ask. Spoiler-heavy notes ("deep notes") only load if you really opt in. They're never on the initial page, so search engines can't index them. Where the book exists on Goodreads, Hardcover, Storygraph, or Bookwyrm, there's an outbound link row and a line showing the Hardcover community's average rating and reader count.
 
 **Bingo.** Each year has a 5×5 reading bingo card of themed squares ("a book published the year you were born", "a book by an author from a country you've never visited", etc.) that I fill in over the year. The home page shows the current year; previous years are linked from there.
 
