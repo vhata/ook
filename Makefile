@@ -19,8 +19,8 @@
 	vault-premises vault-pages vault-wikiquotes \
 	vault-rename-summary-to-progress vault-import-kindle \
 	vault-import-kindle-sessions vault-backfill-asin vault-backfill-started \
-	vault-import-triage vault-promote-goodreads vault-hardcover-sync \
-	deploy-status deploy-logs
+	vault-pause-stale-reading vault-import-triage vault-promote-goodreads \
+	vault-hardcover-sync deploy-status deploy-logs
 
 # `help` reads its own Makefile twice: once to pick up `## --- name ---`
 # section headers as bold dividers, once to render each target line.
@@ -129,6 +129,9 @@ vault-backfill-asin: ## Stamp amazon_asin: frontmatter on vault books that match
 
 vault-backfill-started: ## Stamp `started:` frontmatter from each ASIN's first Kindle session timestamp (never overrides an existing value)
 	@node scripts/backfill-started-from-sessions.mjs
+
+vault-pause-stale-reading: ## Demote stale status:reading books to status:paused (THRESHOLD_DAYS=N to override the 90-day default)
+	@node scripts/pause-stale-reading.mjs $(if $(THRESHOLD_DAYS),--threshold-days $(THRESHOLD_DAYS))
 
 vault-import-triage: ## Build/extend _meta/triage.md from a CSV (CSV=path; prompts to apply when interactive)
 	@node scripts/import-triage.mjs $(if $(CSV),"$(CSV)")
