@@ -450,10 +450,10 @@ function SeriesEntry({
     `/admin?focus=book:${encodeURIComponent(member.slug)}` +
     `&intent=remove-from-series:${encodeURIComponent(seriesName)}`;
   return (
-    <li className="flex items-stretch gap-2">
+    <li className="bg-surface border-rule hover:border-accent flex items-center gap-3 rounded border p-3 transition-colors">
       <Link
         href={`/books/${encodeURIComponent(member.slug)}`}
-        className="bg-surface border-rule hover:border-accent flex min-w-0 flex-1 items-center gap-4 rounded border p-3 transition-colors"
+        className="flex min-w-0 flex-1 items-center gap-4"
       >
         <div className="bg-surface-mute border-rule text-ink-soft flex h-10 w-7 shrink-0 items-center justify-center rounded-sm border font-mono text-[10px] tracking-[0.04em]">
           {member.index !== null ? `#${formatIndex(member.index)}` : "?"}
@@ -476,14 +476,12 @@ function SeriesEntry({
         </div>
       </Link>
       {isOwner && (
-        <div className="flex shrink-0 items-center">
-          <AdminAffordance
-            show={isOwner}
-            href={adminHref}
-            label="remove from series"
-            title={`Stage a patch that drops '${seriesName}' from this book's series field`}
-          />
-        </div>
+        <AdminAffordance
+          show={isOwner}
+          href={adminHref}
+          label="remove from series"
+          title={`Stage a patch that drops '${seriesName}' from this book's series field`}
+        />
       )}
     </li>
   );
