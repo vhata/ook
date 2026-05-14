@@ -112,10 +112,9 @@ function ReasonChip({ reason }: { reason: ConnectionReason }) {
       : reason.kind === "series"
         ? "border-star text-star"
         : "border-rule text-ink-soft";
-  return (
-    <span
-      className={`rounded-full border px-2.5 py-0.5 text-[10px] tracking-[0.12em] uppercase ${colour}`}
-    >
+  const className = `rounded-full border px-2.5 py-0.5 text-[10px] tracking-[0.12em] uppercase ${colour}`;
+  const inner = (
+    <>
       <span className="text-ink-dim">{reason.kind}</span>
       {reason.detail && (
         <>
@@ -123,6 +122,37 @@ function ReasonChip({ reason }: { reason: ConnectionReason }) {
           <span className="text-ink-soft normal-case tracking-normal">{reason.detail}</span>
         </>
       )}
+    </>
+  );
+  const href = chipHref(reason);
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {inner}
+      </Link>
+    );
+  }
+  const titleAttr = reason.kind === "author" ? "No per-author page yet" : undefined;
+  return (
+    <span className={className} title={titleAttr}>
+      {inner}
     </span>
   );
+}
+
+function chipHref(reason: ConnectionReason): string | null {
+  if (reason.kind === "tag" && reason.detail) {
+    return `/tags/${encodeURIComponent(reason.detail)}`;
+  }
+  if (reason.kind === "series" && reason.detail) {
+    return `/series#series-${slugifySeriesName(reason.detail)}`;
+  }
+  return null;
+}
+
+function slugifySeriesName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
