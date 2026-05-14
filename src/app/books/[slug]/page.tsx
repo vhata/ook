@@ -156,10 +156,10 @@ function BookHeader({
         <div className="text-ink-soft mb-4 flex flex-wrap items-center gap-2 text-[10px] tracking-[0.16em] uppercase">
           {book.bingoSquares.length > 0 && bingoYear !== null && (
             <>
-              <span>
+              <Link href="/#bingo" className="hover:underline">
                 {bingoYear} Bingo ·{" "}
                 <span className="text-accent">{book.bingoSquares.join(", ")}</span>
-              </span>
+              </Link>
               <span>·</span>
             </>
           )}
