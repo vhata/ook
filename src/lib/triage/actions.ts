@@ -192,7 +192,11 @@ function bookStatusFrontmatter(
   if (action === "start-reading") {
     return { status: "reading", started: today };
   }
-  return { status: "finished", finished: today };
+  // mark-finished is for historical reads — the operator is saying "I
+  // read this at some point" not "I finished it today." Leave the
+  // finished date null to match Goodreads-bulk-imported books; the
+  // operator can fill the real date later if they remember it.
+  return { status: "finished", finished: null };
 }
 
 function bookPatchMessage(slug: string, action: Exclude<TriageAction, "promote-tbr">): string {
@@ -290,7 +294,11 @@ function renderBookFile(entry: TbrEntry, action: TriageAction, today: string): s
     authors: entry.author ? [entry.author] : [],
     status,
     started: action === "start-reading" ? today : null,
-    finished: action === "mark-finished" ? today : null,
+    // mark-finished is for historical reads — leave the finished date
+    // null (the operator didn't finish it today, they're recording
+    // that they read it at some point). Matches Goodreads-bulk-imported
+    // books and the upsert path above.
+    finished: null,
     source: "triage",
   };
 

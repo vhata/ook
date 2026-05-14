@@ -119,24 +119,28 @@ describe("buildEntryPatches — start-reading", () => {
 });
 
 describe("buildEntryPatches — mark-finished", () => {
-  it("removes from triage.md and mints a vault directory when the slug is new", () => {
+  it("removes from triage.md and mints a vault directory when the slug is new, with null finished date", () => {
+    // mark-finished is for historical reads — the operator is saying
+    // "I've read this at some point," not "I finished it today." The
+    // finished date stays null; the operator can fill it later.
     const result = buildEntryPatches("Maybe", entry, "mark-finished", "2026-05-10", false);
     const file = result.metaPatches[1];
     expect(file.kind).toBe("create-file");
     if (file.kind !== "create-file") throw new Error("type narrowing");
     expect(file.content).toContain("status: finished");
     expect(file.content).toContain("started: null");
-    expect(file.content).toContain('finished: "2026-05-10"');
+    expect(file.content).toContain("finished: null");
+    expect(file.content).not.toContain('finished: "2026-05-10"');
   });
 
-  it("upserts an existing book's frontmatter when the slug already lives in the vault", () => {
+  it("upserts an existing book's frontmatter when the slug already lives in the vault, with null finished date", () => {
     const result = buildEntryPatches("Maybe", entry, "mark-finished", "2026-05-10", true);
     expect(result.metaPatches).toHaveLength(1);
     expect(result.metaPatches[0].kind).toBe("remove-bullet");
     expect(result.patches).toHaveLength(1);
     expect(result.patches[0]).toEqual({
       slug: "The Anomaly",
-      frontmatter_changes: { status: "finished", finished: "2026-05-10" },
+      frontmatter_changes: { status: "finished", finished: null },
       commit_message: "The Anomaly: marked finished via triage",
     });
   });
@@ -182,7 +186,7 @@ describe("buildTriageBatch", () => {
     expect(body.patches[0].slug).toBe("Ancillary Justice");
     expect(body.patches[0].frontmatter_changes).toEqual({
       status: "finished",
-      finished: "2026-05-10",
+      finished: null,
     });
     // Only the remove-bullet meta patch survives.
     expect(body.meta_patches).toHaveLength(1);
@@ -291,7 +295,7 @@ describe("buildHeterogeneousTriageBatch", () => {
     expect(body.patches).toHaveLength(1);
     expect(body.patches[0]).toEqual({
       slug: "Piranesi",
-      frontmatter_changes: { status: "finished", finished: "2026-05-10" },
+      frontmatter_changes: { status: "finished", finished: null },
       commit_message: "Piranesi: marked finished via triage",
     });
     // Anomaly: 2 metas (remove + append); Piranesi: 1 (remove only — book patch handles status).
