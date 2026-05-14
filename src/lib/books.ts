@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 import { cache } from "react";
 import matter from "gray-matter";
 import { dedupeRegionalTitles } from "./discover";
+import { effectiveStatus } from "./status";
 import type {
   Book,
   BookStatus,
@@ -281,9 +282,18 @@ export const getAllBooks = cache(async (): Promise<Book[]> => {
   return books.filter((b): b is Book => b !== null);
 });
 
-export async function getCurrentlyReading(): Promise<Book[]> {
+// Books the reader is *effectively* reading right now — the raw
+// `status: reading` filter alone would surface books flipped to
+// reading years ago and never closed out. Applies `effectiveStatus()`
+// so a stale `reading` book (no progress in > 90 days) auto-promotes
+// to paused and drops off the home-page card. Paused books live on
+// `/now` under the "Set aside" section, not on the home page.
+export async function getCurrentlyReading(today: Date = new Date()): Promise<Book[]> {
   const all = await getAllBooks();
-  return all.filter((b) => b.status === "reading");
+  return all.filter((b) => {
+    if (b.status !== "reading") return false;
+    return effectiveStatus(b.status, b.last_progress, today, b.started) === "reading";
+  });
 }
 
 export async function getRecentlyFinished(limit = 5): Promise<Book[]> {

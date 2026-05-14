@@ -87,9 +87,19 @@ describe("getAllBooks", () => {
 });
 
 describe("getCurrentlyReading", () => {
-  it("returns books with status: reading", async () => {
-    const reading = await getCurrentlyReading();
+  it("returns books whose effective status is reading at the given date", async () => {
+    // PrivateBook (started 2026-04-01) is ~6 weeks stale on 2026-05-13 —
+    // under the 90-day pause threshold, so it stays in the list.
+    const reading = await getCurrentlyReading(new Date("2026-05-13T12:00:00Z"));
     expect(reading.map((b) => b.slug)).toEqual(["PrivateBook"]);
+  });
+
+  it("auto-promotes a stale reading book to paused and drops it from the list", async () => {
+    // The same PrivateBook viewed a year out is now > 90 days stale —
+    // effectiveStatus auto-promotes it to paused and the home-page card
+    // shouldn't surface it.
+    const reading = await getCurrentlyReading(new Date("2027-05-13T12:00:00Z"));
+    expect(reading.map((b) => b.slug)).toEqual([]);
   });
 });
 
