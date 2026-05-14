@@ -88,7 +88,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
 
       {onThisDay.length > 0 && <OnThisDay entries={onThisDay} />}
 
-      <Section title="Currently reading">
+      <Section id="currently-reading" title="Currently reading">
         {reading.length === 0 ? (
           <EmptyNote>Nothing on the desk right now.</EmptyNote>
         ) : (
@@ -105,6 +105,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
       </Section>
 
       <Section
+        id="recently-finished"
         title="Recently finished"
         right={
           finished.length > 0 ? (
@@ -213,13 +214,13 @@ function StatsStrip({
         label="Reading"
         longLabel="Currently reading"
         value={String(reading)}
-        href={reading > 0 ? "/now" : undefined}
+        href={reading > 0 ? "#currently-reading" : undefined}
       />
       <Stat
         label="Finished"
         longLabel="Recently finished"
         value={String(finished)}
-        href={finished > 0 ? "/shelf?sort=finished" : undefined}
+        href={finished > 0 ? "#recently-finished" : undefined}
       />
       <Stat
         label="Bingo"
