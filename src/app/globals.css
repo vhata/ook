@@ -17,6 +17,7 @@ html[data-theme="light"] {
   --accent: #a3402a; /* rust */
   --accent-soft: #a3402a1a;
   --star: #a3792a;
+  --good: #4d7a2a; /* moss green — used for activity heatmaps where the cell value is something positive */
 }
 
 html[data-theme="dark"] {
@@ -32,6 +33,7 @@ html[data-theme="dark"] {
   --accent: #d97757; /* rust dark */
   --accent-soft: #d9775733;
   --star: #d8b066;
+  --good: #7fb05a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -48,6 +50,7 @@ html[data-theme="dark"] {
     --accent: #d97757;
     --accent-soft: #d9775733;
     --star: #d8b066;
+    --good: #7fb05a;
   }
 }
 
@@ -64,6 +67,7 @@ html[data-theme="dark"] {
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-star: var(--star);
+  --color-good: var(--good);
   --font-serif: var(--font-serif);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);

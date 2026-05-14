@@ -293,16 +293,16 @@ function PagesPerMonth({ pagesByMonth }: { pagesByMonth: number[] }) {
 }
 
 function Heatmap({ activity, totalEvents }: { activity: DayActivity[]; totalEvents: number }) {
-  // Five-bucket intensity ramp using the rust accent colour. Picked by eye:
+  // Five-bucket intensity ramp using the moss-green "good" token.
   // 0 events stays neutral; 1–2 light, 3–4 medium, 5–6 strong, 7+ saturated.
-  // Tuned to the realistic personal-site cadence — most days zero, peaks
-  // around finish-days where multiple events cluster.
+  // Green reads as a positive signal (reading happened); the rust accent
+  // is reserved for navigational / interactive emphasis elsewhere.
   const intensity = (count: number): string => {
     if (count === 0) return "var(--surface-mute)";
-    if (count <= 2) return "color-mix(in srgb, var(--accent) 30%, transparent)";
-    if (count <= 4) return "color-mix(in srgb, var(--accent) 55%, transparent)";
-    if (count <= 6) return "color-mix(in srgb, var(--accent) 75%, transparent)";
-    return "var(--accent)";
+    if (count <= 2) return "color-mix(in srgb, var(--good) 30%, transparent)";
+    if (count <= 4) return "color-mix(in srgb, var(--good) 55%, transparent)";
+    if (count <= 6) return "color-mix(in srgb, var(--good) 75%, transparent)";
+    return "var(--good)";
   };
 
   const monthLabels: Array<{ index: number; label: string }> = [];
