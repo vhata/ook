@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { BackLink } from "@/components/BackLink";
 import { HomeMark } from "@/components/HomeMark";
 import { getAllBooks } from "@/lib/books";
 import type { Book } from "@/lib/types";
@@ -35,6 +36,7 @@ export default async function PrintYearPage({ params }: { params: Params }) {
       <main className="mx-auto box-border w-full max-w-[700px] px-6 py-12 sm:px-10">
         <div className="print:hidden">
           <HomeMark />
+          <BackLink href={`/stats/${year}`} label={`${year} stats`} />
         </div>
         <p className="font-serif text-ink-soft text-[16px] italic">Nothing finished in {year}.</p>
       </main>

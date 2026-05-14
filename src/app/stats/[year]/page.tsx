@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BackLink } from "@/components/BackLink";
 import { Cover } from "@/components/Cover";
 import { HomeMark } from "@/components/HomeMark";
 import { foxingFor } from "@/lib/foxing";
@@ -86,6 +87,7 @@ export default async function StatsYearPage({ params }: { params: Params }) {
   return (
     <main className="mx-auto box-border w-full max-w-[900px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
       <HomeMark />
+      <BackLink href="/stats" label="all years" />
 
       <Header year={year} years={allYears} />
 
