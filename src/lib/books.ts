@@ -1044,6 +1044,45 @@ export const loadKindleSessions = cache(async (): Promise<Map<string, KindleStat
   return out;
 });
 
+// Total reading time + session count from Kindle ASINs the takeout
+// has no ownership shard for — sendtokindle personal documents,
+// samples that got read, books that have since been removed from the
+// library. These sessions can't link to a vault entry but they're
+// real reading time the operator did. Surfaced as a footnote on
+// `/stats` so the data is honest about the gap. Returns null when
+// the cache has nothing unlinked (which means either no takeout
+// imported, or every ASIN has a known ownership shard).
+export const getUnlinkedKindleActivity = cache(
+  async (): Promise<{ sessions: number; totalSeconds: number } | null> => {
+    const file = path.join(booksDir(), META_DIR, "kindle-sessions.json");
+    let raw: string;
+    try {
+      raw = await fs.readFile(file, "utf8");
+    } catch {
+      return null;
+    }
+    let parsed: KindleSessionsFile;
+    try {
+      parsed = JSON.parse(raw) as KindleSessionsFile;
+    } catch {
+      return null;
+    }
+    let sessions = 0;
+    let totalSeconds = 0;
+    for (const entry of Object.values(parsed.books ?? {})) {
+      if (!entry || typeof entry.sessions !== "number") continue;
+      // "Unlinked" = no ownership shard. Cache records carry `title:
+      // null` for these (the import script writes null when the ASIN
+      // didn't appear in the Digital.Content.Ownership shards).
+      if (entry.title !== null && entry.title !== undefined) continue;
+      sessions += entry.sessions;
+      totalSeconds += typeof entry.totalSeconds === "number" ? entry.totalSeconds : 0;
+    }
+    if (sessions === 0) return null;
+    return { sessions, totalSeconds };
+  },
+);
+
 export const loadHardcoverBooks = cache(async (): Promise<Map<string, HardcoverBook>> => {
   const file = path.join(booksDir(), META_DIR, "hardcover-books.json");
   let raw: string;

@@ -1,7 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { HomeMark } from "@/components/HomeMark";
-import { getAllBooks, getFinishPairs, getReviewWordFrequency, getStatsYears } from "@/lib/books";
+import {
+  getAllBooks,
+  getFinishPairs,
+  getReviewWordFrequency,
+  getStatsYears,
+  getUnlinkedKindleActivity,
+} from "@/lib/books";
 import type { Book } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -16,11 +22,12 @@ export const metadata = {
 // year has any reading activity yet, falls through to the current-year
 // stats page so the route still does something useful for a fresh vault.
 export default async function StatsIndex() {
-  const [years, books, words, pairs] = await Promise.all([
+  const [years, books, words, pairs, unlinkedKindle] = await Promise.all([
     getStatsYears(),
     getAllBooks(),
     getReviewWordFrequency(40),
     getFinishPairs(2),
+    getUnlinkedKindleActivity(),
   ]);
   if (years.length === 0) redirect(`/stats/${new Date().getFullYear()}`);
 
@@ -92,8 +99,23 @@ export default async function StatsIndex() {
           </li>
         ))}
       </ol>
+
+      {unlinkedKindle && (
+        <p className="text-ink-dim border-rule mt-10 border-t pt-4 text-[12px] italic">
+          Plus an unlinked {unlinkedKindle.sessions.toLocaleString("en-US")} Kindle session
+          {unlinkedKindle.sessions === 1 ? "" : "s"}
+          {" (~"}
+          {formatUnlinkedHours(unlinkedKindle.totalSeconds)}h) reading send-to-Kindle personal
+          documents and samples — real time, but nothing in the vault to pin it to.
+        </p>
+      )}
     </main>
   );
+}
+
+function formatUnlinkedHours(totalSeconds: number): string {
+  const hours = totalSeconds / 3600;
+  return hours >= 10 ? Math.round(hours).toString() : hours.toFixed(1);
 }
 
 type RatedDot = {
