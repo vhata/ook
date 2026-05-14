@@ -121,26 +121,37 @@ function PairingsSection({ pairs }: { pairs: TagPair[] }) {
 }
 
 function TagRow({ summary }: { summary: TagSummary }) {
+  // The row is a flex container with sibling Links rather than one
+  // outer Link wrapping the whole thing, so the co-occurring chips can
+  // be their own links to the paired tag's page without nesting <a>
+  // elements (which is invalid HTML and warns at render).
   return (
-    <Link
-      href={`/tags/${encodeURIComponent(summary.tag)}`}
-      className="bg-surface border-rule hover:border-accent flex items-center gap-4 rounded border p-3 transition-colors"
-    >
-      <div className="font-serif text-ink min-w-0 flex-1 truncate text-[18px] font-medium">
+    <div className="bg-surface border-rule hover:border-accent flex items-center gap-4 rounded border p-3 transition-colors">
+      <Link
+        href={`/tags/${encodeURIComponent(summary.tag)}`}
+        className="font-serif text-ink hover:text-accent min-w-0 flex-1 truncate text-[18px] font-medium"
+      >
         {summary.tag}
-      </div>
+      </Link>
       {summary.coOccurring.length > 0 && (
         <div className="text-ink-soft hidden flex-wrap gap-1 text-[10px] tracking-[0.12em] uppercase sm:flex">
           {summary.coOccurring.map((c) => (
-            <span key={c.tag} className="border-rule rounded-full border px-2 py-0.5">
+            <Link
+              key={c.tag}
+              href={`/tags/${encodeURIComponent(c.tag)}`}
+              className="border-rule hover:border-accent hover:text-ink rounded-full border px-2 py-0.5 transition-colors"
+            >
               {c.tag}
-            </span>
+            </Link>
           ))}
         </div>
       )}
-      <span className="text-ink-soft font-mono text-[12px]">
+      <Link
+        href={`/tags/${encodeURIComponent(summary.tag)}`}
+        className="text-ink-soft hover:text-ink font-mono text-[12px]"
+      >
         {summary.count} {summary.count === 1 ? "book" : "books"}
-      </span>
-    </Link>
+      </Link>
+    </div>
   );
 }

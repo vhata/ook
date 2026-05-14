@@ -234,10 +234,16 @@ function SeriesSection({
   forceCollapseAll: boolean;
   isOwner: boolean;
 }) {
-  const finished = group.members.filter((m) => m.status === "finished").length;
+  const finishedMembers = group.members.filter((m) => m.status === "finished");
+  const finished = finishedMembers.length;
   // When a roster is available, the denominator is the canonical
   // total. Otherwise it's just what the vault has — same as before.
   const total = group.rosterCount ?? group.members.length;
+  // Tooltip on the "N of M read" summary listing finished + not-yet-read
+  // titles. "Not yet read" covers members in any non-finished status AND
+  // roster entries the vault has no directory for. Titles are soft-capped
+  // so a 40-book series doesn't produce a tooltip taller than the viewport.
+  const summaryTooltip = formatSeriesTooltip(finishedMembers, group);
   const open = forceExpandAll;
   const anchorId = `series-${slugifySeriesName(group.name)}`;
   // Native <details> owns its `open` state in the DOM. When a user
@@ -278,7 +284,10 @@ function SeriesSection({
               </div>
             )}
           </div>
-          <span className="text-ink-soft shrink-0 text-[11px] tracking-[0.14em] uppercase">
+          <span
+            className="text-ink-soft shrink-0 text-[11px] tracking-[0.14em] uppercase"
+            title={summaryTooltip}
+          >
             {finished} of {total} read
             {group.rosterCount === undefined ? " in vault" : ""}
           </span>
@@ -287,6 +296,47 @@ function SeriesSection({
       <ol className="mt-4 mb-0 ml-0 list-none space-y-3 p-0">{renderEntries(group, isOwner)}</ol>
     </details>
   );
+}
+
+// Browser tooltips clip multi-line content when it overflows the viewport.
+// Soft-cap each bucket and surface the overflow as "and N more" rather than
+// trying to render every Discworld title.
+const TOOLTIP_TITLE_CAP = 20;
+
+function formatSeriesTooltip(finishedMembers: SeriesMember[], group: SeriesGroup): string {
+  const byIndex = (a: { index: number | null }, b: { index: number | null }) => {
+    if (a.index === null && b.index === null) return 0;
+    if (a.index === null) return 1;
+    if (b.index === null) return -1;
+    return a.index - b.index;
+  };
+
+  const finishedTitles = [...finishedMembers].sort(byIndex).map((m) => m.title);
+  const notReadVault = group.members
+    .filter((m) => m.status !== "finished")
+    .sort(byIndex)
+    .map((m) => m.title);
+  const notReadRoster = group.rosterMissing
+    .slice()
+    .sort((a, b) => byIndex({ index: a.position }, { index: b.position }))
+    .map((r) => r.title);
+  const notReadTitles = [...notReadVault, ...notReadRoster];
+
+  const lines: string[] = [];
+  if (finishedTitles.length > 0) {
+    lines.push(`Finished: ${truncateTitleList(finishedTitles)}`);
+  }
+  if (notReadTitles.length > 0) {
+    if (lines.length > 0) lines.push("");
+    lines.push(`Not yet read: ${truncateTitleList(notReadTitles)}`);
+  }
+  return lines.join("\n");
+}
+
+function truncateTitleList(titles: string[]): string {
+  if (titles.length <= TOOLTIP_TITLE_CAP) return titles.join(", ");
+  const head = titles.slice(0, TOOLTIP_TITLE_CAP).join(", ");
+  return `${head}, and ${titles.length - TOOLTIP_TITLE_CAP} more`;
 }
 
 // Interleaves real members with placeholders in index order. When a
