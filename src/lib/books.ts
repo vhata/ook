@@ -904,18 +904,81 @@ type RosterFile = {
   >;
 };
 
+export type RosterBookEntry = {
+  position: number | null;
+  title: string;
+  slug: string | null;
+  authors: string[];
+};
+
+// Hardcover's GraphQL roster returns every edition of a series — Spanish
+// translations, French part-splits, audio adaptations — at positions like
+// 1.1 / 2.3 alongside the canonical 1, 2, 3 entries. Render-time filter
+// strips two classes of cruft so the page shows the canonical English
+// title set rather than a 23-row Westeros bibliography.
+//
+// 1. Non-integer positions: 1.1, 0.5, 2.3 are always edition variants of
+//    the integer entry they sit beside.
+// 2. Integer-position translations: when Hardcover happens to land a
+//    Spanish or Polish translation on a clean integer (ASoIaF has the
+//    Spanish "El mundo de hielo y fuego" at position 0), drop those by
+//    heuristic — non-Latin script, Slavic diacritics, or a capitalised
+//    non-English article ("El ", "Le ", "Der "). Conservative on purpose;
+//    a curly apostrophe is allow-listed so "The Handmaid's Tale" stays.
+export function filterCanonicalRosterBooks(books: RosterBookEntry[]): RosterBookEntry[] {
+  return books.filter((b) => {
+    if (b.position === null || !Number.isInteger(b.position)) return false;
+    if (looksLikeTranslation(b.title)) return false;
+    return true;
+  });
+}
+
+// Typography characters that appear in English titles and must not trigger
+// the non-Latin check (curly quotes, dashes, ellipsis, middle dot).
+const ENGLISH_TYPOGRAPHY = new Set("‘’“”–—…·");
+
+// Slavic-only diacritics not found in any English text.
+const SLAVIC_DIACRITICS = new Set("ąęłńśźżČčŠšŽžŘř");
+
+// Capitalised leading articles unique to a non-English language. "A " is
+// excluded — it's the English indefinite article. "O " is excluded — too
+// short and ambiguous (capital O can lead an English title via apostrophe
+// or interjection).
+const NON_ENGLISH_LEADING_ARTICLES = [
+  "El ",
+  "La ",
+  "Los ",
+  "Las ",
+  "Le ",
+  "Les ",
+  "Lo ",
+  "Il ",
+  "Der ",
+  "Die ",
+  "Das ",
+  "Een ",
+  "L'",
+  "L’",
+];
+
+function looksLikeTranslation(title: string): boolean {
+  for (const ch of title) {
+    if (ch.codePointAt(0)! > 0x024f && !ENGLISH_TYPOGRAPHY.has(ch)) return true;
+    if (SLAVIC_DIACRITICS.has(ch)) return true;
+  }
+  for (const lead of NON_ENGLISH_LEADING_ARTICLES) {
+    if (title.startsWith(lead)) return true;
+  }
+  return false;
+}
+
 const loadSeriesRosters = cache(
   async (): Promise<
     Map<
       string,
       {
         count: number | null;
-        books: Array<{
-          position: number | null;
-          title: string;
-          slug: string | null;
-          authors: string[];
-        }>;
+        books: RosterBookEntry[];
       }
     >
   > => {
@@ -936,16 +999,11 @@ const loadSeriesRosters = cache(
       string,
       {
         count: number | null;
-        books: Array<{
-          position: number | null;
-          title: string;
-          slug: string | null;
-          authors: string[];
-        }>;
+        books: RosterBookEntry[];
       }
     >();
     for (const [name, entry] of Object.entries(parsed.rosters ?? {})) {
-      const books = (entry.books ?? [])
+      const rawBooks: RosterBookEntry[] = (entry.books ?? [])
         .filter((b): b is { title: string } & typeof b => typeof b.title === "string")
         .map((b) => ({
           position: typeof b.position === "number" ? b.position : null,
@@ -953,7 +1011,16 @@ const loadSeriesRosters = cache(
           slug: typeof b.slug === "string" ? b.slug : null,
           authors: Array.isArray(b.authors) ? b.authors.filter((a) => typeof a === "string") : [],
         }));
-      out.set(name, { count: typeof entry.count === "number" ? entry.count : null, books });
+      const books = filterCanonicalRosterBooks(rawBooks);
+      // `count` in the source file is Hardcover's `books_count` — it
+      // includes the editions and companion variants we've just filtered
+      // out. The "M of N read" header should reflect what the user sees,
+      // so realign the count with the filtered books length. When the
+      // filter strips everything (a series whose only roster entry is a
+      // 1.5 fractional), set count to null so the renderer falls back
+      // to the vault-member count rather than rendering "N of 0 read".
+      const count = books.length > 0 ? books.length : null;
+      out.set(name, { count, books });
     }
     return out;
   },

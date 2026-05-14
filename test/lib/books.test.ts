@@ -30,6 +30,7 @@ import {
   getYearActivity,
   getYearStats,
   computeIndexGaps,
+  filterCanonicalRosterBooks,
   loadHardcoverReviews,
   parseSeriesField,
   parseSeriesMemberships,
@@ -581,6 +582,65 @@ describe("getAllSeries", () => {
     expect(ts.members).toHaveLength(1);
     expect(ts.members[0].slug).toBe("TestBook");
     expect(ts.members[0].index).toBe(1);
+  });
+});
+
+describe("filterCanonicalRosterBooks", () => {
+  const make = (position: number | null, title: string) => ({
+    position,
+    title,
+    slug: null,
+    authors: [],
+  });
+
+  it("drops entries whose position is non-integer", () => {
+    const out = filterCanonicalRosterBooks([
+      make(1, "A Game of Thrones"),
+      make(1.1, "Le trône de fer"),
+      make(2, "A Clash of Kings"),
+      make(2.3, "Clash of Kings, Part.3"),
+    ]);
+    expect(out.map((b) => b.title)).toEqual(["A Game of Thrones", "A Clash of Kings"]);
+  });
+
+  it("drops entries whose position is null", () => {
+    const out = filterCanonicalRosterBooks([make(null, "Untitled"), make(1, "Real Book")]);
+    expect(out.map((b) => b.title)).toEqual(["Real Book"]);
+  });
+
+  it("drops integer-position entries with non-Latin scripts", () => {
+    const out = filterCanonicalRosterBooks([
+      make(7, "Οι κυνηγοί του Ντιουν"),
+      make(8, "Dune: Η Αναγέννηση"),
+      make(1, "A Game of Thrones"),
+    ]);
+    expect(out.map((b) => b.title)).toEqual(["A Game of Thrones"]);
+  });
+
+  it("drops integer-position entries with Slavic diacritics", () => {
+    const out = filterCanonicalRosterBooks([
+      make(0, "Księgarnie i kościopył"),
+      make(1, "Legends & Lattes"),
+    ]);
+    expect(out.map((b) => b.title)).toEqual(["Legends & Lattes"]);
+  });
+
+  it("drops integer-position entries with capitalised non-English articles", () => {
+    const out = filterCanonicalRosterBooks([
+      make(0, "El mundo de hielo y fuego"),
+      make(1, "A Game of Thrones"),
+    ]);
+    expect(out.map((b) => b.title)).toEqual(["A Game of Thrones"]);
+  });
+
+  it("keeps English titles with curly apostrophes (typography allow-list)", () => {
+    const out = filterCanonicalRosterBooks([make(1, "The Handmaid’s Tale")]);
+    expect(out).toHaveLength(1);
+  });
+
+  it("keeps English titles starting with 'A ' (not a non-English article)", () => {
+    const out = filterCanonicalRosterBooks([make(1, "A Game of Thrones")]);
+    expect(out).toHaveLength(1);
   });
 });
 
