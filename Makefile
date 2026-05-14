@@ -18,8 +18,9 @@
 	vault-hardcover-reviews vault-hardcover-ids vault-covers \
 	vault-premises vault-pages vault-wikiquotes \
 	vault-rename-summary-to-progress vault-import-kindle \
-	vault-import-kindle-sessions vault-backfill-asin vault-import-triage \
-	vault-promote-goodreads vault-hardcover-sync deploy-status deploy-logs
+	vault-import-kindle-sessions vault-backfill-asin vault-backfill-started \
+	vault-import-triage vault-promote-goodreads vault-hardcover-sync \
+	deploy-status deploy-logs
 
 # `help` reads its own Makefile twice: once to pick up `## --- name ---`
 # section headers as bold dividers, once to render each target line.
@@ -125,6 +126,9 @@ vault-import-kindle-sessions: ## Ingest an Amazon-takeout reading-session CSV + 
 
 vault-backfill-asin: ## Stamp amazon_asin: frontmatter on vault books that match a Kindle-sessions cache entry by title
 	@node scripts/backfill-asin-from-sessions.mjs
+
+vault-backfill-started: ## Stamp `started:` frontmatter from each ASIN's first Kindle session timestamp (never overrides an existing value)
+	@node scripts/backfill-started-from-sessions.mjs
 
 vault-import-triage: ## Build/extend _meta/triage.md from a CSV (CSV=path; prompts to apply when interactive)
 	@node scripts/import-triage.mjs $(if $(CSV),"$(CSV)")
