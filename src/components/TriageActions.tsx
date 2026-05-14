@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { todayLocal } from "@/lib/dates";
 import type { TbrPile, TbrEntry } from "@/lib/types";
 import {
   buildHeterogeneousTriageBatch,
@@ -87,7 +88,7 @@ export default function TriageActions({
     setError(null);
     setBusy(true);
     try {
-      const body = buildHeterogeneousTriageBatch(queued, today(), existingSlugSet);
+      const body = buildHeterogeneousTriageBatch(queued, todayLocal(), existingSlugSet);
       await postBatch(body);
       setDone((prev) => {
         const next = new Set(prev);
@@ -287,14 +288,4 @@ async function postBatch(body: unknown): Promise<void> {
     const data = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
     throw new Error(data.detail ?? data.error ?? `${res.status}`);
   }
-}
-
-function today(): string {
-  // Local-time date, not UTC — clicking "finished" at 8:30 PM PDT should
-  // write today's date, not tomorrow's. `toISOString()` produces UTC.
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
 }

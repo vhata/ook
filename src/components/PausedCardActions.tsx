@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { todayLocal } from "@/lib/dates";
 
 // Owner-only inline actions for a paused book card on `/now`. Two
 // buttons:
@@ -25,16 +26,6 @@ import { useState } from "react";
 // that's `/now`'s revalidate window's job.
 
 type PendingAction = "pick-up" | "move-to-shelf";
-
-function todayIso(): string {
-  // Local-time date, not UTC — clicking "pick it back up" at 8:30 PM PDT
-  // should set last_progress to today's date, not tomorrow's.
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
 
 export function PausedCardActions({ slug, title }: { slug: string; title: string }) {
   const [busy, setBusy] = useState<PendingAction | null>(null);
@@ -116,7 +107,7 @@ export function buildBody(
       patches: [
         {
           slug,
-          frontmatter_changes: { last_progress: todayIso() },
+          frontmatter_changes: { last_progress: todayLocal() },
           commit_message: `${slug}: picked back up via /now`,
         },
       ],

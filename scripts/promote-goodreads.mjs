@@ -38,6 +38,7 @@ import { cleanTitleAndSeries } from "./lib/promote-goodreads.mjs";
 import { routeGoodreadsEntry, renderTbrBullet, appendTbrBullet } from "./lib/goodreads-routing.mjs";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 import { formatAddition, formatBookHeader } from "./lib/diff-format.mjs";
+import { todayLocal } from "./lib/dates.mjs";
 
 // Title cleanup: the pure helper lives in `scripts/lib/promote-goodreads.mjs`
 // so it can be unit-tested without filesystem IO. Re-export here so any
@@ -112,7 +113,7 @@ async function main() {
   let skippedShelf = 0;
   let skippedSlugCollision = 0;
   let skippedTbrDup = 0;
-  const today = todayIso();
+  const today = todayLocal();
 
   for (const e of entries) {
     if (SHELF_FILTER && e.shelf !== SHELF_FILTER) {
@@ -281,16 +282,6 @@ async function readIfExists(filePath) {
     if (err && err.code === "ENOENT") return "";
     throw err;
   }
-}
-
-function todayIso() {
-  // Local-time date, not UTC — operator running this at 8:30 PM PDT
-  // should stamp today's date, not tomorrow's.
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
 }
 
 // Parse only the YAML frontmatter portion of a markdown file, between
