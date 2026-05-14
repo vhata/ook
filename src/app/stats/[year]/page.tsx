@@ -227,10 +227,13 @@ function Topline({
   rated: Book[];
 }) {
   // Each tile carries a tooltip listing the underlying titles, and an
-  // optional href when a clean drill-in target exists (today only the
-  // longest book has one — a per-book page). The rest piggy-back on the
-  // native title-attribute tooltip; the user gets "what's in this number"
-  // on hover, the rule from feedback_ook_clickable_info.md.
+  // optional href when a clean drill-in target exists. Two targets live
+  // on this same page: the CoverMosaic ("The wall") is the canonical
+  // list of every finished book that year, and the RatingHistogram is
+  // the per-bucket breakdown of the rated subset. Other tiles (Started,
+  // Abandoned, Would reread, Pages) have no clean list-view target so
+  // they stay tooltip-only — the rule from feedback_ook_clickable_info.md
+  // says better to ship an honest tooltip than a fabricated route.
   type Item = {
     label: string;
     value: string;
@@ -243,12 +246,19 @@ function Topline({
       label: "Finished",
       value: String(stats.finished),
       tooltip: titlesTooltip(finished),
+      // The wall at the bottom of this page IS the list of finished
+      // books for the year, ordered by finish date with a click-target
+      // per cover. Anchor-only — same page, no route invented.
+      href: stats.finished > 0 ? "#the-wall" : undefined,
     },
     {
       label: "Avg rating",
       value: stats.averageRating !== null ? stats.averageRating.toFixed(2) : "—",
       hint: stats.rated > 0 ? `over ${stats.rated} rated` : undefined,
       tooltip: rated.length > 0 ? titlesTooltip(rated) : undefined,
+      // The rating histogram below breaks the rated set down per bucket
+      // with per-row tooltips. That's the underlying-data view.
+      href: stats.rated > 0 ? "#rating-distribution" : undefined,
     },
   ];
   if (stats.totalPages !== null) {
@@ -834,7 +844,7 @@ function RatingHistogram({
 }) {
   const max = Math.max(1, ...stats.ratingDistribution.map((b) => b.count));
   return (
-    <section className="mt-12">
+    <section id="rating-distribution" className="mt-12 scroll-mt-8">
       <h2 className="font-serif text-ink m-0 mb-5 text-[22px] leading-tight font-medium tracking-[-0.012em]">
         Rating distribution
       </h2>
@@ -882,7 +892,7 @@ function CoverMosaic({ year, books, todayMs }: { year: number; books: Book[]; to
   // Foxing filter applied per cover, so a year's wall fades gradually
   // toward sepia as that year recedes.
   return (
-    <section className="mt-14">
+    <section id="the-wall" className="mt-14 scroll-mt-8">
       <div className="mb-5 flex items-baseline justify-between gap-3">
         <h2 className="font-serif text-ink m-0 text-[22px] leading-tight font-medium tracking-[-0.012em]">
           The wall — {year}

@@ -96,7 +96,6 @@ Companion rule: inline-link styling stays subtle — links inherit surrounding t
 Specific surfaces to audit + fix:
 
 - **Per-book Kindle-session line.** Currently "Read across N sessions over D days · ~Xh total · on Kindle". Add the period — first session date → last session date (already in `KindleStats.firstStart` / `.lastEnd`). Or hover the line for a tooltip listing the months that had activity. `#polish #per-book #clickable-info`
-- **/stats and /stats/[year] number-rows.** Every "Finished: 12" / "Started: 8" / "Top tag: scifi (5)" entry should link to the underlying list of books. Today they're text-only. `#polish #stats #clickable-info`
 - **Tag co-occurrence pairings.** "Strongest pairings" on `/tags/[tag]` lists pairs but doesn't link to the intersection. Need an `/tags/[tag]+[other-tag]` view (or `/tags/[tag]?and=other-tag`) that lists books carrying both. Boolean AND first; OR later if needed. `#feature #tags #clickable-info`
 - **Inline-link style audit pass.** Sweep every page for inline links that use `text-accent` or heavy underlines and dial them back to "inherit text style, thin underline, accent on hover only". Primary navigation links (controls bar, wordmark, top-of-page back-arrows) stay decorative; everything inline goes subtle. `#polish #design #links`
 
