@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildDailyCounts,
   buildSessionsCache,
+  buildUnlinkedTotals,
   parseOwnershipShards,
   parseSessionsCsv,
   summariseCache,
@@ -437,30 +438,43 @@ describe("buildDailyCounts", () => {
     };
   }
 
-  it("counts one entry per session, keyed by YYYY-MM-DD", () => {
+  // Sessions are attributed to the *local* calendar day of `start`,
+  // so each test pins the TZ-driven offset by using noon UTC starts —
+  // safely inside every real-world time zone for the chosen date.
+  it("counts one entry per session, keyed by local YYYY-MM-DD", () => {
     const out = buildDailyCounts([
-      session("2024-01-01T10:00:00Z"),
-      session("2024-01-01T20:00:00Z"),
-      session("2024-01-02T10:00:00Z"),
+      session("2024-01-01T12:00:00Z"),
+      session("2024-01-01T13:00:00Z"),
+      session("2024-01-02T12:00:00Z"),
     ]);
-    expect(out).toEqual({ "2024-01-01": 2, "2024-01-02": 1 });
+    // Local TZ may pull/push the date by one day; we only care that the
+    // first two sessions collapse onto a single day and the third lands
+    // on the next.
+    const keys = Object.keys(out);
+    expect(keys).toHaveLength(2);
+    expect(out[keys[0]]).toBe(2);
+    expect(out[keys[1]]).toBe(1);
   });
 
   it("sorts keys lexicographically so the JSON output is diff-friendly", () => {
     const out = buildDailyCounts([
-      session("2024-12-01T10:00:00Z"),
-      session("2024-01-01T10:00:00Z"),
-      session("2024-06-01T10:00:00Z"),
+      session("2024-12-01T12:00:00Z"),
+      session("2024-01-01T12:00:00Z"),
+      session("2024-06-01T12:00:00Z"),
     ]);
-    expect(Object.keys(out)).toEqual(["2024-01-01", "2024-06-01", "2024-12-01"]);
+    const keys = Object.keys(out);
+    expect(keys).toEqual([...keys].sort());
+    // Lexicographic and chronological agree for YYYY-MM-DD: Jan first.
+    expect(keys[0].startsWith("2024-01")).toBe(true);
+    expect(keys[2].startsWith("2024-12")).toBe(true);
   });
 
   it("drops sessions with malformed (too-short) start strings", () => {
     const out = buildDailyCounts([
-      session("2024-01-01T10:00:00Z"),
-      { ...session("2024-01-01T10:00:00Z"), start: "short" },
+      session("2024-01-01T12:00:00Z"),
+      { ...session("2024-01-01T12:00:00Z"), start: "short" },
     ]);
-    expect(out).toEqual({ "2024-01-01": 1 });
+    expect(Object.values(out).reduce((s: number, n) => s + (n as number), 0)).toBe(1);
   });
 
   it("returns an empty map for no sessions", () => {
@@ -469,10 +483,70 @@ describe("buildDailyCounts", () => {
 
   it("aggregates across ASINs — the day map is global, not per-book", () => {
     const out = buildDailyCounts([
-      { ...session("2024-01-01T10:00:00Z"), asin: "B001" },
-      { ...session("2024-01-01T11:00:00Z"), asin: "B002" },
-      { ...session("2024-01-01T12:00:00Z"), asin: "B003" },
+      { ...session("2024-01-01T12:00:00Z"), asin: "B001" },
+      { ...session("2024-01-01T13:00:00Z"), asin: "B002" },
+      { ...session("2024-01-01T14:00:00Z"), asin: "B003" },
     ]);
-    expect(out).toEqual({ "2024-01-01": 3 });
+    const keys = Object.keys(out);
+    expect(keys).toHaveLength(1);
+    expect(out[keys[0]]).toBe(3);
+  });
+});
+
+describe("buildUnlinkedTotals", () => {
+  it("sums sessions + seconds only from records with title: null", () => {
+    const cache = {
+      OWNED: {
+        title: "Owned",
+        acquiredDate: null,
+        resourceType: "KindleEBook",
+        sessions: 5,
+        totalSeconds: 9000,
+        firstStart: "2024-01-01T00:00:00Z",
+        lastEnd: "2024-01-02T00:00:00Z",
+        distinctDays: 2,
+      },
+      PDOC1: {
+        title: null,
+        acquiredDate: null,
+        resourceType: null,
+        sessions: 3,
+        totalSeconds: 3600,
+        firstStart: "2024-02-01T00:00:00Z",
+        lastEnd: "2024-02-01T01:00:00Z",
+        distinctDays: 1,
+      },
+      PDOC2: {
+        title: null,
+        acquiredDate: null,
+        resourceType: null,
+        sessions: 7,
+        totalSeconds: 7200,
+        firstStart: "2024-03-01T00:00:00Z",
+        lastEnd: "2024-03-02T00:00:00Z",
+        distinctDays: 2,
+      },
+    };
+    expect(buildUnlinkedTotals(cache)).toEqual({ sessions: 10, totalSeconds: 10800 });
+  });
+
+  it("returns zero totals when every record has a title", () => {
+    const cache = {
+      OWNED: {
+        title: "Owned",
+        acquiredDate: null,
+        resourceType: "KindleEBook",
+        sessions: 5,
+        totalSeconds: 9000,
+        firstStart: "2024-01-01T00:00:00Z",
+        lastEnd: "2024-01-02T00:00:00Z",
+        distinctDays: 2,
+      },
+    };
+    expect(buildUnlinkedTotals(cache)).toEqual({ sessions: 0, totalSeconds: 0 });
+  });
+
+  it("returns zero totals for an empty cache", () => {
+    expect(buildUnlinkedTotals({})).toEqual({ sessions: 0, totalSeconds: 0 });
   });
 });

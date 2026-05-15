@@ -29,6 +29,7 @@ import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 import {
   buildDailyCounts,
   buildSessionsCache,
+  buildUnlinkedTotals,
   parseOwnershipShards,
   parseSessionsCsv,
   summariseCache,
@@ -72,6 +73,7 @@ async function main() {
 
   const cache = buildSessionsCache(sessions, ownership);
   const dailyCounts = buildDailyCounts(sessions);
+  const unlinkedSessions = buildUnlinkedTotals(cache);
   const summary = summariseCache(cache);
   process.stderr.write(
     `\ncache: ${summary.asins} ASINs · ${summary.asinsWithTitle} owned · ${summary.totalSessions} sessions · ~${summary.totalHours}h total\n`,
@@ -94,7 +96,14 @@ async function main() {
       skippedSessionsMalformed: skippedMalformed,
     },
     books: cache,
+    // Per-day session counts (YYYY-MM-DD → count), local time. Powers
+    // the `/stats` heatmap historical-reach backdrop.
     dailyCounts,
+    // Pre-summed total for the "unlinked Kindle activity" footnote on
+    // `/stats` — derivable from `books` (records with `title: null`)
+    // but emitted here so the renderer reads one number instead of
+    // walking the whole map.
+    unlinkedSessions,
   };
   const serialised = `${JSON.stringify(payload, null, 2)}\n`;
 

@@ -1,6 +1,7 @@
 // Pure helpers for the Kindle reading-session importer. Lives in its
 // own module so the CSV parsing, ownership-shard joining, and cache-
 // building logic can be unit-tested without filesystem IO.
+import { isoToLocalDate } from "./dates.mjs";
 //
 // Two source files in an Amazon privacy-data takeout drive this:
 //   - Kindle.Devices.ReadingSession.csv — one row per reading session,
@@ -258,6 +259,13 @@ export function buildSessionsCache(sessions, ownership) {
  * prior to the vault's first commit can render proper reading-day
  * data, not an empty grid.
  *
+ * Sessions are attributed to the calendar day of their `start` in the
+ * runtime's **local** time zone (via `isoToLocalDate`), matching the
+ * rest of the site's date handling (`todayLocal`). A session that
+ * spans midnight UTC but starts at 23:30 local time attributes to the
+ * local calendar day, not the UTC one. We do not split sessions
+ * across days.
+ *
  * Sessions with malformed start timestamps are silently dropped (the
  * upstream parser already filters these; belt-and-braces).
  *
@@ -271,7 +279,8 @@ export function buildDailyCounts(sessions) {
   const counts = new Map();
   for (const s of sessions) {
     if (typeof s.start !== "string" || s.start.length < 10) continue;
-    const date = s.start.slice(0, 10);
+    const date = isoToLocalDate(s.start);
+    if (!date) continue;
     counts.set(date, (counts.get(date) ?? 0) + 1);
   }
   const out = {};
@@ -279,6 +288,36 @@ export function buildDailyCounts(sessions) {
     out[date] = counts.get(date);
   }
   return out;
+}
+
+/**
+ * Sum sessions + seconds from cache records whose ASIN has no
+ * ownership shard (the "unlinked Kindle activity" bucket — sendtokindle
+ * personal documents, samples, books since removed from the library).
+ * Emitted alongside the per-ASIN `books` map as a top-level
+ * `unlinkedSessions` projection on the cache file, so the renderer can
+ * read a tiny pre-summed shape instead of re-walking the per-ASIN map.
+ *
+ * Cache records with `title === null` are the unlinked rows; the
+ * `parseOwnershipShards` filter drops `KindleEBookSample` /
+ * `MobileApp` typed shards, which is what lands their ASINs in the
+ * unlinked bucket here. The drop count + duration must be preserved at
+ * cache time — there's no path back from the committed summary to the
+ * raw session list.
+ *
+ * @param {ReturnType<typeof buildSessionsCache>} cache
+ * @returns {{ sessions: number, totalSeconds: number }}
+ */
+export function buildUnlinkedTotals(cache) {
+  let sessions = 0;
+  let totalSeconds = 0;
+  for (const asin of Object.keys(cache)) {
+    const record = cache[asin];
+    if (record.title !== null) continue;
+    sessions += record.sessions;
+    totalSeconds += record.totalSeconds;
+  }
+  return { sessions, totalSeconds };
 }
 
 /**

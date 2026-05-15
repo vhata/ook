@@ -44,7 +44,12 @@ function makeActivity(year: number, eventDates: string[]): DayActivity[] {
   for (let t = start; t <= end; t += 86400000) {
     const d = new Date(t);
     const date = d.toISOString().slice(0, 10);
-    days.push({ date, weekday: d.getUTCDay(), count: set.has(date) ? 1 : 0 });
+    days.push({
+      date,
+      weekday: d.getUTCDay(),
+      count: set.has(date) ? 1 : 0,
+      kindleSessions: 0,
+    });
   }
   return days;
 }

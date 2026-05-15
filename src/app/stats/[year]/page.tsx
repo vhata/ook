@@ -43,6 +43,12 @@ export default async function StatsYearPage({ params }: { params: Params }) {
     getAllBooks(),
   ]);
   const totalEvents = activity.reduce((sum, d) => sum + d.count, 0);
+  // Kindle session-days count toward the heatmap threshold so years
+  // with only Kindle activity (pre-vault era) still render the calendar
+  // rather than dropping to a one-line timeline. They render as a
+  // backdrop layer, distinct from the foreground event markers.
+  const totalKindleDays = activity.reduce((sum, d) => sum + (d.kindleSessions > 0 ? 1 : 0), 0);
+  const heatmapSignal = totalEvents + totalKindleDays;
   const finishedThisYear = allBooks
     .filter((b) => b.status === "finished" && b.finished?.startsWith(`${year}-`))
     .sort((a, b) => (a.finished ?? "").localeCompare(b.finished ?? ""));
@@ -91,54 +97,70 @@ export default async function StatsYearPage({ params }: { params: Params }) {
 
       <Header year={year} years={allYears} />
 
-      {stats.finished === 0 && stats.abandoned === 0 && stats.startedInYear === 0 ? (
+      {stats.finished === 0 &&
+      stats.abandoned === 0 &&
+      stats.startedInYear === 0 &&
+      heatmapSignal === 0 ? (
         <EmptyYear year={year} />
       ) : (
         <>
-          <Topline
-            stats={stats}
-            finished={finishedThisYear}
-            abandoned={abandonedThisYear}
-            started={startedThisYear}
-            wouldReread={wouldRereadThisYear}
-            rated={ratedThisYear}
-          />
+          {/* For Kindle-only years (pre-vault era, only `dailyCounts` data
+              available) the catalog-derived stats are all zero — render the
+              heatmap + streak + weekend split alone rather than padding
+              the page with "0 finished · 0 abandoned" tiles. */}
+          {(stats.finished > 0 || stats.abandoned > 0 || stats.startedInYear > 0) && (
+            <Topline
+              stats={stats}
+              finished={finishedThisYear}
+              abandoned={abandonedThisYear}
+              started={startedThisYear}
+              wouldReread={wouldRereadThisYear}
+              rated={ratedThisYear}
+            />
+          )}
           {stats.paceProjection && <PaceProjection stats={stats} />}
-          {totalEvents > 0 &&
-            (totalEvents < HEATMAP_MIN_EVENTS ? (
-              <ReadingTimeline year={year} events={events} totalEvents={totalEvents} />
+          {heatmapSignal > 0 &&
+            (heatmapSignal < HEATMAP_MIN_EVENTS ? (
+              <ReadingTimeline
+                year={year}
+                events={events}
+                activity={activity}
+                totalEvents={totalEvents}
+              />
             ) : (
               <Heatmap activity={activity} totalEvents={totalEvents} />
             ))}
-          {totalEvents > 0 && <LongestStreak activity={activity} />}
-          {totalEvents > 0 && <WeekendSplit activity={activity} />}
+          {heatmapSignal > 0 && <LongestStreak activity={activity} />}
+          {heatmapSignal > 0 && <WeekendSplit activity={activity} />}
           {stats.pagesByMonth.some((p) => p > 0) && (
             <PagesPerMonth pagesByMonth={stats.pagesByMonth} />
           )}
           {stats.rated > 0 && <RatingHistogram stats={stats} ratedByBucket={ratedByBucket} />}
-          <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-2">
-            <TopList
-              title="Top tags"
-              empty="No tagged books finished."
-              rows={stats.topTags.map((t) => ({
-                key: t.tag,
-                label: t.tag,
-                count: t.count,
-                href: `/tags/${encodeURIComponent(t.tag)}`,
-                tooltip: titlesTooltip(tagToBooks.get(t.tag) ?? []),
-              }))}
-            />
-            <TopList
-              title="Most read authors"
-              empty="No finished books to count."
-              rows={stats.topAuthors.map((a) => ({
-                key: a.author,
-                label: a.author,
-                count: a.count,
-                tooltip: titlesTooltip(authorToBooks.get(a.author) ?? []),
-              }))}
-            />
-          </div>
+          {(stats.topTags.length > 0 || stats.topAuthors.length > 0) && (
+            <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-2">
+              <TopList
+                title="Top tags"
+                empty="No tagged books finished."
+                rows={stats.topTags.map((t) => ({
+                  key: t.tag,
+                  label: t.tag,
+                  count: t.count,
+                  href: `/tags/${encodeURIComponent(t.tag)}`,
+                  tooltip: titlesTooltip(tagToBooks.get(t.tag) ?? []),
+                }))}
+              />
+              <TopList
+                title="Most read authors"
+                empty="No finished books to count."
+                rows={stats.topAuthors.map((a) => ({
+                  key: a.author,
+                  label: a.author,
+                  count: a.count,
+                  tooltip: titlesTooltip(authorToBooks.get(a.author) ?? []),
+                }))}
+              />
+            </div>
+          )}
           {finishedThisYear.length > 0 && (
             <CoverMosaic year={year} books={finishedThisYear} todayMs={todayMs} />
           )}
@@ -435,6 +457,18 @@ function Heatmap({ activity, totalEvents }: { activity: DayActivity[]; totalEven
     return "var(--good)";
   };
 
+  // Kindle session-day backdrop: a single faint shade for days the
+  // operator had Kindle reading activity but no vault event. Distinct
+  // from the event ramp so the two read as different signals — the
+  // green intensity ramp tells the foreground story (when a book
+  // started / finished / was logged), the backdrop tells the historical
+  // reach ("I was reading on this day, just no event made it to the
+  // vault"). Sits at half the bottom-bucket strength so it stays under
+  // the event green visually.
+  const kindleBackdrop = "color-mix(in srgb, var(--good) 14%, transparent)";
+
+  const totalKindleDays = activity.reduce((sum, d) => sum + (d.kindleSessions > 0 ? 1 : 0), 0);
+
   const monthLabels: Array<{ index: number; label: string }> = [];
   for (let m = 0; m < 12; m++) {
     // Index of the first day of each month in the activity array.
@@ -449,6 +483,15 @@ function Heatmap({ activity, totalEvents }: { activity: DayActivity[]; totalEven
     }
   }
 
+  const cellTitle = (d: DayActivity): string => {
+    const parts = [d.date];
+    if (d.count > 0) parts.push(`${d.count} ${d.count === 1 ? "event" : "events"}`);
+    if (d.kindleSessions > 0) {
+      parts.push(`${d.kindleSessions} Kindle session${d.kindleSessions === 1 ? "" : "s"}`);
+    }
+    return parts.length === 1 ? `${d.date} — no activity` : parts.join(" — ");
+  };
+
   return (
     <section className="mt-12">
       <div className="mb-5 flex items-baseline justify-between gap-3">
@@ -456,7 +499,9 @@ function Heatmap({ activity, totalEvents }: { activity: DayActivity[]; totalEven
           Reading days
         </h2>
         <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
-          {totalEvents} {totalEvents === 1 ? "event" : "events"}
+          {totalEvents > 0
+            ? `${totalEvents} ${totalEvents === 1 ? "event" : "events"}`
+            : `${totalKindleDays} Kindle day${totalKindleDays === 1 ? "" : "s"}`}
         </span>
       </div>
       <div className="bg-surface border-rule overflow-x-auto rounded border p-5">
@@ -469,19 +514,30 @@ function Heatmap({ activity, totalEvents }: { activity: DayActivity[]; totalEven
             gap: "3px",
           }}
         >
-          {activity.map((d) => (
-            <div
-              key={d.date}
-              title={`${d.date} — ${d.count} ${d.count === 1 ? "event" : "events"}`}
-              style={{
-                gridRowStart: d.weekday + 1,
-                background: intensity(d.count),
-                borderRadius: 2,
-              }}
-            />
-          ))}
+          {activity.map((d) => {
+            // Events take precedence over the Kindle backdrop — a day
+            // with a finish AND a Kindle session reads as a finish-day
+            // (green ramp), not a Kindle-day (faint backdrop).
+            const background =
+              d.count > 0
+                ? intensity(d.count)
+                : d.kindleSessions > 0
+                  ? kindleBackdrop
+                  : "var(--surface-mute)";
+            return (
+              <div
+                key={d.date}
+                title={cellTitle(d)}
+                style={{
+                  gridRowStart: d.weekday + 1,
+                  background,
+                  borderRadius: 2,
+                }}
+              />
+            );
+          })}
         </div>
-        <div className="text-ink-soft mt-3 flex items-center gap-2 text-[10px] tracking-[0.14em] uppercase">
+        <div className="text-ink-soft mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] tracking-[0.14em] uppercase">
           <span>less</span>
           {[0, 1, 3, 5, 7].map((n) => (
             <span
@@ -496,6 +552,23 @@ function Heatmap({ activity, totalEvents }: { activity: DayActivity[]; totalEven
             />
           ))}
           <span>more</span>
+          {totalKindleDays > 0 && (
+            <span
+              className="text-ink-soft flex items-center gap-1.5 normal-case"
+              title="Kindle reading-session days from the Amazon takeout, shown when no vault event exists for the day"
+            >
+              <span
+                style={{
+                  width: 12,
+                  height: 12,
+                  background: kindleBackdrop,
+                  borderRadius: 2,
+                  display: "inline-block",
+                }}
+              />
+              <span className="italic">Kindle activity</span>
+            </span>
+          )}
           <span className="text-ink-dim ml-auto hidden sm:inline">
             {monthLabels.map((m) => m.label).join(" · ")}
           </span>
@@ -508,10 +581,12 @@ function Heatmap({ activity, totalEvents }: { activity: DayActivity[]; totalEven
 function ReadingTimeline({
   year,
   events,
+  activity,
   totalEvents,
 }: {
   year: number;
   events: YearEvent[];
+  activity: DayActivity[];
   totalEvents: number;
 }) {
   // Sparse-year fallback for the calendar heatmap. A horizontal line
@@ -568,6 +643,11 @@ function ReadingTimeline({
     });
   }
 
+  const kindleOnlyDays = activity.reduce(
+    (sum, d) => sum + (d.kindleSessions > 0 && d.count === 0 ? 1 : 0),
+    0,
+  );
+
   return (
     <section className="mt-12">
       <div className="mb-5 flex items-baseline justify-between gap-3">
@@ -575,7 +655,9 @@ function ReadingTimeline({
           Reading days
         </h2>
         <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
-          {totalEvents} {totalEvents === 1 ? "event" : "events"}
+          {totalEvents > 0
+            ? `${totalEvents} ${totalEvents === 1 ? "event" : "events"}`
+            : `${kindleOnlyDays} Kindle day${kindleOnlyDays === 1 ? "" : "s"}`}
         </span>
       </div>
       <div className="bg-surface border-rule rounded border p-5">
@@ -617,6 +699,25 @@ function ReadingTimeline({
               </text>
             </g>
           ))}
+          {/* Kindle session-day backdrop — a faint dot below the rail
+              for each day the operator had Kindle activity. Sits beneath
+              the event row so the event markers stay foreground. Skipped
+              when the day already has a vault event (the event dot is
+              the stronger signal). */}
+          {activity
+            .filter((d) => d.kindleSessions > 0 && d.count === 0)
+            .map((d) => (
+              <circle
+                key={`kindle-${d.date}`}
+                cx={x(d.date)}
+                cy={lineY + 6}
+                r={1.4}
+                fill="var(--good)"
+                opacity={0.45}
+              >
+                <title>{`${d.date} — ${d.kindleSessions} Kindle session${d.kindleSessions === 1 ? "" : "s"}`}</title>
+              </circle>
+            ))}
           {/* Event dots, finishes drawn on top */}
           {events
             .slice()
@@ -689,6 +790,18 @@ function ReadingTimeline({
             />
             <span className="text-ink-soft">started</span>
           </span>
+          {kindleOnlyDays > 0 && (
+            <span
+              className="flex items-center gap-1.5"
+              title="Kindle reading-session days from the Amazon takeout, shown beneath the rail when no vault event exists for the day"
+            >
+              <span
+                className="inline-block rounded-full"
+                style={{ width: 4, height: 4, background: "var(--good)", opacity: 0.45 }}
+              />
+              <span className="text-ink-soft">Kindle activity</span>
+            </span>
+          )}
           <span className="text-ink-soft ml-auto italic normal-case opacity-80">
             dot size scales with book length when known
           </span>
@@ -708,17 +821,20 @@ function kindOrder(kind: YearEvent["kind"]): number {
 }
 
 function LongestStreak({ activity }: { activity: DayActivity[] }) {
-  // Longest run of consecutive calendar days with at least one event.
-  // `activity` is already day-by-day in date order, so a single linear
-  // scan finds it. We render only when the streak is at least 2 days —
-  // a single-day "streak" isn't a streak; it's just a day with reading.
+  // Longest run of consecutive calendar days with at least one event OR
+  // Kindle reading session. `activity` is already day-by-day in date
+  // order, so a single linear scan finds it. We render only when the
+  // streak is at least 2 days — a single-day "streak" isn't a streak;
+  // it's just a day with reading. Kindle session-days count because
+  // they're real reading; the headline is "consecutive reading days",
+  // not "consecutive event days".
   let bestLen = 0;
   let bestStart = "";
   let bestEnd = "";
   let curLen = 0;
   let curStart = "";
   for (const d of activity) {
-    if (d.count > 0) {
+    if (d.count > 0 || d.kindleSessions > 0) {
       if (curLen === 0) curStart = d.date;
       curLen++;
       if (curLen > bestLen) {

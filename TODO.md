@@ -6,15 +6,6 @@ Backlog, grouped by readiness state. Each entry tagged with `#area`. Done items 
 
 Sections are grouped by readiness: decided plans first, then open verdicts, deferred-by-design lines, researched dossiers, polish and housekeeping, and the longer brainstormed inventory last. Within each state, sections retain their topical headings.
 
-## Decided & ready to build
-
-### Kindle reading-session follow-ups (codified 2026-05-10, base shipped 2026-05-13)
-
-The base pipeline — Amazon-takeout ingestion, `amazon_asin` schema, title-match backfill, per-book render slot — shipped. The 158 vault books that owned a Kindle edition now carry an ASIN; the cache (per-ASIN summary, ~76 KB) lives at `_meta/kindle-sessions.json`. Two downstream items still queued:
-
-- **Historical reach on `/stats` heatmaps**: the year-day heatmap currently renders from-vault-era only. Folding session-day data into the heatmap source would let years prior to the vault's first commit render too — properly back-fills the historical view of "when did I actually read." The current cache schema doesn't carry per-day data; the import script would need to emit a second tiny projection (or extend the existing record with a per-year day-count map) without recommitting raw sessions. `#feature #stats #historical`
-- **Unlinked-Kindle-activity footnote**: 263 sessions / ~72h of sendtokindle / personal-document reads have no ownership shard and so no vault join. Render an "unlinked Kindle activity: ~Nh across M sessions" footnote on `/stats` (or per-year) rather than silently dropping them — the data is honest about the gap. `#caveat #stats`
-
 ## Deferred by design
 
 ### Agent prompts at state-change moments (codified 2026-05-10)

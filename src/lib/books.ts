@@ -1104,6 +1104,13 @@ type KindleSessionsFile = {
   // `/stats` heatmap historical-reach so years prior to the vault's
   // first commit render proper reading-day data. Added 2026-05-13.
   dailyCounts?: Record<string, number>;
+  // Pre-summed total for the "unlinked Kindle activity" footnote on
+  // `/stats`. Derivable from `books` (records with `title: null`) but
+  // emitted alongside so the renderer reads one number instead of
+  // re-walking the map. Optional — older cache files predate the
+  // field and the renderer falls back to the per-record sum. Added
+  // 2026-05-14.
+  unlinkedSessions?: { sessions?: number; totalSeconds?: number };
 };
 
 export const loadKindleSessions = cache(async (): Promise<Map<string, KindleStats>> => {
@@ -1157,6 +1164,17 @@ export const getUnlinkedKindleActivity = cache(
       parsed = JSON.parse(raw) as KindleSessionsFile;
     } catch {
       return null;
+    }
+    // Prefer the top-level pre-summed projection (newer cache schema —
+    // single read, no per-record walk). Fall back to summing across
+    // `books` records with `title: null` when the projection is absent
+    // (older cache file format predating the field).
+    const projected = parsed.unlinkedSessions;
+    if (projected && typeof projected.sessions === "number" && projected.sessions > 0) {
+      return {
+        sessions: projected.sessions,
+        totalSeconds: typeof projected.totalSeconds === "number" ? projected.totalSeconds : 0,
+      };
     }
     let sessions = 0;
     let totalSeconds = 0;
@@ -1806,7 +1824,10 @@ export async function getOnThisDay(today: Date = new Date()): Promise<LogEntry[]
 
 // One entry per calendar day in the year, with a count of reading events
 // (started + finished + manual log) on that day. Powers the heatmap on
-// `/stats/[year]`.
+// `/stats/[year]`. Kindle session activity is tracked separately in
+// `kindleSessions` so the heatmap can render it as a backdrop layer
+// distinct from the foreground event markers (per-task design call:
+// session-days are reading activity, not events).
 export async function getYearActivity(year: number): Promise<DayActivity[]> {
   const [books, manual, kindleDays] = await Promise.all([
     getAllBooks(),
@@ -1824,15 +1845,10 @@ export async function getYearActivity(year: number): Promise<DayActivity[]> {
     bump(b.finished);
   }
   for (const m of manual) bump(m.date);
-  // Each day with Kindle sessions adds +1 to its cell — counting
-  // "reading-day-or-not" rather than raw session count so the heatmap
-  // composes well with the other event sources (a finish-day with one
-  // session reads as +2, not +(1 + per-session-count) which would
-  // dwarf the other signals).
-  for (const date of kindleDays.keys()) {
-    if (date.startsWith(`${year}-`)) {
-      counts.set(date, (counts.get(date) ?? 0) + 1);
-    }
+
+  const kindleByDate = new Map<string, number>();
+  for (const [date, n] of kindleDays.entries()) {
+    if (date.startsWith(`${year}-`)) kindleByDate.set(date, n);
   }
 
   const days: DayActivity[] = [];
@@ -1841,7 +1857,12 @@ export async function getYearActivity(year: number): Promise<DayActivity[]> {
   for (let t = start; t <= end; t += 86400000) {
     const d = new Date(t);
     const date = d.toISOString().slice(0, 10);
-    days.push({ date, weekday: d.getUTCDay(), count: counts.get(date) ?? 0 });
+    days.push({
+      date,
+      weekday: d.getUTCDay(),
+      count: counts.get(date) ?? 0,
+      kindleSessions: kindleByDate.get(date) ?? 0,
+    });
   }
   return days;
 }

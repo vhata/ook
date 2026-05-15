@@ -32,10 +32,10 @@ async function load() {
   return mod.getUnlinkedKindleActivity;
 }
 
-function writeCache(books: Record<string, unknown>) {
+function writeCache(books: Record<string, unknown>, extra: Record<string, unknown> = {}) {
   writeFileSync(
     path.join(vault, "_meta", "kindle-sessions.json"),
-    JSON.stringify({ schemaVersion: 1, books }),
+    JSON.stringify({ schemaVersion: 1, books, ...extra }),
     "utf8",
   );
 }
@@ -96,5 +96,49 @@ describe("getUnlinkedKindleActivity", () => {
     writeFileSync(path.join(vault, "_meta", "kindle-sessions.json"), "not json", "utf8");
     const fn = await load();
     expect(await fn()).toBeNull();
+  });
+
+  it("prefers the top-level `unlinkedSessions` projection when present", async () => {
+    // Per-record sum would be 10 sessions / 10800 sec — projection is
+    // authoritative. Renderer reads one number instead of walking the
+    // whole map.
+    writeCache(
+      {
+        PDOC1: {
+          title: null,
+          sessions: 3,
+          totalSeconds: 3600,
+          firstStart: "2024-02-01T00:00:00Z",
+          lastEnd: "2024-02-01T01:00:00Z",
+          distinctDays: 1,
+        },
+        PDOC2: {
+          title: null,
+          sessions: 7,
+          totalSeconds: 7200,
+          firstStart: "2024-03-01T00:00:00Z",
+          lastEnd: "2024-03-02T00:00:00Z",
+          distinctDays: 2,
+        },
+      },
+      { unlinkedSessions: { sessions: 10, totalSeconds: 10800 } },
+    );
+    const fn = await load();
+    expect(await fn()).toEqual({ sessions: 10, totalSeconds: 10800 });
+  });
+
+  it("falls back to the per-record sum when the projection is absent (legacy cache shape)", async () => {
+    writeCache({
+      PDOC1: {
+        title: null,
+        sessions: 4,
+        totalSeconds: 5000,
+        firstStart: "2024-02-01T00:00:00Z",
+        lastEnd: "2024-02-01T01:00:00Z",
+        distinctDays: 1,
+      },
+    });
+    const fn = await load();
+    expect(await fn()).toEqual({ sessions: 4, totalSeconds: 5000 });
   });
 });

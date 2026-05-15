@@ -7,6 +7,7 @@ import {
   getReviewWordFrequency,
   getStatsYears,
   getUnlinkedKindleActivity,
+  loadKindleDailyCounts,
 } from "@/lib/books";
 import type { Book } from "@/lib/types";
 
@@ -22,14 +23,24 @@ export const metadata = {
 // year has any reading activity yet, falls through to the current-year
 // stats page so the route still does something useful for a fresh vault.
 export default async function StatsIndex() {
-  const [years, books, words, pairs, unlinkedKindle] = await Promise.all([
+  const [years, books, words, pairs, unlinkedKindle, kindleDays] = await Promise.all([
     getStatsYears(),
     getAllBooks(),
     getReviewWordFrequency(40),
     getFinishPairs(2),
     getUnlinkedKindleActivity(),
+    loadKindleDailyCounts(),
   ]);
   if (years.length === 0) redirect(`/stats/${new Date().getFullYear()}`);
+
+  // Pre-tally Kindle reading-days per year so the historical-reach
+  // tiles (years with Kindle activity but no vault events) can show
+  // "N reading days" instead of an empty card. Cheap one-pass map walk.
+  const kindleDaysByYear = new Map<number, number>();
+  for (const date of kindleDays.keys()) {
+    const y = Number(date.slice(0, 4));
+    if (Number.isFinite(y)) kindleDaysByYear.set(y, (kindleDaysByYear.get(y) ?? 0) + 1);
+  }
 
   const yearly = years.map((year) => {
     const finished = books
@@ -40,6 +51,7 @@ export default async function StatsIndex() {
       first: finished[0] ?? null,
       last: finished[finished.length - 1] ?? null,
       finishedCount: finished.length,
+      kindleDaysCount: kindleDaysByYear.get(year) ?? 0,
     };
   });
 
@@ -77,35 +89,67 @@ export default async function StatsIndex() {
       {pairs.length > 0 && <FinishPatterns pairs={pairs} />}
 
       <ol className="m-0 list-none space-y-6 p-0">
-        {yearly.map((y) => (
-          <li key={y.year} className="bg-surface border-rule rounded border p-5 sm:p-6">
-            <div className="mb-4 flex items-baseline justify-between gap-3">
-              <Link
-                href={`/stats/${y.year}`}
-                className="font-serif text-ink hover:text-accent text-[34px] leading-none font-medium tracking-[-0.02em]"
+        {yearly.map((y) => {
+          // Kindle-only year: no vault finishes, but the takeout has
+          // session days. Render a faint tile so the historical reach
+          // is visible without padding the page with "none recorded"
+          // bookends. Clicking still drills into the year page, which
+          // surfaces the heatmap backdrop layer.
+          if (y.finishedCount === 0 && y.kindleDaysCount > 0) {
+            return (
+              <li
+                key={y.year}
+                className="bg-surface border-rule rounded border p-5 sm:p-6 opacity-65"
               >
-                {y.year}
-              </Link>
-              {/* The "N finished" count also drills into that year's page —
-                  the heading is already a link, but a user who lands on
-                  the count first should be able to click straight through.
-                  Subtle hover-only underline; no accent paint on the
-                  surrounding tracking-uppercase text. */}
-              <Link
-                href={`/stats/${y.year}`}
-                className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase decoration-rule hover:decoration-accent underline-offset-[3px] hover:underline"
-              >
-                {y.finishedCount} finished
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Bookend label="First" book={y.first} />
-              {y.first && y.last && y.first.slug !== y.last.slug && (
-                <Bookend label="Last" book={y.last} />
-              )}
-            </div>
-          </li>
-        ))}
+                <div className="flex items-baseline justify-between gap-3">
+                  <Link
+                    href={`/stats/${y.year}`}
+                    className="font-serif text-ink-soft hover:text-ink text-[28px] leading-none font-medium tracking-[-0.02em]"
+                  >
+                    {y.year}
+                  </Link>
+                  <Link
+                    href={`/stats/${y.year}`}
+                    className="text-ink-dim hover:text-ink-soft text-[11px] tracking-[0.14em] uppercase decoration-rule hover:decoration-accent underline-offset-[3px] hover:underline"
+                    title="Pre-vault reading reconstructed from Amazon Kindle takeout — no event records, but a Kindle session was active on each of these days"
+                  >
+                    {y.kindleDaysCount} Kindle reading day
+                    {y.kindleDaysCount === 1 ? "" : "s"}
+                  </Link>
+                </div>
+              </li>
+            );
+          }
+          return (
+            <li key={y.year} className="bg-surface border-rule rounded border p-5 sm:p-6">
+              <div className="mb-4 flex items-baseline justify-between gap-3">
+                <Link
+                  href={`/stats/${y.year}`}
+                  className="font-serif text-ink hover:text-accent text-[34px] leading-none font-medium tracking-[-0.02em]"
+                >
+                  {y.year}
+                </Link>
+                {/* The "N finished" count also drills into that year's page —
+                    the heading is already a link, but a user who lands on
+                    the count first should be able to click straight through.
+                    Subtle hover-only underline; no accent paint on the
+                    surrounding tracking-uppercase text. */}
+                <Link
+                  href={`/stats/${y.year}`}
+                  className="text-ink-soft hover:text-ink text-[11px] tracking-[0.14em] uppercase decoration-rule hover:decoration-accent underline-offset-[3px] hover:underline"
+                >
+                  {y.finishedCount} finished
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Bookend label="First" book={y.first} />
+                {y.first && y.last && y.first.slug !== y.last.slug && (
+                  <Bookend label="Last" book={y.last} />
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ol>
 
       {unlinkedKindle && (

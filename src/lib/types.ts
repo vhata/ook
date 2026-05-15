@@ -305,7 +305,17 @@ export type DayActivity = {
   // Day of week, 0=Sun..6=Sat (UTC).
   weekday: number;
   // Total events on this date — started + finished + manual log entries.
+  // Kindle session activity does NOT contribute to this count — that's
+  // tracked separately in `kindleSessions` and rendered as a backdrop
+  // layer so it doesn't compete with the event markers.
   count: number;
+  // Number of Kindle reading sessions that started on this date
+  // (sourced from `_meta/kindle-sessions.json`'s `dailyCounts`). 0 when
+  // the Kindle-sessions cache is absent or has no activity for the date.
+  // The heatmap shades cells with `kindleSessions > 0` even when
+  // `count === 0`, so years prior to the vault's first event still
+  // render the days the operator was actually reading on a Kindle.
+  kindleSessions: number;
 };
 
 // One reading event in the year — a started, finished, or manual log
