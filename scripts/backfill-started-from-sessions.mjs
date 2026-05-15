@@ -15,6 +15,16 @@
 // Pure cache-to-frontmatter: no network. Per-book skip: never
 // overwrites an existing `started:`. Manual edits stick.
 //
+// Time-zone discipline: `firstStart` in the cache is a UTC ISO
+// timestamp (e.g. `2024-01-01T02:30:00Z`). Slicing the first ten
+// characters off that string gives the UTC date, which can be a day
+// off from the reader's lived experience (a session at 02:30Z is
+// 21:30 the previous evening on the US East Coast). The vault's
+// other date fields are stamped in the operator's local time
+// (see `scripts/lib/dates.mjs`'s `todayLocal`), so this script does
+// the same: parse the ISO instant, then format it with the runtime's
+// local-time calendar fields.
+//
 // Sanity guard: if the cache's firstStart is AFTER the book's
 // `finished:`, skip with a warning — the data is contradictory and
 // the operator should look at it by hand rather than have the script
@@ -33,6 +43,7 @@ import { fileURLToPath } from "node:url";
 import matter from "gray-matter";
 import { formatBookHeader, formatLineInsertion } from "./lib/diff-format.mjs";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
+import { todayLocal } from "./lib/dates.mjs";
 
 const argv = parseArgs(process.argv.slice(2));
 const VAULT = path.resolve(
@@ -106,7 +117,11 @@ async function main() {
       continue;
     }
 
-    const startedDate = record.firstStart.slice(0, 10);
+    const startedDate = localDateFromIso(record.firstStart);
+    if (!startedDate) {
+      counts.noCache++;
+      continue;
+    }
     const finished = typeof data.finished === "string" ? data.finished : null;
     if (finished && startedDate > finished) {
       process.stderr.write(
@@ -164,6 +179,19 @@ export function hasRealStarted(value) {
   if (typeof value === "string") return value.length > 0;
   if (value instanceof Date) return !Number.isNaN(value.getTime());
   return false;
+}
+
+// Convert a UTC ISO timestamp (the shape `firstStart` takes in the
+// kindle-sessions cache) to a YYYY-MM-DD string in the runtime's
+// local time zone. Mirrors `lib/dates.mjs`'s `todayLocal` shape so
+// the dates this script stamps match every other vault-side date.
+// Returns null for any input that doesn't parse into a real instant —
+// caller treats a null exactly like a missing cache record.
+export function localDateFromIso(iso) {
+  if (typeof iso !== "string" || iso.length === 0) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return todayLocal(d);
 }
 
 // Surgical line-level edit, same shape as backfill-pages.mjs /

@@ -11,7 +11,11 @@
 import { describe, expect, it } from "vitest";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore - .mjs script lives outside the TS project graph
-import { hasRealStarted, insertField } from "../../scripts/backfill-started-from-sessions.mjs";
+import {
+  hasRealStarted,
+  insertField,
+  localDateFromIso,
+} from "../../scripts/backfill-started-from-sessions.mjs";
 
 function frontmatter(...lines: string[]) {
   return ["---", ...lines, "---", "", "Body text."].join("\n");
@@ -109,5 +113,59 @@ describe("hasRealStarted", () => {
 
   it("treats an invalid Date as no value", () => {
     expect(hasRealStarted(new Date("not-a-date"))).toBe(false);
+  });
+});
+
+describe("localDateFromIso", () => {
+  // `firstStart` from the kindle-sessions cache is always a UTC ISO
+  // timestamp. The script must format it as YYYY-MM-DD in the
+  // operator's local time, the same way `todayLocal` formats `new Date()`.
+  // Using `.slice(0, 10)` instead would stamp a UTC date — a day off
+  // from the reader's lived experience whenever the instant straddles
+  // local midnight.
+  //
+  // Mid-day-UTC inputs (T12:00:00Z) are stable across every real-world
+  // time zone (UTC-11 to UTC+13 all see the same calendar date), so
+  // the assertions hold regardless of the test runner's TZ.
+
+  it("formats a mid-day UTC instant as the same calendar date everywhere", () => {
+    expect(localDateFromIso("2024-06-15T12:00:00Z")).toBe("2024-06-15");
+  });
+
+  it("uses the LOCAL calendar day, not the UTC day, when the instant is parsed", () => {
+    // Pick an instant and compute the expected local date the same way
+    // the helper does. This pins the behaviour as "use local fields",
+    // not "use UTC fields", without depending on the runner's TZ.
+    const iso = "2024-01-01T02:30:00Z";
+    const d = new Date(iso);
+    const expected =
+      `${d.getFullYear()}-` +
+      `${String(d.getMonth() + 1).padStart(2, "0")}-` +
+      `${String(d.getDate()).padStart(2, "0")}`;
+    expect(localDateFromIso(iso)).toBe(expected);
+  });
+
+  it("honours an explicit timezone offset in the timestamp", () => {
+    // 2024-06-15T12:00:00-04:00 == 2024-06-15T16:00:00Z. Both serialise
+    // the same instant; the helper resolves them to the same local date.
+    expect(localDateFromIso("2024-06-15T12:00:00-04:00")).toBe(
+      localDateFromIso("2024-06-15T16:00:00Z"),
+    );
+  });
+
+  it("returns null for null / undefined / empty string", () => {
+    expect(localDateFromIso(null)).toBeNull();
+    expect(localDateFromIso(undefined)).toBeNull();
+    expect(localDateFromIso("")).toBeNull();
+  });
+
+  it("returns null for unparseable strings", () => {
+    expect(localDateFromIso("not-a-date")).toBeNull();
+    expect(localDateFromIso("Not Available")).toBeNull();
+  });
+
+  it("returns null for non-string inputs", () => {
+    expect(localDateFromIso(0 as unknown as string)).toBeNull();
+    expect(localDateFromIso({} as unknown as string)).toBeNull();
   });
 });
