@@ -106,3 +106,22 @@ body {
   background: var(--accent-soft);
   color: var(--ink);
 }
+
+/* `/shelf` spine colour. Each spine emits two CSS custom-properties
+   (`--sp-l` for light, `--sp-d` for dark); the rules below resolve
+   `--spine-color` to the right one based on the active theme. The
+   selector matches both the explicit `data-theme` attribute and the
+   media-query fallback so users on system-default get the right
+   palette without a flash of the wrong one. */
+:root,
+html[data-theme="light"] {
+  --spine-color: var(--sp-l);
+}
+html[data-theme="dark"] {
+  --spine-color: var(--sp-d);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) {
+    --spine-color: var(--sp-d);
+  }
+}

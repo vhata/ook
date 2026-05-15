@@ -1,7 +1,9 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { HomeMark } from "@/components/HomeMark";
 import { getAllBooks, getBingo, getCurrentBingoYear } from "@/lib/books";
 import { buildShelfItems, computeSpineWidth } from "@/lib/shelf";
+import { spineColor } from "@/lib/spine-color";
 import type { Book } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +23,13 @@ const VALID_SORTS = new Set(["finished", "author", "rating", "title"]);
 // `pages` value fall back to a default width — the formula degrades
 // silently as the field is populated per-book.
 //
-// Colour comes from a hash of the first tag (or first author when
-// there's no tag), sampled from a small palette tuned to sit beside
-// the paper-and-ink scheme.
+// Colour comes from `spineColor` (`src/lib/spine-color.ts`): a hash of
+// the book's first series membership (when present) or its title,
+// projected through a curated set of bookshelf-register hue bands
+// — burgundy, ochre, olive, forest, slate, navy, plum, with the warm
+// bands deliberately over-weighted. Series members share a hue, like
+// a publisher's uniform binding. Theme-aware via per-spine CSS
+// custom-properties.
 //
 // Markers ride on top of the spine:
 //   - Books on the active bingo card carry a 2 px accent stripe along
@@ -209,30 +215,6 @@ function YearTick({ year }: { year: number }) {
   );
 }
 
-// Eight spine colours, deliberately desaturated to sit beside the
-// paper-and-ink palette. Tuned by eye in HSL for similar luminance so
-// no spine yells louder than its neighbours.
-const SPINE_COLORS = [
-  "#8a4f3a", // rust-brown
-  "#7e6a3e", // ochre
-  "#3f6a4a", // forest
-  "#3a5a78", // slate-blue
-  "#5e3f6a", // plum
-  "#7e3f4a", // garnet
-  "#5e6a3f", // olive
-  "#3f5a5e", // teal
-];
-
-function spineColor(book: Book): string {
-  const seed = book.tags[0] ?? book.authors[0] ?? book.title;
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-  }
-  const idx = Math.abs(hash) % SPINE_COLORS.length;
-  return SPINE_COLORS[idx];
-}
-
 function Spine({ book, onBingoCard }: { book: Book; onBingoCard: boolean }) {
   const fill = spineColor(book);
   const width = computeSpineWidth(book.pages);
@@ -244,12 +226,23 @@ function Spine({ book, onBingoCard }: { book: Book; onBingoCard: boolean }) {
   const rating = book.rating !== null ? "★".repeat(Math.floor(book.rating)) : "";
   const isReading = book.status === "reading";
 
+  // Per-spine CSS custom properties carry both theme variants; the
+  // `--spine-color` selector in `globals.css` picks the right one based
+  // on the active `html[data-theme]` (or `prefers-color-scheme` when the
+  // attribute isn't set). SVG `fill` reads from the var so the same
+  // markup serves both themes without a re-render.
+  const spineStyle = {
+    "--sp-l": fill.light,
+    "--sp-d": fill.dark,
+  } as CSSProperties;
+
   return (
     <Link
       href={`/books/${encodeURIComponent(book.slug)}`}
       title={`${book.title}${book.authors.length > 0 ? ` — ${book.authors.join(", ")}` : ""}${book.finished ? ` · ${book.finished}` : ""}${rating ? ` · ${rating}` : ""}${isReading ? " · currently reading" : ""}${onBingoCard ? " · on the bingo card" : ""}`}
       className="block shrink-0 transition-transform hover:-translate-y-1"
       aria-label={book.title}
+      style={spineStyle}
     >
       <svg
         width={width}
@@ -271,7 +264,7 @@ function Spine({ book, onBingoCard }: { book: Book; onBingoCard: boolean }) {
         )}
         {/* Spine background — origin shifts down by 8 px to leave room
             for the bookmark tongue above. */}
-        <rect x="0" y="8" width={width} height={SPINE_H} fill={fill} />
+        <rect x="0" y="8" width={width} height={SPINE_H} fill="var(--spine-color)" />
         {/* Bingo-card accent stripe along the top edge of the spine. */}
         {onBingoCard && <rect x="0" y="8" width={width} height="2" fill="var(--accent)" />}
         {/* Top + bottom decorative bands (the printer's rule). */}
