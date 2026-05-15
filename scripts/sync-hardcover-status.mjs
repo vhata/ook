@@ -62,8 +62,8 @@ import matter from "gray-matter";
 import { maybePromptApply } from "./lib/maybe-prompt-apply.mjs";
 import {
   decideAction,
+  decideSyncStateWrite,
   snapshotForCache,
-  stableStringify,
   vaultStateMatchesCache,
 } from "./lib/hardcover-sync.mjs";
 
@@ -336,26 +336,27 @@ async function main() {
       // actually changed. Bumping just the `updated` timestamp on
       // every run produces a no-op commit through the auto-hygiene
       // workflow ("updated 03:34 → updated 03:35" and nothing else).
-      // Compare the new entries against what's on disk; skip the
-      // write entirely when nothing material moved.
+      // The decision lives in `decideSyncStateWrite` so two
+      // consecutive runs with identical inputs can be exercised in a
+      // unit test.
       const existing = await fs
         .readFile(SYNC_STATE_FILE, "utf8")
         .then((s) => JSON.parse(s))
         .catch(() => null);
-      const newEntries = syncState.entries ?? {};
-      const existingEntries = existing?.entries ?? {};
-      const entriesEqual = stableStringify(newEntries) === stableStringify(existingEntries);
-      if (entriesEqual) {
-        process.stderr.write(`sync-state unchanged; skipping write to ${SYNC_STATE_FILE}\n`);
+      const verdict = decideSyncStateWrite({
+        newEntries: syncState.entries ?? {},
+        existing,
+        generator: "scripts/sync-hardcover-status.mjs",
+        now: () => new Date().toISOString(),
+      });
+      if (!verdict.write) {
+        process.stderr.write(
+          `sync-state unchanged (${verdict.reason}); skipping write to ${SYNC_STATE_FILE}\n`,
+        );
         return;
       }
       await fs.mkdir(path.dirname(SYNC_STATE_FILE), { recursive: true });
-      const out = {
-        updated: new Date().toISOString(),
-        generator: "scripts/sync-hardcover-status.mjs",
-        entries: newEntries,
-      };
-      await fs.writeFile(SYNC_STATE_FILE, JSON.stringify(out, null, 2) + "\n", "utf8");
+      await fs.writeFile(SYNC_STATE_FILE, verdict.contents, "utf8");
       process.stderr.write(`wrote ${SYNC_STATE_FILE}\n`);
     },
   });

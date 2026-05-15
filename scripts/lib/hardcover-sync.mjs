@@ -263,13 +263,20 @@ export function decideAction({ vault, remote, hardcoverBookId }) {
  * Cache-state shape we persist between runs in
  * `<vault>/_meta/hardcover-sync-state.json`. Keyed by vault slug.
  *
+ * Every value is a JSON-round-trip-stable primitive (`string | number
+ * | null`). `undefined`, `NaN`, and `Infinity` are normalised to `null`
+ * so the in-memory snapshot is byte-identical to what JSON.stringify
+ * would write and JSON.parse would read back — keeping the no-op-skip
+ * guard honest.
+ *
  * @param {object} vault
- * @returns {{ status: string; rating: number | null; started: string | null; finished: string | null }}
+ * @returns {{ status: string | null; rating: number | null; started: string | null; finished: string | null }}
  */
 export function snapshotForCache(vault) {
+  const rating = vault.rating;
   return {
-    status: vault.status,
-    rating: vault.rating ?? null,
+    status: typeof vault.status === "string" ? vault.status : null,
+    rating: typeof rating === "number" && Number.isFinite(rating) ? rating : null,
     started: normalizeDate(vault.started),
     finished: normalizeDate(vault.finished),
   };
@@ -284,17 +291,62 @@ export function snapshotForCache(vault) {
  *
  * Sorts object keys at every depth so two equivalent objects with
  * different key insertion orders produce identical strings; arrays
- * stay in their natural order.
+ * stay in their natural order. Mirrors `JSON.stringify`'s treatment
+ * of `undefined`: keys whose value is `undefined` are dropped (in
+ * objects) or rendered as `null` (in arrays). Otherwise an
+ * in-memory `{a: undefined}` would stringify to `'{"a":undefined}'`
+ * while its on-disk round-trip (which `JSON.stringify` omitted the
+ * undefined from) stringifies to `'{}'` — a guard-fooling
+ * structural-equal-but-byte-different pair that produces a no-op
+ * cache write.
  *
  * @param {unknown} value
  * @returns {string}
  */
 export function stableStringify(value) {
+  if (value === undefined) return JSON.stringify(null);
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).join(",")}]`;
+    // JSON.stringify renders undefined array slots as null; match that.
+    const parts = value.map((v) => (v === undefined ? "null" : stableStringify(v)));
+    return `[${parts.join(",")}]`;
   }
-  const keys = Object.keys(value).sort();
+  const keys = Object.keys(value)
+    .filter((k) => value[k] !== undefined)
+    .sort();
   const parts = keys.map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`);
   return `{${parts.join(",")}}`;
+}
+
+/**
+ * Decide whether the sync-state cache file needs to be written, and
+ * what to write. Pure — the caller does the I/O. Split out from the
+ * script body so two consecutive runs can be exercised against the
+ * same fixture and asserted byte-identical.
+ *
+ * The previous shape compared in-memory entries against the on-disk
+ * file with `stableStringify` and skipped the write when equal, but
+ * the guard sat inline inside the script's main flow and was awkward
+ * to regression-test. Encoding it as a pure helper lets us pin the
+ * "two runs with identical inputs produce identical bytes" contract
+ * the auto-hygiene workflow depends on.
+ *
+ * @param {object} args
+ * @param {Record<string, unknown>} args.newEntries     - entries we'd write now
+ * @param {Record<string, unknown> | null | undefined} args.existing - parsed contents of the on-disk file, or null
+ * @param {string} args.generator                       - generator string for the file metadata
+ * @param {() => string} args.now                       - returns the `updated` ISO timestamp; injectable for tests
+ * @returns {{ write: false; reason: string } | { write: true; contents: string }}
+ */
+export function decideSyncStateWrite({ newEntries, existing, generator, now }) {
+  const existingEntries = existing?.entries ?? {};
+  if (stableStringify(newEntries) === stableStringify(existingEntries)) {
+    return { write: false, reason: "entries unchanged" };
+  }
+  const out = {
+    updated: now(),
+    generator,
+    entries: newEntries,
+  };
+  return { write: true, contents: JSON.stringify(out, null, 2) + "\n" };
 }

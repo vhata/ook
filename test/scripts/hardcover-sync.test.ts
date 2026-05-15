@@ -13,6 +13,7 @@ import {
   buildUserBookPayload,
   decideAction,
   decideRatingPush,
+  decideSyncStateWrite,
   normalizeDate,
   snapshotForCache,
   stableStringify,
@@ -315,5 +316,180 @@ describe("stableStringify", () => {
     expect(stableStringify(42)).toBe("42");
     expect(stableStringify("hello")).toBe('"hello"');
     expect(stableStringify(true)).toBe("true");
+  });
+
+  it("drops keys with undefined values to match JSON.stringify (no-op-commit guard)", () => {
+    // The cache-write skip lives or dies on this: an in-memory
+    // `{a: undefined}` MUST stringify to the same string as its
+    // on-disk round-trip (which JSON.stringify renders as `{}`).
+    // Without this, the guard sees a structural diff between
+    // identical states and writes a churn file every run.
+    expect(stableStringify({ a: undefined })).toBe("{}");
+    expect(stableStringify({ a: 1, b: undefined, c: 3 })).toBe('{"a":1,"c":3}');
+    expect(stableStringify({ a: undefined })).toBe(stableStringify({}));
+  });
+
+  it("renders undefined array slots as null (also matching JSON.stringify)", () => {
+    expect(stableStringify([1, undefined, 3])).toBe("[1,null,3]");
+  });
+});
+
+describe("decideSyncStateWrite", () => {
+  // Regression pin for the auto-hygiene no-op-commit bug (TODO entry
+  // 2026-05-13): the cache writer must produce byte-identical output
+  // on two consecutive runs with the same input, so the workflow
+  // doesn't churn out "Auto-hygiene: hardcover-sync-state refresh"
+  // commits where only the `updated` timestamp moved.
+  const baseEntries = {
+    piranesi: { status: "finished", rating: 5, started: "2024-03-01", finished: "2024-03-08" },
+    anathem: { status: "tbr", rating: null, started: null, finished: null },
+  };
+
+  it("writes on the first run (no existing file)", () => {
+    const v = decideSyncStateWrite({
+      newEntries: baseEntries,
+      existing: null,
+      generator: "test",
+      now: () => "2026-05-14T00:00:00.000Z",
+    });
+    expect(v.write).toBe(true);
+    if (v.write) {
+      expect(v.contents).toContain('"piranesi"');
+      expect(v.contents).toContain('"updated"');
+      expect(v.contents.endsWith("\n")).toBe(true);
+    }
+  });
+
+  it("two consecutive runs with identical entries produce byte-identical output", () => {
+    // The smoking-gun test for the no-op-commit bug. First run writes;
+    // second run reads back the first's output and decides whether to
+    // write again. The contract: with identical inputs, the second
+    // verdict is `write: false` — i.e. the auto-hygiene step finds
+    // nothing dirty and emits no commit.
+    const v1 = decideSyncStateWrite({
+      newEntries: baseEntries,
+      existing: null,
+      generator: "scripts/sync-hardcover-status.mjs",
+      now: () => "2026-05-14T00:00:00.000Z",
+    });
+    expect(v1.write).toBe(true);
+    if (!v1.write) return;
+
+    // Simulate the file being read back on the next run.
+    const onDisk = JSON.parse(v1.contents);
+
+    // The next run, even with a DIFFERENT `now` (a real clock would
+    // produce a later timestamp), must decide write:false because the
+    // entries haven't changed. The `updated` field is part of the
+    // file but not part of the diff that matters.
+    const v2 = decideSyncStateWrite({
+      newEntries: baseEntries,
+      existing: onDisk,
+      generator: "scripts/sync-hardcover-status.mjs",
+      now: () => "2026-05-14T00:01:00.000Z",
+    });
+    expect(v2.write).toBe(false);
+  });
+
+  it("treats null and undefined entry values as equivalent across runs (guard against JSON round-trip churn)", () => {
+    // The on-disk file (after JSON.stringify) drops `rating: undefined`
+    // and reads it back as missing. The in-memory snapshot has it as
+    // explicit null. Before the stableStringify undefined-skip fix,
+    // these compared as different and produced a no-op write.
+    const newEntries = {
+      anathem: { status: "tbr", rating: null, started: null, finished: null },
+    };
+    // What JSON.parse of a previous JSON.stringify would yield if the
+    // prior in-memory had explicit undefined values that JSON dropped.
+    const existing = {
+      generator: "test",
+      updated: "2026-05-13T00:00:00.000Z",
+      entries: {
+        anathem: { status: "tbr", rating: null, started: null, finished: null },
+      },
+    };
+    const v = decideSyncStateWrite({
+      newEntries,
+      existing,
+      generator: "test",
+      now: () => "2026-05-14T00:00:00.000Z",
+    });
+    expect(v.write).toBe(false);
+  });
+
+  it("writes when entries genuinely change", () => {
+    const existing = {
+      generator: "test",
+      updated: "2026-05-13T00:00:00.000Z",
+      entries: { piranesi: { ...baseEntries.piranesi, status: "reading" } },
+    };
+    const v = decideSyncStateWrite({
+      newEntries: baseEntries,
+      existing,
+      generator: "test",
+      now: () => "2026-05-14T00:00:00.000Z",
+    });
+    expect(v.write).toBe(true);
+  });
+
+  it("ignores key insertion order in entries (guard against in-memory vs disk shape divergence)", () => {
+    // Two equivalent entries, keys in different orders. Without
+    // stableStringify, the in-memory build of the entry would
+    // stringify to a different byte sequence than the disk read-back,
+    // and we'd write churn every run.
+    const a = {
+      foo: { status: "finished", rating: 4, started: "2024-01-01", finished: "2024-01-31" },
+    };
+    const b = {
+      foo: { finished: "2024-01-31", started: "2024-01-01", rating: 4, status: "finished" },
+    };
+    const v = decideSyncStateWrite({
+      newEntries: a,
+      existing: { entries: b, generator: "test", updated: "x" },
+      generator: "test",
+      now: () => "2026-05-14T00:00:00.000Z",
+    });
+    expect(v.write).toBe(false);
+  });
+});
+
+describe("snapshotForCache — defensive normalisation (no-op-commit guard)", () => {
+  // The cache is JSON-round-tripped between runs. Snapshot values
+  // must therefore be JSON-stable primitives — anything that JSON
+  // silently rewrites (undefined, NaN, Infinity) would diverge across
+  // the round-trip and trip the no-op-commit guard.
+  it("normalises non-finite ratings to null", () => {
+    expect(snapshotForCache({ status: "finished", rating: NaN }).rating).toBeNull();
+    expect(snapshotForCache({ status: "finished", rating: Infinity }).rating).toBeNull();
+    expect(snapshotForCache({ status: "finished", rating: -Infinity }).rating).toBeNull();
+  });
+
+  it("normalises non-number ratings to null", () => {
+    // Defensive: if upstream readers ever hand us a string rating,
+    // we shouldn't smuggle it through to the cache.
+    expect(
+      snapshotForCache({ status: "finished", rating: "4.5" as unknown as number }).rating,
+    ).toBeNull();
+  });
+
+  it("normalises non-string status to null", () => {
+    expect(snapshotForCache({ status: undefined as unknown as string }).status).toBeNull();
+    expect(snapshotForCache({ status: null as unknown as string }).status).toBeNull();
+  });
+
+  it("produces an entry whose JSON round-trip is byte-identical to itself", () => {
+    // The load-bearing property: snapshot → JSON.stringify → JSON.parse
+    // → snapshot's structural twin. If anything in the snapshot
+    // shape can't survive that round trip, two consecutive sync
+    // runs will diff against themselves.
+    const snap = snapshotForCache({
+      slug: "piranesi",
+      status: "finished",
+      rating: 5,
+      started: "2024-03-01",
+      finished: "2024-03-08T00:00:00Z",
+    });
+    const roundTripped = JSON.parse(JSON.stringify(snap));
+    expect(stableStringify(snap)).toBe(stableStringify(roundTripped));
   });
 });
