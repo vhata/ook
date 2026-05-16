@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import { HomeMark } from "@/components/HomeMark";
 import { getAllBooks, getBingo, getCurrentBingoYear } from "@/lib/books";
 import { buildShelfItems, computeSpineWidth } from "@/lib/shelf";
-import { spineColor } from "@/lib/spine-color";
+import { spineStyle } from "@/lib/spine-color";
 import type { Book } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -216,7 +216,6 @@ function YearTick({ year }: { year: number }) {
 }
 
 function Spine({ book, onBingoCard }: { book: Book; onBingoCard: boolean }) {
-  const fill = spineColor(book);
   const width = computeSpineWidth(book.pages);
   // Title length budget scales with width — narrow spines elide aggressively,
   // wide ones get more room. The SVG text runs along the spine's vertical
@@ -226,23 +225,13 @@ function Spine({ book, onBingoCard }: { book: Book; onBingoCard: boolean }) {
   const rating = book.rating !== null ? "★".repeat(Math.floor(book.rating)) : "";
   const isReading = book.status === "reading";
 
-  // Per-spine CSS custom properties carry both theme variants; the
-  // `--spine-color` selector in `globals.css` picks the right one based
-  // on the active `html[data-theme]` (or `prefers-color-scheme` when the
-  // attribute isn't set). SVG `fill` reads from the var so the same
-  // markup serves both themes without a re-render.
-  const spineStyle = {
-    "--sp-l": fill.light,
-    "--sp-d": fill.dark,
-  } as CSSProperties;
-
   return (
     <Link
       href={`/books/${encodeURIComponent(book.slug)}`}
       title={`${book.title}${book.authors.length > 0 ? ` — ${book.authors.join(", ")}` : ""}${book.finished ? ` · ${book.finished}` : ""}${rating ? ` · ${rating}` : ""}${isReading ? " · currently reading" : ""}${onBingoCard ? " · on the bingo card" : ""}`}
       className="block shrink-0 transition-transform hover:-translate-y-1"
       aria-label={book.title}
-      style={spineStyle}
+      style={spineStyle(book) as CSSProperties}
     >
       <svg
         width={width}

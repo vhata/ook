@@ -5,6 +5,7 @@ import {
   hashToHue,
   spineColor,
   spineHashInput,
+  spineStyle,
 } from "../../src/lib/spine-color";
 
 type BookFixture = { series: string | null; title: string };
@@ -180,5 +181,32 @@ describe("spineColor", () => {
       wedges.add(wedge);
     }
     expect(wedges.size).toBeGreaterThanOrEqual(6);
+  });
+});
+
+describe("spineStyle", () => {
+  // The earlier implementation chained `:root { --spine-color: var(--sp-l) }`
+  // and emitted `--sp-l`/`--sp-d` on each anchor. That broke because var()
+  // substitutes against the consuming element's cascade, so `var(--sp-l)`
+  // resolved against :root where `--sp-l` is undefined — spines rendered
+  // black. The fix sets `--spine-color` directly via `light-dark()` on the
+  // anchor. This test pins that shape so a refactor can't silently regress
+  // to the chained pattern.
+  it("emits --spine-color directly using light-dark()", () => {
+    const style = spineStyle(mk("Piranesi"));
+    expect(Object.keys(style)).toEqual(["--spine-color"]);
+    expect(style["--spine-color"]).toMatch(/^light-dark\(hsl\([^)]+\), hsl\([^)]+\)\)$/);
+  });
+
+  it("does NOT emit --sp-l or --sp-d (the chained-var pattern that broke)", () => {
+    const style = spineStyle(mk("Piranesi"));
+    expect(style).not.toHaveProperty("--sp-l");
+    expect(style).not.toHaveProperty("--sp-d");
+  });
+
+  it("interleaves the light and dark variants in order", () => {
+    const book = mk("Piranesi");
+    const { light, dark } = spineColor(book);
+    expect(spineStyle(book)["--spine-color"]).toBe(`light-dark(${light}, ${dark})`);
   });
 });

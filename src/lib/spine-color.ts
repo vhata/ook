@@ -185,6 +185,25 @@ export function spineColor(book: Pick<Book, "series" | "title">): SpineColor {
   };
 }
 
+/**
+ * Inline-style object for a spine's anchor element. Sets `--spine-color`
+ * directly via `light-dark()` so the SVG `fill="var(--spine-color)"`
+ * resolves locally on the same element.
+ *
+ * Why not chain through `:root { --spine-color: var(--sp-l) }`: `var()`
+ * substitution happens at the consuming element's cascade, and the
+ * per-book light/dark values only exist on this anchor's inline style.
+ * A `:root`-level chain would resolve `var(--sp-l)` against `:root`,
+ * where it's undefined — the SVG rect's fill then falls back to its
+ * default (black).
+ */
+export function spineStyle(book: Pick<Book, "series" | "title">): Record<string, string> {
+  const fill = spineColor(book);
+  return {
+    "--spine-color": `light-dark(${fill.light}, ${fill.dark})`,
+  };
+}
+
 // Re-exported envelope bounds — tests assert outputs sit within them
 // without re-deriving the magic numbers.
 export const SPINE_COLOR_BOUNDS = {

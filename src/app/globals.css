@@ -5,6 +5,7 @@
 
 :root,
 html[data-theme="light"] {
+  color-scheme: light;
   --bg: #faf7f1;
   --bg-raised: #fffdf7;
   --surface: #ffffff;
@@ -21,6 +22,7 @@ html[data-theme="light"] {
 }
 
 html[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0d1014;
   --bg-raised: #11151a;
   --surface: #161b21;
@@ -38,6 +40,7 @@ html[data-theme="dark"] {
 
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) {
+    color-scheme: dark;
     --bg: #0d1014;
     --bg-raised: #11151a;
     --surface: #161b21;
@@ -105,23 +108,4 @@ body {
 ::selection {
   background: var(--accent-soft);
   color: var(--ink);
-}
-
-/* `/shelf` spine colour. Each spine emits two CSS custom-properties
-   (`--sp-l` for light, `--sp-d` for dark); the rules below resolve
-   `--spine-color` to the right one based on the active theme. The
-   selector matches both the explicit `data-theme` attribute and the
-   media-query fallback so users on system-default get the right
-   palette without a flash of the wrong one. */
-:root,
-html[data-theme="light"] {
-  --spine-color: var(--sp-l);
-}
-html[data-theme="dark"] {
-  --spine-color: var(--sp-d);
-}
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme]) {
-    --spine-color: var(--sp-d);
-  }
 }
