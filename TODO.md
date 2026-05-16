@@ -12,7 +12,10 @@ Sections are grouped by readiness: decided plans first, then open verdicts, defe
 
 Pattern: at certain meaningful moments in the `/admin` flow, the agent asks one (or two, bundled) low-friction questions that draw out the user's voice. **Tenet**: voice > integrations > automation > polish. Capture must never feel like a slog. The user explicitly navigates or commits to these moments; the prompts piggyback on existing flow, never form-fill.
 
-The **finish prompt** (status → finished asks for pullquote + rating in one bundled commit) ships in this run. The other moments below are deferred for after a week or two of using the finish-prompt in anger, to see whether the bundled-commit-gates-the-action trade lands well or burns.
+The **finish prompt** (status → finished asks for pullquote + rating in one bundled commit) has shipped. Originally the others below were going to wait on finish-prompt mileage before pulling forward, but finishes don't happen often enough for that to be useful (note 2026-05-15). Voice prompts ship in parallel from here, weighted by trigger frequency in real use:
+
+- **More frequent triggers (ship first):** Start prompt (tbr → reading), Quiet → return (any ≥14-day gap), 5-star unreviewed (orthogonal to finishes).
+- **Rarer triggers (ship when scoped):** Reading-streak milestone, Series completion.
 
 - **Start prompt**: status flips tbr → reading. Agent asks "what brought you to this?" — answer goes into a new `trigger:` frontmatter field. Once per book. Skip on second-read. `#agent #voice #prompts`
 - **5-star unreviewed**: when a book is rated 5 and has no review file, agent's NEXT commit-message-prompt opportunistically asks "quick — why was this a five?" — answer seeds `review.md`. One ask per session per book. `#agent #voice #prompts #review`
