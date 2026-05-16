@@ -32,9 +32,6 @@ Source notes for everything below (don't re-research — surfaced from a feral r
 
 - **One-tap "add Goodreads / Hardcover ID" enrichment**: Conversational agent prompt: "I matched this to Goodreads ID 12345 (link) — confirm?" then writes both IDs to frontmatter. Unlocks every downstream linking feature. **Sketch:** during in-vault capture, search Hardcover for top match; one-tap confirm writes `goodreads_id` and `hardcover_id`. **Homework:** one-tap. `#feature #capture #ids`
 - **"Readers who liked X also liked Y" recommendations** on a `/discover` route. **Source:** Hardcover `book.recommendations` and curated `lists`; Goodreads' similar-books endpoint is dead. **Sketch:** at build, take last N finished books with rating ≥4, query Hardcover, surface top 5 with one-tap "add to TBR". **Homework:** one-tap accept/dismiss. `#feature #recs #hardcover`
-- **"Discover via friends" via Hardcover follow graph** — replaces dead Goodreads-friends-feed. Recent ratings/reviews from Hardcover users the reader follows. **Source:** Hardcover GraphQL `me.following` + their public `user_books`. **Sketch:** `/discover/friends` strip; gracefully degrades when no follows. **Homework:** none beyond following on Hardcover. `#feature #social #hardcover`
-- **Bingo-square recommendations from finished+TBR cross-reference**: For each unfilled square, suggest one TBR book + one Hardcover-list book that fits the theme. **Sketch:** at build, score TBR books by tag overlap; fall back to curated Hardcover lists. **Homework:** none — passive surfacing. `#feature #bingo #recs`
-- **Rejected: Goodreads "Add to Shelf" embed widget** — phones Amazon trackers, looks dated, adds reader work. The link-row entry above already covers outbound. `#rejected #goodreads`
 
 ### Highlights — the user's own (researched 2026-05-03, scoped 2026-05-15)
 
@@ -48,15 +45,6 @@ Source notes:
 - **Bookcision/Kindle highlight import (primary path)**: Bookcision bookmarklet emits JSON; user drops it into the vault, importer materialises into per-book `quotes.md`. The operator highlights occasionally — once-per-book manual flow is the right shape. **Sketch:** Bookcision per book → `vault/<book>/kindle-export.json` → `ook import kindle-export`. **Homework:** one-tap per book on Bookcision; the import is automatic from there. `#feature #highlights #kindle`
 - **"I finished X" agent flow**: When user reports finishing, agent says "I see N Kindle clippings for this — drop them into `quotes.md`?" Collapses the favourite-quote question into "here are 12, pick or skip, all saved." **Homework:** one-tap yes/no. `#feature #highlights #agent #completion`
 - **Highlight-driven "currently reading" surfacing**: Show the most-recent highlight on the homepage as a sign-of-life under "currently reading." The highlight IS the status update. **Sketch:** sort imported highlights by date, render the top 1–3 from currently-reading book(s) on the home page. **Homework:** none — passive. `#feature #highlights #homepage`
-
-### Highlights — public / community
-
-- **Render Amazon "Popular Highlights" on per-book pages** — "What other readers found memorable" sidebar. **Source:** no official API; comes from Bookcision/notebook exports as a labelled subset. **Sketch:** save to `popular-highlights.md`, render in sidebar with highlighter count. Best-effort; never block on it. **Homework:** piggybacks on personal-highlight import. `#feature #highlights #popular`
-- **Goodreads per-book quotes scrape** (`/work/quotes/<work_id>`): public, attributed, persistent, no auth. ~30 quotes/page with like counts. Rate-limit 8–12 req/min, 3–8s jitter. **Sketch:** offline batch — fetch top 5 quotes once at book-add, store in `community-quotes.md` with source URL + likes. **Homework:** none. `#feature #highlights #goodreads #community`
-- **Hardcover quotes via GraphQL** as primary community-quote source. API in **beta and unstable** ("anything you build could break"); coverage thinner than Goodreads, but no scraping. **Sketch:** same shape as Goodreads importer; fall back to Goodreads when Hardcover has nothing. **Homework:** none. `#feature #highlights #hardcover #community`
-- **Highlight overlap visualiser**: When a personal highlight overlaps (fuzzy match) with a Goodreads/Amazon popular highlight, mark it with "also highlighted by N readers." Bumps overlap matches up the pullquote suggester scoring. **Sketch:** normalise + token-set ratio > 0.85; render badge on per-book page. **Homework:** none — derived. `#feature #highlights #overlap`
-- **Public-page anti-spoiler guard for community quotes**: Filter community quotes that look like ending-spoilers before rendering on public per-book pages. Personal highlights unaffected (user has finished those). **Source:** Goodreads' optional `<spoiler>` markers + heuristic on phrases like "in the end", "finally,", "died" + agent pass on remainders. **Homework:** none — automatic. `#feature #highlights #spoilers`
-- **Punted: Storygraph / BookWyrm community quotes**: No public per-book quotes endpoints today (Storygraph is stat/recommendation-focused, BookWyrm uses ActivityPub federation per-instance). Revisit in 12 months. `#not-now #highlights`
 
 ## Polish & housekeeping
 
@@ -96,7 +84,6 @@ Cosmetic and atmospheric ideas. Mostly low-stakes; pick whichever delights.
 
 - **Page-turn micro-interaction**: animate the switch between review/quotes/synopsis tabs as a page-curl. `#polish #visual #per-book`
 - **Embossed/letterpress alternative theme**: a third theme beyond light/dark, vintage printer's aesthetic. `#feature #visual #theme`
-- **Rating-as-wear-marks**: instead of stars, render condition (pristine for 5, dog-eared for 3, water-damaged for 1). May offend the rated. `#feature #visual #ratings`
 
 ### Stats & introspection (brainstormed 2026-05-03)
 
@@ -107,75 +94,42 @@ Vault-only stats; no external API needed. All extend the existing `/stats/[year]
 - **"Books I rated 5 but never re-read"**: introspection axis; needs `reread_count` schema. `#feature #stats #introspection`
 - **Author depth chart**: per author, books-read / books-written. Denominator from Hardcover or Open Library. `#feature #stats #authors #hardcover`
 
-### Discovery & wandering (brainstormed 2026-05-03)
-
-Surface your own past back to you. All vault-only.
-
-- **"Books I read while the world did X" overlay**: major news events from Wikipedia overlaid on `/log`. Provenance-marked, never asserted as causation. `#feature #discovery #log #wikipedia`
-
 ### Sharing & outbound (brainstormed 2026-05-03)
 
 Let the site reach beyond the page-view.
 
-- **WebSub push notification on book status flips**: niche but real, pingable subscribers. `#feature #feed #websub`
 - **Email digest, monthly self-mail**: cron + Resend, summary of "what you read, what you said." `#feature #email #digest`
-- **Reply-by-email comments**: `mailto:` link on per-book pages with subject pre-filled, lands in vault inbox. `#feature #per-book #comments`
 
 ### Capture / input (brainstormed 2026-05-03)
 
 How books arrive in the vault. Most are split between vault repo + an ook-side receiving endpoint.
 
-- **Android share-target "share to ook TBR"**: register ook as a `share_target` in the web app manifest so Android's share sheet offers it for URLs and text. Sharing a book page (Amazon, Hardcover, Goodreads, library catalogue) from mobile lands as a stub in the vault inbox. Web Share Target API is the right shape — ook is already a PWA-capable web app, no native app or platform-specific tooling needed. Works on any modern Android browser. **Homework:** one tap to share. `#feature #capture #android #vault`
-- **Browser extension on Amazon/Goodreads/Hardcover/Storygraph**: "add to ook TBR" button that scrapes title/author/cover. `#feature #capture #browser-ext`
-- **Email-to-vault inbox**: forward a Goodreads "Want to read" notification to a special address, importer parses and stubs. `#feature #capture #email`
-- **Voice capture endpoint**: "Hey Google, tell ook I finished Piranesi" via Google Assistant routine / Android Intent → drops a finish-stub into vault inbox. **Open question:** does this fix a felt pain or is it novelty? `/admin` is right there on the phone. Worth a deliberate decision before any build. `#feature #capture #android #voice`
-- **Receipt OCR import**: snap a Powell's receipt, books added to TBR with provenance. `#feature #capture #ocr`
-- **Cover photo capture**: phone snap of a paperback, OCR the title, stub it. `#feature #capture #ocr`
-- **Library hold notification → TBR stub**: when a hold becomes available at your library, auto-stub. Library-specific integration. `#feature #capture #library`
 - **Kindle library mirror diff**: periodic diff against the Kindle ownership shards already on hand (`_meta/kindle-sessions.json` has per-ASIN entries) that flags "in your Kindle library but not in your vault." Distinct from the highlights work — this is the library, not the annotations. `#feature #capture #devices`
 
 ### AI-flavoured experiments (brainstormed 2026-05-03)
 
 Use sparingly. Each is a vector that can swallow the project's soul.
 
-- **Embedding-based recommender from your own corpus**: vector search across reviews + quotes; "more like this" without Hardcover. `#feature #ai #recommender`
 - **Chat with your library**: agent reads all reviews, answers introspective questions ("what do I think about female protagonists in sci-fi?"). `#feature #ai #chat`
 - **Draft-review generator**: when finishing, pre-fill a review skeleton based on your past style. `#feature #ai #review`
-- **"Imagined sequel" paragraph**: one paragraph speculating on a follow-up to a finished book. Pure novelty. `#feature #ai #per-book`
 - **Annual letter from your reading**: Claude composes a "Dear reader, here's what 2026 looked like" piece from `/log` and reviews. `#feature #ai #annual`
-- **Vector "find me the book where..."**: paste a vague memory ("the one with the labyrinth and the bird"), it finds the matching book. `#feature #ai #search`
 
 ### Schema extensions (vault-side, brainstormed 2026-05-03)
 
 Vault-write work, but ook will render whatever lands. Listed here so the renderer knows what's coming.
 
-- **`read_at` location field**: coffee shop / plane / bed / beach. Surfaces a "where I read it" view. `#schema #vault`
-- **`companion_media`**: albums, films, podcasts paired with the book in your memory. Free-form list. `#schema #vault #cross-domain`
-- **`partner` field**: solo / kid / book club / read-aloud / spouse. `#schema #vault`
-- **`trigger` field**: what brought you to the book — recommendation, gift, impulse, obligation. `#schema #vault #provenance`
-- **`mood_on_finish`**: single-word emotional state when you closed the cover. `#schema #vault #introspection`
+- **`trigger` field**: what brought you to the book — recommendation, gift, impulse, obligation. Pairs with the deferred Start prompt. `#schema #vault #provenance`
+- **`mood_on_finish`**: single-word emotional state when you closed the cover. Voice-adjacent. `#schema #vault #introspection`
 - **`edition` field**: paperback / hardcover / UK / audio. Affects which cover _should_ render. `#schema #vault #covers`
 - **`reread_count` integer**: increments instead of overwrites when you re-read. Unlocks several stats axes. `#schema #vault #rereads`
-- **`abandoned_at_pct` field**: where you stopped on abandons. `#schema #vault #abandoned`
-- **`voice_memo` link**: URL to a 30-second audio reflection per book. `#schema #vault #audio`
-- **`if_read_earlier` field**: speculative-wistfulness reflection. `#schema #vault #introspection`
-- **`pages` frontmatter**: integer page count. Unblocks pages-read, longest-book, reading velocity, the bookspine shelf, and several stats axes. `#schema #vault #pages`
 
 ### Wild & probably-doomed (brainstormed 2026-05-03)
 
-The unfiltered drawer. Strike most. Keep one.
+Three survivors from the unfiltered drawer. Pruned 2026-05-15.
 
 - Time-machine view: vault-history-aware extension. The current `?at=` lens filters the live frontmatter against a past date — covers most of the value. Pulling past commits of the books repo (the original "vault-history-aware" framing) is a heavier follow-up: lets the lens see frontmatter as it actually was on that day, not just `started`/`finished` re-projected. `#wild #time-machine`
-- **`ook quiz` CLI**: flashcards on quotes from finished books. Lives in the vault repo's `bin/`. `#wild #cli #quotes`
 - **Library-card aesthetic mode**: every book gets a stamped checkout-history card view. Theme. `#wild #visual #theme`
-- **Reverse bingo archaeology**: every past book retroactively tagged with which prior bingo squares it could have filled. A guilt trip. `#wild #bingo`
-- **"Read in 2026, remember in 2032" check-in email**: at finish time, schedule a six-year-out self-mail asking if you'd re-read. `#wild #email #future`
-- **Book-as-shader**: procedural fragment shader generates a unique abstract per book from tags + rating + length. Cosmetic, mesmerising. `#wild #visual #shader`
-- **3D reading room**: every finished book a physical volume in a virtual space. Probably terrible, possibly transcendent. `#wild #3d #spatial`
-- **Meta-bingo card**: 5×5 of past bingo cards. Each cell a year's card. Click → that year. `#wild #bingo #meta`
 - **Static-export branch**: generate a fully-static archive that needs no Vercel. Posterity hedge. `#wild #posterity #static`
-- **ePub export of your reviews**: your own book, of you, by you, about you reading. `#wild #epub #archive`
-- **Bookcrossing log**: track physical lending — "this copy is currently with Sarah." `#wild #lending`
 
 ### Tooling & vault hygiene (brainstormed 2026-05-03)
 
