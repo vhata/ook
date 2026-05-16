@@ -31,31 +31,23 @@ Source notes for everything below (don't re-research — surfaced from a feral r
 - **Open Library** is the right answer for cover URLs (already wired) and ISBN lookup; review/rating corpus too thin for social signal.
 
 - **One-tap "add Goodreads / Hardcover ID" enrichment**: Conversational agent prompt: "I matched this to Goodreads ID 12345 (link) — confirm?" then writes both IDs to frontmatter. Unlocks every downstream linking feature. **Sketch:** during in-vault capture, search Hardcover for top match; one-tap confirm writes `goodreads_id` and `hardcover_id`. **Homework:** one-tap. `#feature #capture #ids`
-- **Friend reviews on per-book pages — BLOCKED**: would be the most valuable social-graph feature, but Goodreads' friend graph is API-gone and scraping a logged-in friends-feed breaches ToS. Pivot path: Bookwyrm if user joins an instance; Hardcover follows otherwise (separate entry). **Source:** none viable for Goodreads. `#blocked #goodreads #social`
 - **"Readers who liked X also liked Y" recommendations** on a `/discover` route. **Source:** Hardcover `book.recommendations` and curated `lists`; Goodreads' similar-books endpoint is dead. **Sketch:** at build, take last N finished books with rating ≥4, query Hardcover, surface top 5 with one-tap "add to TBR". **Homework:** one-tap accept/dismiss. `#feature #recs #hardcover`
-- **Goodreads-shelf RSS as a "currently reading" mirror** for fallback / mobile-app captures. **Source:** `goodreads.com/review/list_rss/<USER_ID>?shelf=currently-reading` (last 100, undocumented but 15+ years stable). **Sketch:** build-time fetch, diff against vault, surface "on Goodreads but not in vault" in `/log` sidebar with one-tap "import to vault". **Homework:** one-tap. `#feature #rss #goodreads`
 - **"Discover via friends" via Hardcover follow graph** — replaces dead Goodreads-friends-feed. Recent ratings/reviews from Hardcover users the reader follows. **Source:** Hardcover GraphQL `me.following` + their public `user_books`. **Sketch:** `/discover/friends` strip; gracefully degrades when no follows. **Homework:** none beyond following on Hardcover. `#feature #social #hardcover`
 - **Bingo-square recommendations from finished+TBR cross-reference**: For each unfilled square, suggest one TBR book + one Hardcover-list book that fits the theme. **Sketch:** at build, score TBR books by tag overlap; fall back to curated Hardcover lists. **Homework:** none — passive surfacing. `#feature #bingo #recs`
-- **Storygraph / Bookwyrm import parity** behind `--source` flag on the importer. Low priority unless the user actively migrates. `#feature #import #portability`
 - **Rejected: Goodreads "Add to Shelf" embed widget** — phones Amazon trackers, looks dated, adds reader work. The link-row entry above already covers outbound. `#rejected #goodreads`
 
-### Highlights — the user's own (researched 2026-05-03)
+### Highlights — the user's own (researched 2026-05-03, scoped 2026-05-15)
+
+Scoped on 2026-05-15 to "occasional Kindle highlights, no Readwise / Apple Books / Bookwyrm" per the integration filter: an integration earns a slot only when it fixes a felt pain. Readwise and Apple Books struck — services not in use. Goodreads email-export fallback struck — Goodreads is downstream of Kindle, not a separate source. Highlight-tag passthrough struck (depended on Readwise tag schema).
 
 Source notes:
 
 - **No official Amazon API** for personal or popular Kindle highlights. Bookcision (Readwise's bookmarklet) is the least-fragile option.
 - **Kindle for Mac does NOT write `My Clippings.txt`** — that file only comes from physical Kindle devices. Common misconception.
-- **Apple Books DB paths**: `~/Library/Containers/com.apple.iBooksX/Data/Documents/{AEAnnotation,BKLibrary}/*.sqlite` — undocumented, schema shifts across macOS releases, sandboxed but readable.
-- **Readwise API** (`GET /api/v2/export/`, Token header, 240 req/min) is the de facto aggregator: Kindle, Apple Books, Instapaper, Twitter, etc. Cost: $9.99/mo or $5.59 Lite.
-- **Goodreads "My Kindle Notes & Highlights" page** is still public per-book when account-linked to Amazon; email-export option exists.
 
-- **Readwise API sync**: Pull all highlights from Readwise on a schedule, materialise into per-book `quotes.md`. Single integration covers every source the user actually uses. **Sketch:** `ook sync readwise` writes a JSON cache, renders into `quotes.md` with stable footer for diff-clean re-runs; cover_image_url goes into frontmatter as URL. **Homework:** none after token paste. `#feature #highlights #readwise #sync`
-- **Apple Books SQLite reader**: Read the local annotations DB directly. The only clean path since Readwise's Apple Books support is poor. **Sketch:** `ook import applebooks` opens DBs read-only, joins, writes per-book `quotes.md` blocks tagged `## From Apple Books`. **Homework:** none. `#feature #highlights #applebooks`
-- **read.amazon.com/notebook scraper / Bookcision flow**: Bookcision bookmarklet emits JSON; user drops it into the vault, importer materialises. Covers Kindle-app reads that don't generate `My Clippings.txt`. **Sketch:** simplest reliable form is manual — Bookcision per book → `vault/<book>/kindle-export.json` → `ook import kindle-export`. **Homework:** one-tap per book. `#feature #highlights #kindle #scrape`
-- **Goodreads "Kindle Notes & Highlights" email-export fallback**: Mail rule drops the export into a watched folder, parser converts to `quotes.md`. Probably skip in favour of Readwise unless those fail. **Homework:** one click per book to trigger email. `#feature #highlights #goodreads #fallback`
-- **"I finished X" agent flow**: When user reports finishing, agent says "I see N highlights for this in your <Readwise / Apple Books / clippings> — drop them into `quotes.md`?" Collapses the favourite-quote question into "here are 12, pick or skip, all saved." **Homework:** one-tap yes/no. `#feature #highlights #agent #completion`
+- **Bookcision/Kindle highlight import (primary path)**: Bookcision bookmarklet emits JSON; user drops it into the vault, importer materialises into per-book `quotes.md`. The operator highlights occasionally — once-per-book manual flow is the right shape. **Sketch:** Bookcision per book → `vault/<book>/kindle-export.json` → `ook import kindle-export`. **Homework:** one-tap per book on Bookcision; the import is automatic from there. `#feature #highlights #kindle`
+- **"I finished X" agent flow**: When user reports finishing, agent says "I see N Kindle clippings for this — drop them into `quotes.md`?" Collapses the favourite-quote question into "here are 12, pick or skip, all saved." **Homework:** one-tap yes/no. `#feature #highlights #agent #completion`
 - **Highlight-driven "currently reading" surfacing**: Show the most-recent highlight on the homepage as a sign-of-life under "currently reading." The highlight IS the status update. **Sketch:** sort imported highlights by date, render the top 1–3 from currently-reading book(s) on the home page. **Homework:** none — passive. `#feature #highlights #homepage`
-- **Highlight-tag passthrough**: Carry Readwise tags (`.h1`, `.concept`, `.favorite`) into `quotes.md` as section headings or inline tags. Honour user's existing curation. **Sketch:** group highlights by primary tag (favourites first); favourites pool feeds the pullquote suggester. **Homework:** none. `#feature #highlights #tags`
 
 ### Highlights — public / community
 
@@ -128,7 +120,6 @@ Let the site reach beyond the page-view.
 - **WebSub push notification on book status flips**: niche but real, pingable subscribers. `#feature #feed #websub`
 - **Email digest, monthly self-mail**: cron + Resend, summary of "what you read, what you said." `#feature #email #digest`
 - **Reply-by-email comments**: `mailto:` link on per-book pages with subject pre-filled, lands in vault inbox. `#feature #per-book #comments`
-- **ActivityPub federation of finishes to Bookwyrm/Mastodon**: heavy lift; if you join a Bookwyrm instance, ook becomes the front-end of your entry. `#feature #activitypub #bookwyrm`
 
 ### Capture / input (brainstormed 2026-05-03)
 
@@ -141,18 +132,7 @@ How books arrive in the vault. Most are split between vault repo + an ook-side r
 - **Receipt OCR import**: snap a Powell's receipt, books added to TBR with provenance. `#feature #capture #ocr`
 - **Cover photo capture**: phone snap of a paperback, OCR the title, stub it. `#feature #capture #ocr`
 - **Library hold notification → TBR stub**: when a hold becomes available at your library, auto-stub. Library-specific integration. `#feature #capture #library`
-- **Apple Books / Kindle library mirror diff**: periodic diff that flags "in your devices but not in your vault." Distinct from the highlights work — this is the library, not the annotations. `#feature #capture #devices`
-
-### Cross-domain integrations (brainstormed 2026-05-03)
-
-Where reading touches the rest of life. Mostly out-of-character for a render-only site, listed for completeness.
-
-- **Slack / Discord status auto-update**: "Reading X" while currently-reading exists. `#feature #cross-domain #status`
-- **Smart-light "reading mode"**: warm light auto-on at sunset when `/now` is non-empty. Home Assistant / Hue integration. `#feature #cross-domain #lights`
-- **Pomodoro reading timer**: integrated, tracks minutes-per-session per book. `#feature #cross-domain #timer`
-- **Calendar block proposal**: starting a book of N pages? Propose a daily reading block based on pace. iCal export. `#feature #cross-domain #calendar`
-- **Spotify "soundtracks for finished books"**: manually curated or genre-matched playlists per book, surfaced on per-book page. `#feature #cross-domain #spotify`
-- **Cocktail / meal pairing per book**: the "Drinks of the Books" spinoff. Cute, deeply optional. `#feature #cross-domain #pairing`
+- **Kindle library mirror diff**: periodic diff against the Kindle ownership shards already on hand (`_meta/kindle-sessions.json` has per-ASIN entries) that flags "in your Kindle library but not in your vault." Distinct from the highlights work — this is the library, not the annotations. `#feature #capture #devices`
 
 ### AI-flavoured experiments (brainstormed 2026-05-03)
 
