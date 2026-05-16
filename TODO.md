@@ -125,10 +125,10 @@ Let the site reach beyond the page-view.
 
 How books arrive in the vault. Most are split between vault repo + an ook-side receiving endpoint.
 
-- **iOS Shortcut "share to ook TBR"**: share any book URL, drops a stub into the vault inbox. `#feature #capture #ios #vault`
+- **Android share-target "share to ook TBR"**: register ook as a `share_target` in the web app manifest so Android's share sheet offers it for URLs and text. Sharing a book page (Amazon, Hardcover, Goodreads, library catalogue) from mobile lands as a stub in the vault inbox. Web Share Target API is the right shape — ook is already a PWA-capable web app, no native app or platform-specific tooling needed. Works on any modern Android browser. **Homework:** one tap to share. `#feature #capture #android #vault`
 - **Browser extension on Amazon/Goodreads/Hardcover/Storygraph**: "add to ook TBR" button that scrapes title/author/cover. `#feature #capture #browser-ext`
 - **Email-to-vault inbox**: forward a Goodreads "Want to read" notification to a special address, importer parses and stubs. `#feature #capture #email`
-- **Voice capture endpoint**: "Hey ook, I just finished Piranesi" via Apple Shortcuts → drops a finish-stub into vault inbox. `#feature #capture #voice`
+- **Voice capture endpoint**: "Hey Google, tell ook I finished Piranesi" via Google Assistant routine / Android Intent → drops a finish-stub into vault inbox. **Open question:** does this fix a felt pain or is it novelty? `/admin` is right there on the phone. Worth a deliberate decision before any build. `#feature #capture #android #voice`
 - **Receipt OCR import**: snap a Powell's receipt, books added to TBR with provenance. `#feature #capture #ocr`
 - **Cover photo capture**: phone snap of a paperback, OCR the title, stub it. `#feature #capture #ocr`
 - **Library hold notification → TBR stub**: when a hold becomes available at your library, auto-stub. Library-specific integration. `#feature #capture #library`
