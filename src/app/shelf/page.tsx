@@ -4,6 +4,7 @@ import { HomeMark } from "@/components/HomeMark";
 import { getAllBooks, getBingo, getCurrentBingoYear } from "@/lib/books";
 import { buildShelfItems, computeSpineWidth } from "@/lib/shelf";
 import { spineStyle } from "@/lib/spine-color";
+import { spineDecoration, type SpineDecoration, type SpineGlyph } from "@/lib/spine-decoration";
 import type { Book } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,14 @@ const VALID_SORTS = new Set(["finished", "author", "rating", "title"]);
 //   - Currently-reading books carry a small bookmark tongue above the
 //     shelf line.
 //
+// A second axis of variety beyond hue: each spine may carry one
+// decoration from `spine-decoration.ts` — cross-hatch overlay, stipple,
+// chevron border, gilt edge, or a small foot glyph. Same series → same
+// decoration (publisher uniform binding); ~35% of spines stay plain so
+// the decorated ones read as accent, not clutter. Decorations are
+// constrained to the spine body below y=24 so they never overlap the
+// bingo stripe, title rule, or bookmark tongue.
+//
 // When sorted by finish date (the default), year boundaries get a small
 // gap and a tick label below the shelf so the eye can find the seam in
 // ~200 spines without breaking the timeline metaphor.
@@ -60,6 +69,7 @@ export default async function ShelfPage({ searchParams }: { searchParams: Search
   return (
     <main className="mx-auto box-border w-full max-w-[1200px] px-6 py-12 sm:px-10 sm:pt-10 sm:pb-20">
       <HomeMark />
+      <ShelfDefs />
 
       <header className="border-rule mb-8 border-b pb-6">
         <div className="text-ink-soft mb-3 text-[11px] tracking-[0.18em] uppercase">Shelf</div>
@@ -224,6 +234,7 @@ function Spine({ book, onBingoCard }: { book: Book; onBingoCard: boolean }) {
   const titleShort = abbreviate(book.title, titleBudget);
   const rating = book.rating !== null ? "★".repeat(Math.floor(book.rating)) : "";
   const isReading = book.status === "reading";
+  const decoration = spineDecoration(book);
 
   return (
     <Link
@@ -254,6 +265,10 @@ function Spine({ book, onBingoCard }: { book: Book; onBingoCard: boolean }) {
         {/* Spine background — origin shifts down by 8 px to leave room
             for the bookmark tongue above. */}
         <rect x="0" y="8" width={width} height={SPINE_H} fill="var(--spine-color)" />
+        {/* Decoration overlay — pure ornament, never load-bearing. Lives
+            in the spine body (y=24 down) so it never collides with the
+            bingo stripe, title rule, or bookmark tongue above. */}
+        <SpineDecorationLayer decoration={decoration} width={width} />
         {/* Bingo-card accent stripe along the top edge of the spine. */}
         {onBingoCard && <rect x="0" y="8" width={width} height="2" fill="var(--accent)" />}
         {/* Top + bottom decorative bands (the printer's rule). */}
@@ -283,6 +298,186 @@ function Spine({ book, onBingoCard }: { book: Book; onBingoCard: boolean }) {
         </text>
       </svg>
     </Link>
+  );
+}
+
+// The spine body proper starts at y=8 (the rect origin). The bingo
+// stripe and title rule occupy y=8..y=14; the bookmark tongue lives at
+// y=0..y=10. Decorations must not paint into those rows. The decoration
+// zone is y=24..y=SPINE_H+8 (inclusive top, exclusive bottom in SVG
+// coords) to leave a few pixels of breathing room under the title rule.
+const DECORATION_TOP = 24;
+const DECORATION_BOTTOM = SPINE_H + 6;
+
+function SpineDecorationLayer({
+  decoration,
+  width,
+}: {
+  decoration: SpineDecoration | null;
+  width: number;
+}) {
+  if (!decoration) return null;
+  switch (decoration.kind) {
+    case "cross-hatch":
+      return (
+        <rect
+          x="0"
+          y={DECORATION_TOP}
+          width={width}
+          height={DECORATION_BOTTOM - DECORATION_TOP}
+          fill="url(#spine-cross-hatch)"
+          opacity="0.55"
+        />
+      );
+    case "stipple":
+      return (
+        <rect
+          x="0"
+          y={DECORATION_TOP}
+          width={width}
+          height={DECORATION_BOTTOM - DECORATION_TOP}
+          fill="url(#spine-stipple)"
+          opacity="0.55"
+        />
+      );
+    case "chevron":
+      // A vertical column of small chevrons running down the centre of
+      // the spine, well below the title rule. Subtle — reads as
+      // embossed cloth, not as a bullet list.
+      return <ChevronDecoration width={width} />;
+    case "gilt-edge":
+      // A thin lighter rect along each long edge of the spine — mimics
+      // gilded page edges peeking out from the binding.
+      return (
+        <>
+          <rect
+            x="0"
+            y={DECORATION_TOP}
+            width="1"
+            height={DECORATION_BOTTOM - DECORATION_TOP}
+            fill="rgba(255,240,200,0.55)"
+          />
+          <rect
+            x={width - 1}
+            y={DECORATION_TOP}
+            width="1"
+            height={DECORATION_BOTTOM - DECORATION_TOP}
+            fill="rgba(255,240,200,0.55)"
+          />
+        </>
+      );
+    case "foot-glyph":
+      return <FootGlyph glyph={decoration.glyph} width={width} />;
+  }
+}
+
+function ChevronDecoration({ width }: { width: number }) {
+  // Stack a few chevrons along the lower third so they don't compete
+  // with the centred title. Centred horizontally; arrow-up shape, three
+  // pixels wide.
+  const cx = width / 2;
+  const baseY = SPINE_H - 30;
+  const chevrons = [0, 8, 16];
+  return (
+    <g fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1" strokeLinecap="square">
+      {chevrons.map((dy) => (
+        <path
+          key={dy}
+          d={`M ${cx - 3} ${baseY + dy + 3} L ${cx} ${baseY + dy} L ${cx + 3} ${baseY + dy + 3}`}
+        />
+      ))}
+    </g>
+  );
+}
+
+function FootGlyph({ glyph, width }: { glyph: SpineGlyph; width: number }) {
+  // Place the glyph near the foot of the spine, centred horizontally,
+  // small enough to read as a publisher's mark rather than as a label.
+  const cx = width / 2;
+  const cy = SPINE_H - 8;
+  const fill = "rgba(255,240,200,0.7)";
+  switch (glyph) {
+    case "asterisk":
+      return (
+        <text
+          x={cx}
+          y={cy}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontFamily="ui-serif, serif"
+          fontSize="9"
+          fill={fill}
+        >
+          ✻
+        </text>
+      );
+    case "dot":
+      return <circle cx={cx} cy={cy} r="1.4" fill={fill} />;
+    case "diamond":
+      return (
+        <path
+          d={`M ${cx} ${cy - 3} L ${cx + 2.5} ${cy} L ${cx} ${cy + 3} L ${cx - 2.5} ${cy} Z`}
+          fill={fill}
+        />
+      );
+    case "fleur":
+      return (
+        <text
+          x={cx}
+          y={cy}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontFamily="ui-serif, serif"
+          fontSize="9"
+          fill={fill}
+        >
+          ❦
+        </text>
+      );
+    case "cross":
+      return (
+        <g stroke={fill} strokeWidth="1" strokeLinecap="square">
+          <line x1={cx - 2} y1={cy} x2={cx + 2} y2={cy} />
+          <line x1={cx} y1={cy - 2} x2={cx} y2={cy + 2} />
+        </g>
+      );
+  }
+}
+
+// Page-level SVG `<defs>` holding the pattern definitions used by
+// `<SpineDecorationLayer>`. Patterns are referenced via `url(#id)` from
+// the per-spine SVGs. SVG `url(#…)` references resolve against the
+// same HTML document, so a single hidden SVG at the page level is
+// enough — no need to duplicate the defs in every spine.
+function ShelfDefs() {
+  return (
+    <svg
+      aria-hidden
+      width="0"
+      height="0"
+      style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+    >
+      <defs>
+        {/* Diagonal cross-hatch. 6-px tile, two thin strokes at 45°
+            and -45°. Subtle off-white so it reads on every hue band. */}
+        <pattern
+          id="spine-cross-hatch"
+          patternUnits="userSpaceOnUse"
+          width="6"
+          height="6"
+          patternTransform="rotate(0)"
+        >
+          <path d="M 0 0 L 6 6" stroke="rgba(255,255,255,0.18)" strokeWidth="0.7" fill="none" />
+          <path d="M 6 0 L 0 6" stroke="rgba(0,0,0,0.16)" strokeWidth="0.7" fill="none" />
+        </pattern>
+        {/* Stipple — small dots on a 5-px grid. Off-white over the
+            spine fill reads as flecked cloth. */}
+        <pattern id="spine-stipple" patternUnits="userSpaceOnUse" width="5" height="5">
+          <circle cx="1.5" cy="1.5" r="0.6" fill="rgba(255,255,255,0.30)" />
+          <circle cx="3.5" cy="3.5" r="0.45" fill="rgba(0,0,0,0.22)" />
+        </pattern>
+      </defs>
+    </svg>
   );
 }
 
