@@ -140,6 +140,47 @@ function byteToRange(byte: number, min: number, max: number): number {
   return min + (byte / 255) * (max - min);
 }
 
+// Trailing collective nouns we fold off the end of a series name when
+// normalising. The vault contains both "Mistborn" (books 1-6) and
+// "The Mistborn Saga" (book 7) for the same series; "Red Rising"
+// (book 3) and "Red Rising Saga" (books 1-2) likewise; "The Shadow"
+// (book 4) and "The Shadow Series" (books 2-3). Each suffix is the
+// publisher's collective noun, not part of the brand — folding them
+// out collapses every observed sibling onto the same key. Order in
+// the regex matters: `Saga` and `Series` are the active offenders;
+// the rest are pre-emptive (`Cycle` already exists in
+// "Earthsea Cycle", `Chronicle(s)` and `Trilogy` and `Quartet` are
+// common enough that the same drift will surface eventually).
+const TRAILING_COLLECTIVES = /\s+(?:saga|series|cycle|trilogy|quartet|chronicles?)$/;
+
+/**
+ * Normalise a series name to a stable hash key so cosmetic variance
+ * across sibling books (leading "The ", trailing collective nouns,
+ * lingering commas/colons, double spaces) collapses to one input.
+ * The fix-shape from the TODO: trim, lowercase, strip leading article,
+ * fold internal punctuation, drop a trailing collective noun, collapse
+ * whitespace. Pure; exported for tests.
+ */
+export function normalizeSeriesName(raw: string): string {
+  let s = raw.trim().toLowerCase();
+  // Drop a leading definite/indefinite article. "The Mistborn Saga"
+  // and "Mistborn" must end up with the same stem; "An Ember in the
+  // Ashes" and "Ember in the Ashes" likewise.
+  s = s.replace(/^(?:the|an|a)\s+/, "");
+  // Fold commas, colons, semicolons inside the name to spaces. The
+  // `#N` suffix is already stripped upstream, but trailing commas
+  // (`"Earthsea Cycle, "`) and colon variants (`"The Elder Empire:
+  // Sea"`) drift between siblings.
+  s = s.replace(/[,:;]+/g, " ");
+  // Collapse internal whitespace runs to a single space.
+  s = s.replace(/\s+/g, " ").trim();
+  // Drop trailing collective noun ("Mistborn Saga" → "mistborn",
+  // "Red Rising Saga" → "red rising"). Run after the article strip
+  // so "the mistborn saga" lands on "mistborn".
+  s = s.replace(TRAILING_COLLECTIVES, "").trim();
+  return s;
+}
+
 /**
  * Hash input for the spine colour. First series membership when the
  * book has one (so every Discworld book gets the same hue), otherwise
@@ -155,7 +196,10 @@ export function spineHashInput(book: Pick<Book, "series" | "title">): string {
     // on the index.
     const first = raw.split(";")[0]?.trim() ?? "";
     const withoutIndex = first.replace(/\s*,?\s*#\d+(?:\.\d+)?\s*$/, "").trim();
-    if (withoutIndex.length > 0) return `series:${withoutIndex.toLowerCase()}`;
+    if (withoutIndex.length > 0) {
+      const normalized = normalizeSeriesName(withoutIndex);
+      if (normalized.length > 0) return `series:${normalized}`;
+    }
   }
   return `title:${book.title.toLowerCase()}`;
 }
