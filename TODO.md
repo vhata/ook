@@ -12,12 +12,10 @@ Sections are grouped by readiness: decided plans first, then open verdicts, defe
 
 Pattern: at certain meaningful moments in the `/admin` flow, the agent asks one (or two, bundled) low-friction questions that draw out the user's voice. **Tenet**: voice > integrations > automation > polish. Capture must never feel like a slog. The user explicitly navigates or commits to these moments; the prompts piggyback on existing flow, never form-fill.
 
-The **finish prompt** (status → finished asks for pullquote + rating in one bundled commit) has shipped. The **start prompt** (tbr → reading asks "what brought you to this?" → `trigger:` frontmatter, skipped on second-read) has shipped. The others below are weighted by trigger frequency in real use:
+The **finish prompt** (status → finished asks for pullquote + rating in one bundled commit) has shipped. The **start prompt** (tbr → reading asks "what brought you to this?" → `trigger:` frontmatter, skipped on second-read) has shipped. The **5-star unreviewed prompt** (when a 5-rated book has no review, ask "quick — why was this a five?" at commit time → seeds `review.md`, one ask per session per book) has shipped. The others below are weighted by trigger frequency in real use:
 
-- **More frequent triggers (ship first):** Quiet → return (any ≥14-day gap), 5-star unreviewed (orthogonal to finishes).
+- **More frequent triggers (ship first):** Quiet → return (any ≥14-day gap).
 - **Rarer triggers (ship when scoped):** Reading-streak milestone, Series completion.
-
-- **5-star unreviewed**: when a book is rated 5 and has no review file, agent's NEXT commit-message-prompt opportunistically asks "quick — why was this a five?" — answer seeds `review.md`. One ask per session per book. `#agent #voice #prompts #review`
 - **Reading-streak milestone**: when current streak crosses 10/30/100 days at commit time, agent says "that's a streak. Anything to note about it?" — answer goes to `_meta/log.md` as a Note entry. `#agent #voice #prompts #streak`
 - **Quiet → return**: when there's been no event for ≥14 days and the user comes back to /admin to mark something, agent asks "welcome back — anything interesting in the gap?" — answer to `_meta/log.md`. `#agent #voice #prompts #quiet`
 - **Series completion**: when status → finished completes a series the user has fully tracked, agent asks "you finished the series. Looking back, what stuck?" — answer to a new file `<slug>/series-finish.md` or appended to the final book's review. `#agent #voice #prompts #series`
