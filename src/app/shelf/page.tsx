@@ -317,28 +317,55 @@ function SpineDecorationLayer({
   width: number;
 }) {
   if (!decoration) return null;
+  // The rotated title runs down the centre of the spine occupying a
+  // band roughly equal to the font height. Pattern decorations flank
+  // that band on the left and right rather than running over it, so the
+  // title stays readable. Narrow spines get a tighter clearance.
+  const titleBand = 14;
+  const leftWidth = Math.max(0, Math.floor((width - titleBand) / 2));
+  const rightX = width - leftWidth;
   switch (decoration.kind) {
     case "cross-hatch":
       return (
-        <rect
-          x="0"
-          y={DECORATION_TOP}
-          width={width}
-          height={DECORATION_BOTTOM - DECORATION_TOP}
-          fill="url(#spine-cross-hatch)"
-          opacity="0.55"
-        />
+        <>
+          <rect
+            x="0"
+            y={DECORATION_TOP}
+            width={leftWidth}
+            height={DECORATION_BOTTOM - DECORATION_TOP}
+            fill="url(#spine-cross-hatch)"
+            opacity="1"
+          />
+          <rect
+            x={rightX}
+            y={DECORATION_TOP}
+            width={leftWidth}
+            height={DECORATION_BOTTOM - DECORATION_TOP}
+            fill="url(#spine-cross-hatch)"
+            opacity="1"
+          />
+        </>
       );
     case "stipple":
       return (
-        <rect
-          x="0"
-          y={DECORATION_TOP}
-          width={width}
-          height={DECORATION_BOTTOM - DECORATION_TOP}
-          fill="url(#spine-stipple)"
-          opacity="0.55"
-        />
+        <>
+          <rect
+            x="0"
+            y={DECORATION_TOP}
+            width={leftWidth}
+            height={DECORATION_BOTTOM - DECORATION_TOP}
+            fill="url(#spine-stipple)"
+            opacity="1"
+          />
+          <rect
+            x={rightX}
+            y={DECORATION_TOP}
+            width={leftWidth}
+            height={DECORATION_BOTTOM - DECORATION_TOP}
+            fill="url(#spine-stipple)"
+            opacity="1"
+          />
+        </>
       );
     case "chevron":
       // A vertical column of small chevrons running down the centre of
@@ -353,16 +380,16 @@ function SpineDecorationLayer({
           <rect
             x="0"
             y={DECORATION_TOP}
-            width="1"
+            width="2"
             height={DECORATION_BOTTOM - DECORATION_TOP}
-            fill="rgba(255,240,200,0.55)"
+            fill="rgba(255,240,200,0.92)"
           />
           <rect
-            x={width - 1}
+            x={width - 2}
             y={DECORATION_TOP}
-            width="1"
+            width="2"
             height={DECORATION_BOTTOM - DECORATION_TOP}
-            fill="rgba(255,240,200,0.55)"
+            fill="rgba(255,240,200,0.92)"
           />
         </>
       );
@@ -379,7 +406,7 @@ function ChevronDecoration({ width }: { width: number }) {
   const baseY = SPINE_H - 30;
   const chevrons = [0, 8, 16];
   return (
-    <g fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth="1" strokeLinecap="square">
+    <g fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="1.5" strokeLinecap="square">
       {chevrons.map((dy) => (
         <path
           key={dy}
@@ -395,7 +422,7 @@ function FootGlyph({ glyph, width }: { glyph: SpineGlyph; width: number }) {
   // small enough to read as a publisher's mark rather than as a label.
   const cx = width / 2;
   const cy = SPINE_H - 8;
-  const fill = "rgba(255,240,200,0.7)";
+  const fill = "rgba(255,240,200,0.95)";
   switch (glyph) {
     case "asterisk":
       return (
@@ -405,18 +432,18 @@ function FootGlyph({ glyph, width }: { glyph: SpineGlyph; width: number }) {
           textAnchor="middle"
           dominantBaseline="middle"
           fontFamily="ui-serif, serif"
-          fontSize="9"
+          fontSize="11"
           fill={fill}
         >
           ✻
         </text>
       );
     case "dot":
-      return <circle cx={cx} cy={cy} r="1.4" fill={fill} />;
+      return <circle cx={cx} cy={cy} r="1.9" fill={fill} />;
     case "diamond":
       return (
         <path
-          d={`M ${cx} ${cy - 3} L ${cx + 2.5} ${cy} L ${cx} ${cy + 3} L ${cx - 2.5} ${cy} Z`}
+          d={`M ${cx} ${cy - 4} L ${cx + 3.5} ${cy} L ${cx} ${cy + 4} L ${cx - 3.5} ${cy} Z`}
           fill={fill}
         />
       );
@@ -428,7 +455,7 @@ function FootGlyph({ glyph, width }: { glyph: SpineGlyph; width: number }) {
           textAnchor="middle"
           dominantBaseline="middle"
           fontFamily="ui-serif, serif"
-          fontSize="9"
+          fontSize="11"
           fill={fill}
         >
           ❦
@@ -436,9 +463,9 @@ function FootGlyph({ glyph, width }: { glyph: SpineGlyph; width: number }) {
       );
     case "cross":
       return (
-        <g stroke={fill} strokeWidth="1" strokeLinecap="square">
-          <line x1={cx - 2} y1={cy} x2={cx + 2} y2={cy} />
-          <line x1={cx} y1={cy - 2} x2={cx} y2={cy + 2} />
+        <g stroke={fill} strokeWidth="1.4" strokeLinecap="square">
+          <line x1={cx - 3} y1={cy} x2={cx + 3} y2={cy} />
+          <line x1={cx} y1={cy - 3} x2={cx} y2={cy + 3} />
         </g>
       );
   }
@@ -467,14 +494,14 @@ function ShelfDefs() {
           height="6"
           patternTransform="rotate(0)"
         >
-          <path d="M 0 0 L 6 6" stroke="rgba(255,255,255,0.18)" strokeWidth="0.7" fill="none" />
-          <path d="M 6 0 L 0 6" stroke="rgba(0,0,0,0.16)" strokeWidth="0.7" fill="none" />
+          <path d="M 0 0 L 6 6" stroke="rgba(255,255,255,0.55)" strokeWidth="1.1" fill="none" />
+          <path d="M 6 0 L 0 6" stroke="rgba(0,0,0,0.45)" strokeWidth="1.1" fill="none" />
         </pattern>
         {/* Stipple — small dots on a 5-px grid. Off-white over the
             spine fill reads as flecked cloth. */}
         <pattern id="spine-stipple" patternUnits="userSpaceOnUse" width="5" height="5">
-          <circle cx="1.5" cy="1.5" r="0.6" fill="rgba(255,255,255,0.30)" />
-          <circle cx="3.5" cy="3.5" r="0.45" fill="rgba(0,0,0,0.22)" />
+          <circle cx="1.5" cy="1.5" r="0.9" fill="rgba(255,255,255,0.65)" />
+          <circle cx="3.5" cy="3.5" r="0.75" fill="rgba(0,0,0,0.55)" />
         </pattern>
       </defs>
     </svg>
