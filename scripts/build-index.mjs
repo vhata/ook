@@ -105,6 +105,7 @@ async function main() {
           : null,
       hideExternalReviews: data.hide_external_reviews === true,
       pages: parseNullableNumber(data.pages),
+      trigger: parseNullableString(data.trigger),
     });
   }
 

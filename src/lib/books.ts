@@ -195,6 +195,7 @@ async function readBookDir(slug: string): Promise<Book | null> {
     source: parseSource(data.source),
     hideExternalReviews: data.hide_external_reviews === true,
     pages: parseNullableNumber(data.pages),
+    trigger: parseNullableString(data.trigger),
   };
 }
 

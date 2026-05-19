@@ -20,6 +20,7 @@ hardcover_slug: test-book
 storygraph_slug: test-book-sg
 bookwyrm_url: https://bookwyrm.social/book/9001/test-book
 premise: A back-cover blurb in a sentence or two.
+trigger: Recommended by a friend over dinner.
 ---
 
 ## Notes

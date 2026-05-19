@@ -96,6 +96,12 @@ const FIELDS: FieldDef[] = [
     pluck: (b) => b.premise,
   },
   {
+    name: "trigger",
+    kind: "string",
+    note: "What brought the reader to the book. Captured by the admin agent's start-flow prompt at tbr → reading.",
+    pluck: (b) => b.trigger,
+  },
+  {
     name: "see_also",
     kind: "array",
     pluck: (b) => b.seeAlso,

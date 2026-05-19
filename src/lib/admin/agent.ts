@@ -65,6 +65,19 @@ If the book is ALREADY finished (the get_book result shows status: finished) and
 
 If the user includes the pullquote and rating in their initial free-text ("I just finished Piranesi, rating 5, pullquote 'a man lives in a house of statues'"), no follow-up is needed — bundle and propose_patch directly.
 
+Start-flow rule (load-bearing):
+When the user reports starting a book — anything that resolves to a "tbr → reading" status flip — do NOT call propose_patch on the first turn. Instead, ask ONE follow-up question in plain text:
+  "What brought you to this?"
+When their reply arrives, bundle the status flip (and any started date) with the answer written to a \`trigger:\` frontmatter field into ONE propose_patch call.
+
+This is once per book. Second-reads skip the prompt entirely — if the get_book result shows the book already has a \`started\` value OR a \`finished\` value (i.e. the reader has touched this book before), treat the tbr → reading flip as a re-open and proceed straight to propose_patch with NO start-flow question. The trigger is meant to capture the first-encounter story, not a re-read motive.
+
+Skippable in one tap: if the user replies "skip", "no", "(skip)", "don't know", or anything clearly dismissive, commit the status flip WITHOUT a trigger field (leave it absent). The voice gate is "one question at a meaningful moment, never form-fill" — do not nag, do not ask a second time.
+
+Override: if the user clearly indicates in their initial free-text that they want to skip the trigger question ("just mark it reading, no trigger"), respect that and commit straight away. If the user includes the trigger in their initial free-text ("starting Piranesi, picked it up because Susanna Clarke was recommended on the Backlisted podcast"), no follow-up is needed — bundle the trigger and propose_patch directly.
+
+The start-flow gate only fires at the tbr → reading transition. A book already at status: reading (or any other non-tbr status) gets a plain propose_patch when the user edits something on it; no trigger question.
+
 Progress-archive rule (rides on the finish flow):
 When the patch flips a book to status: finished AND the book has a progress.md file (get_book frontmatter shows hasProgress: true), the same propose_patch must also archive that file. The dance:
   1. On get_book for the finish flip, also fetch sections: ["progress"] so you have the file's current content.
@@ -83,6 +96,7 @@ Schema notes:
 - Dates: ISO YYYY-MM-DD.
 - Pullquote lives in frontmatter as \`pullquote: "..."\` (string). Rating lives as \`rating: N\` (integer 1-5).
 - Premise (\`premise:\`) is the tier-0 back-cover blurb. Operator-populated from the Hardcover description cache via \`scripts/backfill-premises.mjs\` — the agent does NOT write it. If the user explicitly asks to overwrite a premise (rare), proceed; otherwise leave it alone.
+- Trigger (\`trigger:\`) is a short free-text string — what brought the reader to the book. Captured at the tbr → reading transition by the start-flow rule above. Single-line; whatever the reader typed, verbatim. Optional — absent on books where the reader skipped the prompt.
 
 URL-paste enrichment:
 When the user's message contains a book URL (Goodreads / Hardcover / Storygraph / Amazon / Bookwyrm), the system pre-parses it and appends a parenthetical at the end of the message of the form "(Parsed from <url>: goodreads_id: 12345, hardcover_slug: …)". Treat those parsed fields as ground-truth IDs ready to write to frontmatter when the user is adding or updating a book. The supported frontmatter ID fields today are: \`goodreads_id\`, \`hardcover_slug\`, \`storygraph_slug\`, \`bookwyrm_url\`. ASIN and ISBN may also appear in the parenthetical — mention them in your reply so the user knows they were detected, but DON'T write them to frontmatter yet (no schema slot for them today).`;
@@ -90,6 +104,26 @@ When the user's message contains a book URL (Goodreads / Hardcover / Storygraph 
 // Exported for test pinning — the finish-flow rule is load-bearing
 // and a future agent.ts refactor must not silently drop it.
 export const FINISH_FLOW_INSTRUCTION_MARKER = "Finish-flow rule (load-bearing):";
+
+// Same pinning treatment for the start-flow rule. The tbr → reading
+// trigger-prompt lives in natural language (the tool layer doesn't
+// enforce the gate, the agent does), so a refactor that strips the
+// block would silently regress the voice prompt.
+export const START_FLOW_INSTRUCTION_MARKER = "Start-flow rule (load-bearing):";
+
+// Pure helper: decides whether the start-flow trigger question should
+// fire for a tbr → reading flip on this book. Returns false when the
+// book has any prior reading history (a `started` or `finished` date
+// in its frontmatter) — second-reads skip the prompt. Exported for
+// test pinning; the agent applies the same rule in natural language.
+export function shouldAskStartTrigger(book: {
+  started?: string | null;
+  finished?: string | null;
+}): boolean {
+  if (book.started && book.started.length > 0) return false;
+  if (book.finished && book.finished.length > 0) return false;
+  return true;
+}
 
 // URL-paste enrichment — scans the user's free-text input for any
 // book URLs we know how to parse, runs them through `parseBookIds`,

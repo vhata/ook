@@ -157,6 +157,7 @@ function book(overrides: Partial<Book> & { slug: string }): Book {
     amazonAsin: null,
     source: null,
     hideExternalReviews: false,
+    trigger: null,
     ...overrides,
   };
 }

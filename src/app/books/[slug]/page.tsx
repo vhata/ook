@@ -220,6 +220,7 @@ function BookHeader({
         <BookDates book={book} />
         <HardcoverStats hardcover={hardcover} />
         <KindleSessionStats stats={kindleStats} />
+        <TriggerLine trigger={book.trigger} />
         <ShareRow slug={book.slug} />
         <div className="mt-3">
           {/* Owner-only edit affordance — seeds /admin with the book
@@ -364,6 +365,23 @@ function KindleSessionStats({ stats }: { stats: KindleStats | null }) {
           <span className="text-ink-dim">{range}</span>
         </>
       )}
+    </div>
+  );
+}
+
+// Single-line subordinate render of the trigger frontmatter field —
+// the reader's answer to "what brought you to this?" captured by the
+// admin agent's start-flow prompt at the tbr → reading transition. One
+// italic line in the metadata strip register; hidden entirely when no
+// trigger was captured (the reader skipped the prompt, the book
+// predates the prompt, or it's a re-read). Voice-bearing content, not
+// catalog data — but rendered at the catalog tier so it lives near the
+// title without competing with the pullquote.
+function TriggerLine({ trigger }: { trigger: string | null }) {
+  if (!trigger) return null;
+  return (
+    <div className="text-ink-soft mt-3 max-w-[680px] text-[13px] leading-[1.5] italic">
+      <span className="text-ink-dim not-italic">why I picked this:</span> {trigger}
     </div>
   );
 }

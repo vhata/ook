@@ -63,6 +63,7 @@ const baseBook: Book = {
   source: "manual",
   hideExternalReviews: false,
   pages: null,
+  trigger: null,
 };
 
 vi.mock("../../src/lib/books", async () => {
@@ -179,6 +180,43 @@ describe("BookPage server component", { timeout: 15000 }, () => {
     expect(container.textContent ?? "").not.toContain(
       "A man lives in an endless house of statues.",
     );
+  });
+
+  it("renders the trigger line when book.trigger is set", async () => {
+    const lib = await import("../../src/lib/books");
+    const original = lib.getBookBySlug;
+    (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = async (slug: string) =>
+      slug === "piranesi"
+        ? {
+            book: { ...baseBook, trigger: "Picked it up on a friend's recommendation." },
+            body: "",
+            review: null,
+            quotes: null,
+            hardcover: null,
+            hardcoverReviews: null,
+            kindleStats: null,
+            progress: null,
+          }
+        : null;
+    try {
+      const BookPage = await importPage();
+      const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+      const { container } = render(tree);
+      const text = container.textContent ?? "";
+      expect(text).toContain("why I picked this:");
+      expect(text).toContain("Picked it up on a friend's recommendation.");
+    } finally {
+      (lib as unknown as { getBookBySlug: typeof original }).getBookBySlug = original;
+    }
+  });
+
+  it("omits the trigger line entirely when book.trigger is null", async () => {
+    // baseBook.trigger is null by default — the "why I picked this:"
+    // label must not appear in the DOM.
+    const BookPage = await importPage();
+    const tree = await BookPage({ params: Promise.resolve({ slug: "piranesi" }) });
+    const { container } = render(tree);
+    expect(container.textContent ?? "").not.toContain("why I picked this:");
   });
 
   it("throws NEXT_NOT_FOUND for an unknown slug", async () => {

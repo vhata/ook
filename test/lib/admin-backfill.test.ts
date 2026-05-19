@@ -37,6 +37,7 @@ function book(partial: Partial<Book> & { slug: string; title: string }): Book {
     source: null,
     hideExternalReviews: false,
     pages: null,
+    trigger: null,
     ...partial,
   };
 }

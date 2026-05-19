@@ -363,6 +363,7 @@ describe("externalLinks", () => {
       source: null,
       hideExternalReviews: false,
       pages: null,
+      trigger: null,
       ...overrides,
     };
   }
@@ -430,6 +431,7 @@ describe("bookStuck", () => {
       source: null,
       hideExternalReviews: false,
       pages: null,
+      trigger: null,
       ...overrides,
     };
   }
@@ -946,6 +948,50 @@ describe("premise frontmatter", () => {
   });
 });
 
+describe("trigger frontmatter", () => {
+  it("parses a present `trigger:` value via the walk-fallback path", async () => {
+    const books = await getAllBooks();
+    const test = books.find((b) => b.slug === "TestBook");
+    expect(test?.trigger).toBe("Recommended by a friend over dinner.");
+  });
+
+  it("returns null when `trigger:` is absent from frontmatter", async () => {
+    const books = await getAllBooks();
+    const priv = books.find((b) => b.slug === "PrivateBook");
+    expect(priv?.trigger).toBeNull();
+  });
+
+  it("treats an empty `trigger: ''` or bare `trigger:` as null", async () => {
+    const os = await import("node:os");
+    const fsMod = await import("node:fs/promises");
+    const pathMod = await import("node:path");
+    const tmpRoot = await fsMod.mkdtemp(pathMod.join(os.tmpdir(), "ook-trigger-"));
+    const emptyDir = pathMod.join(tmpRoot, "EmptyTriggerBook");
+    await fsMod.mkdir(emptyDir, { recursive: true });
+    await fsMod.writeFile(
+      pathMod.join(emptyDir, "EmptyTriggerBook.md"),
+      '---\ntitle: Empty\ntrigger: ""\n---\nbody\n',
+    );
+    const blankDir = pathMod.join(tmpRoot, "BlankTriggerBook");
+    await fsMod.mkdir(blankDir, { recursive: true });
+    await fsMod.writeFile(
+      pathMod.join(blankDir, "BlankTriggerBook.md"),
+      "---\ntitle: Blank\ntrigger:\n---\nbody\n",
+    );
+
+    vi.stubEnv("BOOKS_DIR", tmpRoot);
+    try {
+      const empty = await getBookBySlug("EmptyTriggerBook");
+      const blank = await getBookBySlug("BlankTriggerBook");
+      expect(empty?.book.trigger).toBeNull();
+      expect(blank?.book.trigger).toBeNull();
+    } finally {
+      vi.stubEnv("BOOKS_DIR", FIXTURE_VAULT);
+      await fsMod.rm(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("getYearStats — pages-derived fields", () => {
   it("populates longestBook from the Hardcover cache for paged finishes", async () => {
     const stats = await getYearStats(2026);
@@ -1021,6 +1067,7 @@ describe("computeYearPagesTotal", () => {
       source: null,
       hideExternalReviews: false,
       pages: null,
+      trigger: null,
       ...overrides,
     };
   }
@@ -1120,6 +1167,7 @@ describe("computeReadingPace", () => {
       source: null,
       hideExternalReviews: false,
       pages: null,
+      trigger: null,
       ...overrides,
     };
   }
@@ -1222,6 +1270,7 @@ describe("estimateReadingDaysRemaining", () => {
       source: null,
       hideExternalReviews: false,
       pages: null,
+      trigger: null,
       ...overrides,
     };
   }

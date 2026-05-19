@@ -64,6 +64,7 @@ const baseBook: Book = {
   source: "manual",
   hideExternalReviews: false,
   pages: null,
+  trigger: null,
 };
 
 vi.mock("../../src/lib/books", async () => {

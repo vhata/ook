@@ -70,6 +70,14 @@ export type Book = {
   // Hardcover cache also carries a `pages` field per book, but this is
   // the vault-frontmatter projection — single source of truth per book.
   pages: number | null;
+  // What brought the reader to this book — a recommendation, a gift, an
+  // impulse, an obligation, a chase up an author's backlist. Captured
+  // by the admin agent's start-flow prompt at the tbr → reading
+  // transition (one free-text question, skippable). Once per book —
+  // second-reads skip the prompt. Null when never captured or when the
+  // reader skipped the prompt. Rendered as a single subordinate italic
+  // line on the per-book page when present.
+  trigger: string | null;
 };
 
 export type BookSource = "goodreads" | "media-list" | "manual";

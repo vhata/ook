@@ -286,6 +286,7 @@ function defaultBook(slug: string): Book {
     source: null,
     hideExternalReviews: false,
     pages: null,
+    trigger: null,
   };
 }
 
@@ -324,6 +325,8 @@ function projectFrontmatterToBook(
     patch.cover = (fm.cover as string | null) ?? null;
   if (typeof fm.premise === "string" || fm.premise === null)
     patch.premise = (fm.premise as string | null) ?? null;
+  if (typeof fm.trigger === "string" || fm.trigger === null)
+    patch.trigger = (fm.trigger as string | null) ?? null;
   // ... external IDs
   if (typeof fm.goodreads_id === "string" || typeof fm.goodreads_id === "number")
     patch.goodreadsId = String(fm.goodreads_id);

@@ -12,12 +12,11 @@ Sections are grouped by readiness: decided plans first, then open verdicts, defe
 
 Pattern: at certain meaningful moments in the `/admin` flow, the agent asks one (or two, bundled) low-friction questions that draw out the user's voice. **Tenet**: voice > integrations > automation > polish. Capture must never feel like a slog. The user explicitly navigates or commits to these moments; the prompts piggyback on existing flow, never form-fill.
 
-The **finish prompt** (status → finished asks for pullquote + rating in one bundled commit) has shipped. Originally the others below were going to wait on finish-prompt mileage before pulling forward, but finishes don't happen often enough for that to be useful (note 2026-05-15). Voice prompts ship in parallel from here, weighted by trigger frequency in real use:
+The **finish prompt** (status → finished asks for pullquote + rating in one bundled commit) has shipped. The **start prompt** (tbr → reading asks "what brought you to this?" → `trigger:` frontmatter, skipped on second-read) has shipped. The others below are weighted by trigger frequency in real use:
 
-- **More frequent triggers (ship first):** Start prompt (tbr → reading), Quiet → return (any ≥14-day gap), 5-star unreviewed (orthogonal to finishes).
+- **More frequent triggers (ship first):** Quiet → return (any ≥14-day gap), 5-star unreviewed (orthogonal to finishes).
 - **Rarer triggers (ship when scoped):** Reading-streak milestone, Series completion.
 
-- **Start prompt**: status flips tbr → reading. Agent asks "what brought you to this?" — answer goes into a new `trigger:` frontmatter field. Once per book. Skip on second-read. `#agent #voice #prompts`
 - **5-star unreviewed**: when a book is rated 5 and has no review file, agent's NEXT commit-message-prompt opportunistically asks "quick — why was this a five?" — answer seeds `review.md`. One ask per session per book. `#agent #voice #prompts #review`
 - **Reading-streak milestone**: when current streak crosses 10/30/100 days at commit time, agent says "that's a streak. Anything to note about it?" — answer goes to `_meta/log.md` as a Note entry. `#agent #voice #prompts #streak`
 - **Quiet → return**: when there's been no event for ≥14 days and the user comes back to /admin to mark something, agent asks "welcome back — anything interesting in the gap?" — answer to `_meta/log.md`. `#agent #voice #prompts #quiet`
@@ -119,7 +118,6 @@ Use sparingly. Each is a vector that can swallow the project's soul.
 
 Vault-write work, but ook will render whatever lands. Listed here so the renderer knows what's coming.
 
-- **`trigger` field**: what brought you to the book — recommendation, gift, impulse, obligation. Pairs with the deferred Start prompt. `#schema #vault #provenance`
 - **`mood_on_finish`**: single-word emotional state when you closed the cover. Voice-adjacent. `#schema #vault #introspection`
 - **`edition` field**: paperback / hardcover / UK / audio. Affects which cover _should_ render. `#schema #vault #covers`
 - **`reread_count` integer**: increments instead of overwrites when you re-read. Unlocks several stats axes. `#schema #vault #rereads`

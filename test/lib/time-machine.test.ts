@@ -40,6 +40,7 @@ function book(overrides: Partial<Book>): Book {
     source: null,
     hideExternalReviews: false,
     pages: null,
+    trigger: null,
     ...overrides,
   };
 }

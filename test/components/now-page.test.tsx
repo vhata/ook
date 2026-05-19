@@ -48,6 +48,7 @@ const baseBook: Book = {
   source: "manual",
   hideExternalReviews: false,
   pages: null,
+  trigger: null,
 };
 
 const finishedBook: Book = {
