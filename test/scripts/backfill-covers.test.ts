@@ -25,8 +25,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 // @ts-ignore - .mjs script lives outside the TS project graph
 import {
   applyCoverWrite,
+  buildGoogleBooksQueries,
+  coverFromGoogleBooks,
   coverFromOpenLibrary,
+  findOpenLibraryCandidate,
   isCoverPopulated,
+  parseGoogleBooksThumbnail,
+  pickPreferredCoverId,
+  readCoverPreferences,
 } from "../../scripts/backfill-covers.mjs";
 
 const SCRIPT = path.resolve(__dirname, "../../scripts/backfill-covers.mjs");
@@ -176,6 +182,328 @@ describe("coverFromOpenLibrary", () => {
   });
 });
 
+// Shared fetch mock factory used by the new fallback / preference suites.
+function makeMockFetch(
+  map: Record<string, { ok: boolean; len?: number; body?: unknown }>,
+): typeof fetch {
+  return (async (url: string | URL, opts?: { method?: string }) => {
+    const key = String(url);
+    const entry = map[key];
+    void opts;
+    if (!entry) {
+      return {
+        ok: false,
+        headers: { get: () => null },
+        json: async () => ({}),
+      } as unknown as Response;
+    }
+    return {
+      ok: entry.ok,
+      headers: {
+        get: (name: string) =>
+          name.toLowerCase() === "content-length" ? String(entry.len ?? 0) : null,
+      },
+      json: async () => entry.body ?? {},
+    } as unknown as Response;
+  }) as unknown as typeof fetch;
+}
+
+describe("findOpenLibraryCandidate — ISBN13 marginal fallback", () => {
+  it("returns the marginal ISBN13 URL when both ISBN probes are thin AND title+author returns nothing", async () => {
+    // ISBN13 → placeholder-sized response (marginal); ISBN10 also thin;
+    // title+author search returns no docs. Behaviour change: instead of
+    // null, the function reports the ISBN13 URL marked marginal so the
+    // caller can keep it as a last resort.
+    const isbn13Url = "https://covers.openlibrary.org/b/isbn/9780000000000-L.jpg";
+    const isbn10Url = "https://covers.openlibrary.org/b/isbn/0000000001-L.jpg";
+    const search = "https://openlibrary.org/search.json?title=Quiet+Book&limit=5&author=Anon";
+    const fetchImpl = makeMockFetch({
+      [isbn13Url]: { ok: true, len: 800 },
+      [isbn10Url]: { ok: true, len: 700 },
+      [search]: { ok: true, body: { docs: [] } },
+    });
+    const found = await findOpenLibraryCandidate(
+      {
+        isbn13: "9780000000000",
+        isbn: "0000000001",
+        title: "Quiet Book",
+        authors: ["Anon"],
+      },
+      { fetchImpl },
+    );
+    expect(found).toEqual({ url: isbn13Url, marginal: true });
+  });
+
+  it("returns null when the ISBN13 probe missed entirely (no placeholder) and title+author also failed", async () => {
+    // A hard 404 from the covers API is "miss" — not marginal — and
+    // doesn't seed the floor. We only fall back to ISBN13 when there
+    // was at least a placeholder hit anchoring a real edition.
+    const isbn13Url = "https://covers.openlibrary.org/b/isbn/9780000000001-L.jpg";
+    const search = "https://openlibrary.org/search.json?title=Gone&limit=5";
+    const fetchImpl = makeMockFetch({
+      [isbn13Url]: { ok: false },
+      [search]: { ok: true, body: { docs: [] } },
+    });
+    const found = await findOpenLibraryCandidate(
+      { isbn13: "9780000000001", title: "Gone" },
+      { fetchImpl },
+    );
+    expect(found).toBeNull();
+  });
+
+  it("prefers a real title+author match over a marginal ISBN13 candidate", async () => {
+    // Even though ISBN13 returned a marginal candidate, a real cover_i
+    // from the search is the better answer — marginal is a last resort,
+    // not a tie-breaker.
+    const isbn13Url = "https://covers.openlibrary.org/b/isbn/9780000000002-L.jpg";
+    const search = "https://openlibrary.org/search.json?title=Found+Book&limit=5";
+    const fetchImpl = makeMockFetch({
+      [isbn13Url]: { ok: true, len: 600 },
+      [search]: { ok: true, body: { docs: [{ cover_i: 42 }] } },
+    });
+    const found = await findOpenLibraryCandidate(
+      { isbn13: "9780000000002", title: "Found Book" },
+      { fetchImpl },
+    );
+    expect(found).toEqual({
+      url: "https://covers.openlibrary.org/b/id/42-L.jpg",
+      marginal: false,
+    });
+  });
+});
+
+describe("buildGoogleBooksQueries", () => {
+  it("starts with the ISBN13 query when present", () => {
+    const qs = buildGoogleBooksQueries({
+      isbn13: "9780525512189",
+      isbn: "0525512187",
+      title: "Piranesi",
+      authors: ["Susanna Clarke"],
+    });
+    expect(qs[0]).toBe("isbn:9780525512189");
+  });
+
+  it("adds an ISBN10 query when it differs from the ISBN13", () => {
+    const qs = buildGoogleBooksQueries({
+      isbn13: "9780525512189",
+      isbn: "0525512187",
+      title: "Piranesi",
+    });
+    expect(qs).toContain("isbn:9780525512189");
+    expect(qs).toContain("isbn:0525512187");
+  });
+
+  it("falls through to an intitle+inauthor query when ISBNs are missing", () => {
+    const qs = buildGoogleBooksQueries({ title: "Piranesi", authors: ["Susanna Clarke"] });
+    expect(qs).toEqual(["intitle:Piranesi inauthor:Susanna Clarke"]);
+  });
+
+  it("returns an empty list when neither ISBNs nor a title are available", () => {
+    expect(buildGoogleBooksQueries({ authors: ["A"] })).toEqual([]);
+    expect(buildGoogleBooksQueries({})).toEqual([]);
+  });
+});
+
+describe("parseGoogleBooksThumbnail", () => {
+  it("returns the first non-empty thumbnail across items[]", () => {
+    const json = {
+      items: [
+        { volumeInfo: { imageLinks: {} } },
+        {
+          volumeInfo: {
+            imageLinks: {
+              thumbnail: "http://books.google.com/books/content?id=abc&zoom=1",
+            },
+          },
+        },
+      ],
+    };
+    expect(parseGoogleBooksThumbnail(json)).toBe(
+      "http://books.google.com/books/content?id=abc&zoom=1",
+    );
+  });
+
+  it("prefers thumbnail over smallThumbnail when both are present", () => {
+    const json = {
+      items: [
+        {
+          volumeInfo: {
+            imageLinks: {
+              smallThumbnail: "http://small.example/x.jpg",
+              thumbnail: "http://thumb.example/x.jpg",
+            },
+          },
+        },
+      ],
+    };
+    expect(parseGoogleBooksThumbnail(json)).toBe("http://thumb.example/x.jpg");
+  });
+
+  it("falls back to smallThumbnail when only that key is present", () => {
+    const json = {
+      items: [
+        {
+          volumeInfo: {
+            imageLinks: { smallThumbnail: "http://small.example/x.jpg" },
+          },
+        },
+      ],
+    };
+    expect(parseGoogleBooksThumbnail(json)).toBe("http://small.example/x.jpg");
+  });
+
+  it("returns null when items is empty or undefined", () => {
+    expect(parseGoogleBooksThumbnail({})).toBeNull();
+    expect(parseGoogleBooksThumbnail({ items: [] })).toBeNull();
+    expect(parseGoogleBooksThumbnail({ items: [{ volumeInfo: {} }] })).toBeNull();
+  });
+});
+
+describe("coverFromGoogleBooks", () => {
+  it("queries by ISBN13 first, parses the thumbnail, then HEAD-probes for size", async () => {
+    const search =
+      "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780525512189&maxResults=5";
+    const thumb = "http://books.google.com/books/content?id=abc&zoom=1";
+    const fetchImpl = makeMockFetch({
+      [search]: {
+        ok: true,
+        body: { items: [{ volumeInfo: { imageLinks: { thumbnail: thumb } } }] },
+      },
+      [thumb]: { ok: true, len: 30000 },
+    });
+    const out = await coverFromGoogleBooks({ isbn13: "9780525512189", title: "X" }, { fetchImpl });
+    expect(out).toBe(thumb);
+  });
+
+  it("returns null when the thumbnail HEAD-probe says placeholder", async () => {
+    const search =
+      "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780000000005&maxResults=5";
+    const thumb = "http://books.google.com/books/content?id=tiny";
+    const fetchImpl = makeMockFetch({
+      [search]: {
+        ok: true,
+        body: { items: [{ volumeInfo: { imageLinks: { thumbnail: thumb } } }] },
+      },
+      [thumb]: { ok: true, len: 500 },
+    });
+    const out = await coverFromGoogleBooks({ isbn13: "9780000000005" }, { fetchImpl });
+    expect(out).toBeNull();
+  });
+
+  it("falls through ISBN → intitle+inauthor when ISBN returns no items", async () => {
+    const isbnSearch =
+      "https://www.googleapis.com/books/v1/volumes?q=isbn%3A9780000000006&maxResults=5";
+    const titleSearch =
+      "https://www.googleapis.com/books/v1/volumes?q=intitle%3ASample%20inauthor%3AAuthor&maxResults=5";
+    const thumb = "http://books.google.com/books/content?id=ok&zoom=1";
+    const fetchImpl = makeMockFetch({
+      [isbnSearch]: { ok: true, body: { items: [] } },
+      [titleSearch]: {
+        ok: true,
+        body: { items: [{ volumeInfo: { imageLinks: { thumbnail: thumb } } }] },
+      },
+      [thumb]: { ok: true, len: 30000 },
+    });
+    const out = await coverFromGoogleBooks(
+      { isbn13: "9780000000006", title: "Sample", authors: ["Author"] },
+      { fetchImpl },
+    );
+    expect(out).toBe(thumb);
+  });
+});
+
+describe("pickPreferredCoverId — language preference", () => {
+  it("picks the English-language doc when no frontmatter language is set", () => {
+    const docs = [
+      { cover_i: 11, language: ["fre"] },
+      { cover_i: 22, language: ["eng"] },
+      { cover_i: 33, language: ["ger"] },
+    ];
+    expect(pickPreferredCoverId(docs, {})).toBe(22);
+  });
+
+  it("honours an explicit language preference (de)", () => {
+    const docs = [
+      { cover_i: 11, language: ["fre"] },
+      { cover_i: 22, language: ["eng"] },
+      { cover_i: 33, language: ["ger"] },
+    ];
+    expect(pickPreferredCoverId(docs, { language: "de" })).toBe(33);
+  });
+
+  it("falls back to the first candidate when no language matches", () => {
+    const docs = [
+      { cover_i: 11, language: ["fre"] },
+      { cover_i: 22, language: ["spa"] },
+    ];
+    // Default language is English; neither doc matches, so the natural
+    // result is the first candidate — deterministic, not random.
+    expect(pickPreferredCoverId(docs, {})).toBe(11);
+  });
+
+  it("ignores docs that lack a cover_i", () => {
+    const docs = [{ language: ["eng"] }, { cover_i: 99, language: ["fre"] }];
+    expect(pickPreferredCoverId(docs, {})).toBe(99);
+  });
+});
+
+describe("pickPreferredCoverId — region preference", () => {
+  it("biases toward the UK candidate when region=uk", () => {
+    const docs = [
+      { cover_i: 1, language: ["eng"], publish_place: ["New York"] },
+      { cover_i: 2, language: ["eng"], publish_place: ["London"] },
+      { cover_i: 3, language: ["eng"], publish_place: ["Boston"] },
+    ];
+    expect(pickPreferredCoverId(docs, { region: "uk" })).toBe(2);
+  });
+
+  it("biases toward the US candidate when region=us", () => {
+    const docs = [
+      {
+        cover_i: 1,
+        language: ["eng"],
+        publisher: ["Bloomsbury Publishing"],
+        publish_place: ["London"],
+      },
+      { cover_i: 2, language: ["eng"], publisher: ["Scholastic"], publish_place: ["New York"] },
+    ];
+    expect(pickPreferredCoverId(docs, { region: "us" })).toBe(2);
+  });
+
+  it("falls back to language-only ranking when no region tokens match", () => {
+    const docs = [
+      { cover_i: 1, language: ["eng"], publish_place: ["Tokyo"] },
+      { cover_i: 2, language: ["fre"], publish_place: ["Paris"] },
+    ];
+    // region=uk doesn't match either doc; language=en still picks doc 1.
+    expect(pickPreferredCoverId(docs, { region: "uk" })).toBe(1);
+  });
+});
+
+describe("readCoverPreferences", () => {
+  it("returns null language and region when no frontmatter fields are set", () => {
+    const out = readCoverPreferences({});
+    expect(out.language).toBeNull();
+    expect(out.region).toBeNull();
+  });
+
+  it("reads `language:` and `region:` straight from frontmatter when present", () => {
+    const out = readCoverPreferences({ language: "de", region: "UK" });
+    expect(out.language).toBe("de");
+    expect(out.region).toBe("UK");
+  });
+
+  it("infers region from an `edition:` field naming a market", () => {
+    expect(readCoverPreferences({ edition: "UK paperback" }).region).toBe("uk");
+    expect(readCoverPreferences({ edition: "US Hardcover" }).region).toBe("us");
+  });
+
+  it("prefers an explicit `region:` over the `edition:` inference", () => {
+    const out = readCoverPreferences({ region: "AU", edition: "UK paperback" });
+    expect(out.region).toBe("AU");
+  });
+});
+
 describe("backfill-covers integration (cache → frontmatter)", { timeout: 20_000 }, () => {
   let vault: string;
 
@@ -289,7 +617,9 @@ Body.
   function runScript(args: string[], envOverrides?: Record<string, string>) {
     const r = spawnSync(
       process.execPath,
-      [SCRIPT, "--vault", vault, "--no-open-library", ...args],
+      // Disable both external fallbacks so the integration suite stays
+      // network-free regardless of which sources the script supports.
+      [SCRIPT, "--vault", vault, "--no-open-library", "--no-google-books", ...args],
       {
         encoding: "utf8",
         env: { ...process.env, ...(envOverrides ?? {}) },
