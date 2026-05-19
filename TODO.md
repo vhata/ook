@@ -42,7 +42,6 @@ Source notes:
 - **No official Amazon API** for personal or popular Kindle highlights. Bookcision (Readwise's bookmarklet) is the least-fragile option.
 - **Kindle for Mac does NOT write `My Clippings.txt`** — that file only comes from physical Kindle devices. Common misconception.
 
-- **Bookcision/Kindle highlight import (primary path)**: Bookcision bookmarklet emits JSON; user drops it into the vault, importer materialises into per-book `quotes.md`. The operator highlights occasionally — once-per-book manual flow is the right shape. **Sketch:** Bookcision per book → `vault/<book>/kindle-export.json` → `ook import kindle-export`. **Homework:** one-tap per book on Bookcision; the import is automatic from there. `#feature #highlights #kindle`
 - **"I finished X" agent flow**: When user reports finishing, agent says "I see N Kindle clippings for this — drop them into `quotes.md`?" Collapses the favourite-quote question into "here are 12, pick or skip, all saved." **Homework:** one-tap yes/no. `#feature #highlights #agent #completion`
 - **Highlight-driven "currently reading" surfacing**: Show the most-recent highlight on the homepage as a sign-of-life under "currently reading." The highlight IS the status update. **Sketch:** sort imported highlights by date, render the top 1–3 from currently-reading book(s) on the home page. **Homework:** none — passive. `#feature #highlights #homepage`
 

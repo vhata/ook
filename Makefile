@@ -18,7 +18,8 @@
 	vault-hardcover-reviews vault-hardcover-ids vault-covers \
 	vault-premises vault-pages vault-wikiquotes \
 	vault-rename-summary-to-progress vault-import-kindle \
-	vault-import-kindle-sessions vault-backfill-asin vault-backfill-started \
+	vault-import-bookcision vault-import-kindle-sessions \
+	vault-backfill-asin vault-backfill-started \
 	vault-pause-stale-reading vault-import-triage vault-promote-goodreads \
 	vault-hardcover-sync deploy-status deploy-logs
 
@@ -120,6 +121,9 @@ vault-rename-summary-to-progress: ## One-shot vault migration — rename every <
 
 vault-import-kindle: ## Parse a Kindle My Clippings.txt and append matched highlights into per-book quotes.md (FILE=path)
 	@node scripts/import-kindle-clippings.mjs $(if $(FILE),--file "$(FILE)")
+
+vault-import-bookcision: ## Ingest a Bookcision JSON export (FILE=path or DIR=path) and append highlights into per-book quotes.md
+	@node scripts/import-bookcision.mjs $(if $(DIR),--dir "$(DIR)") $(if $(FILE),"$(FILE)")
 
 vault-import-kindle-sessions: ## Ingest an Amazon-takeout reading-session CSV + ownership shards into _meta/kindle-sessions.json (TAKEOUT=path)
 	@node scripts/import-kindle-sessions.mjs $(if $(TAKEOUT),--takeout "$(TAKEOUT)")
