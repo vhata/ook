@@ -82,6 +82,15 @@ function PairingsSection({ pairs }: { pairs: TagPair[] }) {
       <ol className="m-0 list-none space-y-2 p-0">
         {pairs.map((p) => {
           const pct = Math.round((p.count / max) * 100);
+          // Each side of the pair still links to its own /tags/[tag]
+          // (the existing affordance — "see everything tagged X"),
+          // while a third link wrapping the count drills into the
+          // AND-view (`/tags/[a]?and=[b]`) — "see the books in the
+          // overlap". Inline-link register: subtle, inherit text
+          // style. The two halves of the pair label are tag-inks
+          // with no underline; the count-and-bar group carries the
+          // intersection link and a discreet hover treatment so the
+          // drill-in is discoverable without shouting.
           return (
             <li
               key={`${p.tags[0]}|${p.tags[1]}`}
@@ -102,16 +111,24 @@ function PairingsSection({ pairs }: { pairs: TagPair[] }) {
                   {p.tags[1]}
                 </Link>
               </div>
-              <div className="bg-surface-mute relative h-1.5 w-32 overflow-hidden rounded-full">
-                <div
-                  className="bg-accent absolute inset-y-0 left-0"
-                  style={{ width: `${pct}%` }}
-                  aria-hidden="true"
-                />
-              </div>
-              <div className="text-ink-soft min-w-[40px] text-right font-mono text-[11px]">
-                {p.count}
-              </div>
+              <Link
+                href={
+                  `/tags/${encodeURIComponent(p.tags[0])}` + `?and=${encodeURIComponent(p.tags[1])}`
+                }
+                className="group flex items-center gap-3"
+                title={`Books carrying both ${p.tags[0]} and ${p.tags[1]}`}
+              >
+                <div className="bg-surface-mute group-hover:bg-surface-mute relative h-1.5 w-32 overflow-hidden rounded-full">
+                  <div
+                    className="bg-accent-soft group-hover:bg-accent absolute inset-y-0 left-0 transition-colors"
+                    style={{ width: `${pct}%` }}
+                    aria-hidden="true"
+                  />
+                </div>
+                <div className="text-ink-soft group-hover:text-ink min-w-[40px] text-right font-mono text-[11px] underline decoration-dotted underline-offset-[3px]">
+                  {p.count}
+                </div>
+              </Link>
             </li>
           );
         })}

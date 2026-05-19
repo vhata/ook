@@ -62,7 +62,6 @@ Companion rule: inline-link styling stays subtle — links inherit surrounding t
 
 Specific surfaces to audit + fix:
 
-- **Tag co-occurrence pairings.** "Strongest pairings" on `/tags/[tag]` lists pairs but doesn't link to the intersection. Need an `/tags/[tag]+[other-tag]` view (or `/tags/[tag]?and=other-tag`) that lists books carrying both. Boolean AND first; OR later if needed. `#feature #tags #clickable-info`
 - **Inline-link style audit pass.** Sweep every page for inline links that use `text-accent` or heavy underlines and dial them back to "inherit text style, thin underline, accent on hover only". Primary navigation links (controls bar, wordmark, top-of-page back-arrows) stay decorative; everything inline goes subtle. `#polish #design #links`
 
 ### Specific UI gaps from the 2026-05-13 review
