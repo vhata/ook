@@ -53,6 +53,7 @@ const baseBook = (overrides: Partial<Book>): Book => ({
   source: "manual",
   hideExternalReviews: false,
   pages: null,
+  trigger: null,
   ...overrides,
 });
 
