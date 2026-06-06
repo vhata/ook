@@ -92,6 +92,7 @@ Vault-only stats; no external API needed. All extend the existing `/stats/[year]
 Let the site reach beyond the page-view.
 
 - **Email digest, monthly self-mail**: cron + Resend, summary of "what you read, what you said." `#feature #email #digest`
+- **`/api/showcase.json` field extensions** (codified 2026-06-05, after shipping the endpoint). The public showcase feed consumed by vhata.net is an additive contract — new fields are safe to add, renames/removals need coordination with that site. Candidates when vhata asks for them: `currentStreak` (already computed by `getCurrentReadingStreak`, omitted at launch because the consumer didn't request it), a `pullquote`/`mood` line per recently-finished book (voice-tier — surfaces the owner's words on the external site, not just catalog facts), and per-now-reading `daysIn`. Don't pre-build: add a field only when the consuming site has a place to render it, so the contract grows to demand rather than speculation. `#feature #sharing #api #showcase`
 
 ### Capture / input (brainstormed 2026-05-03)
 

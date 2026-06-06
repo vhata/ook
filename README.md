@@ -24,7 +24,7 @@ If you're a reader, you might find some of the shapes interesting. If you're a d
 
 **Series, tags, shelf, discover.** `/series` groups books by series and shows how far through I am, leaning on Hardcover for the canonical roster when one exists. `/tags` is the tag taxonomy with co-occurrences. `/shelf` is every finished book as a bookspine. `/discover` is the most-connected pairs of books in the corpus, scored by shared series / author / tags / cross-references.
 
-**The little things.** A `/now` page suitable for embedding on a personal homepage. Subscribable feeds in Atom and JSON Feed. A printable A4 bibliography per year. Per-book QR codes and shareable postcards. A random-book button. A time-machine view that renders the home page as it would have looked on any past date. Light / dark / auto theme toggle. The accent colour drifts across the year: rust in winter, ochre in spring, slate-blue in summer, forest in autumn.
+**The little things.** A `/now` page suitable for embedding on a personal homepage. A public `/api/showcase.json` feed another site can read server-side to feature my current reading. Subscribable feeds in Atom and JSON Feed. A printable A4 bibliography per year. Per-book QR codes and shareable postcards. A random-book button. A time-machine view that renders the home page as it would have looked on any past date. Light / dark / auto theme toggle. The accent colour drifts across the year: rust in winter, ochre in spring, slate-blue in summer, forest in autumn.
 
 ## Anti-features (deliberately not here)
 
