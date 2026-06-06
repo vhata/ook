@@ -1680,7 +1680,7 @@ export async function getFinishPairs(minOccurrences = 2): Promise<FinishPair[]> 
     const a = finished[i];
     const b = finished[i + 1];
     if (a.slug === b.slug) continue; // same book listed twice (edge)
-    const key = `${a.slug} ${b.slug}`;
+    const key = `${a.slug}\u0000${b.slug}`;
     const existing = tallies.get(key);
     if (existing) {
       existing.count++;
