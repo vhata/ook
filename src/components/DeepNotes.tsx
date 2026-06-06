@@ -80,7 +80,10 @@ export default function DeepNotes({ slug }: Props) {
                 <ol className="my-3 list-decimal space-y-1.5 pl-6">{children}</ol>
               ),
               a: ({ children, ...props }) => (
-                <a className="text-accent underline underline-offset-2" {...props}>
+                <a
+                  className="decoration-rule underline decoration-dotted underline-offset-2 transition-colors hover:text-accent hover:decoration-accent"
+                  {...props}
+                >
                   {children}
                 </a>
               ),

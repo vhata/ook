@@ -32,7 +32,10 @@ export default async function SchemaPage() {
         <p className="font-serif text-ink-soft mt-3 max-w-[640px] text-[17px] italic">
           Every field the renderer reads, how many of the {summary.total} books in the vault carry
           it, and a few sample values. Companion to{" "}
-          <a href="/vault-health" className="text-accent underline underline-offset-2">
+          <a
+            href="/vault-health"
+            className="decoration-rule underline decoration-dotted underline-offset-2 transition-colors hover:text-accent hover:decoration-accent"
+          >
             /vault-health
           </a>
           : that page shows what&rsquo;s missing per book; this one shows the schema as a whole.

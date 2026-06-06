@@ -58,8 +58,6 @@ Companion rule: inline-link styling stays subtle — links inherit surrounding t
 
 Specific surfaces to audit + fix:
 
-- **Inline-link style audit pass.** Sweep every page for inline links that use `text-accent` or heavy underlines and dial them back to "inherit text style, thin underline, accent on hover only". Primary navigation links (controls bar, wordmark, top-of-page back-arrows) stay decorative; everything inline goes subtle. `#polish #design #links`
-
 ### Specific UI gaps from the 2026-05-13 review
 
 - **/discover regional-pair ignore toggle.** Clickable-info on `/discover` is otherwise done — book titles link to their pages, and the shared-tag / shared-series / shared-author badges each drill into their filtered view (`/tags/[tag]`, `/series#…`, `/authors/[author]`). Two things remain: (a) the "Same book, different markets" regional-title rows still have no operator action — add an "ignore this pair from now on" affordance that writes to a `_meta/discover-ignored.json` cache (through the `/admin` write surface, per the owner-affordance discipline) so the page stops surfacing it; (b) the see-also "linked both ways" badge stays unlinked by design (both books already link from the row) — revisit only if a see-also filtered view ever earns its keep. `#feature #discover #clickable-info`
