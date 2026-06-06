@@ -19,7 +19,7 @@
 	vault-premises vault-pages vault-wikiquotes \
 	vault-rename-summary-to-progress vault-import-kindle \
 	vault-import-bookcision vault-import-kindle-sessions \
-	vault-backfill-asin vault-backfill-started \
+	vault-backfill-asin vault-backfill-started vault-backfill-finished \
 	vault-pause-stale-reading vault-import-triage vault-promote-goodreads \
 	vault-hardcover-sync deploy-status deploy-logs
 
@@ -133,6 +133,9 @@ vault-backfill-asin: ## Stamp amazon_asin: frontmatter on vault books that match
 
 vault-backfill-started: ## Stamp `started:` frontmatter from each ASIN's first Kindle session timestamp (never overrides an existing value)
 	@node scripts/backfill-started-from-sessions.mjs
+
+vault-backfill-finished: ## Stamp `finished:` from each ASIN's last Kindle session, guarded to within N days of started: (GUARD_DAYS=N; default 90)
+	@node scripts/backfill-finished-from-sessions.mjs $(if $(GUARD_DAYS),--guard-days $(GUARD_DAYS))
 
 vault-pause-stale-reading: ## Demote stale status:reading books to status:paused (THRESHOLD_DAYS=N to override the 90-day default)
 	@node scripts/pause-stale-reading.mjs $(if $(THRESHOLD_DAYS),--threshold-days $(THRESHOLD_DAYS))
