@@ -6,6 +6,7 @@ import { join, dirname } from "node:path";
 import {
   FINISH_FLOW_INSTRUCTION_MARKER,
   START_FLOW_INSTRUCTION_MARKER,
+  QUIET_RETURN_INSTRUCTION_MARKER,
   shouldAskStartTrigger,
 } from "../../src/lib/admin/agent";
 
@@ -145,5 +146,57 @@ describe("shouldAskStartTrigger", () => {
 
   it("handles missing fields the same as null", () => {
     expect(shouldAskStartTrigger({})).toBe(true);
+  });
+});
+
+// Quiet-return rule pinning. Mirrors the finish/start shape — the
+// prompt lives in natural language (the tool layer doesn't enforce the
+// gate, the agent does), so a refactor that strips the block would
+// silently regress the voice prompt that fires after a long quiet gap.
+//
+// MANUAL VERIFICATION RECIPE (until a transport mock lands):
+//   1. npm run dev
+//   2. Open /admin, sign in via passkey.
+//   3. With no corpus event in the last ≥ 14 days, type any ordinary
+//      update ("mark <book> as reading").
+//   4. The agent does the action AND adds one plain-text aside —
+//      "welcome back — anything interesting in the gap?" — bundling any
+//      answer as a Note append-bullet on `_meta/log.md` in the SAME
+//      propose_patch.
+//   5. Replying "skip" / "no" / nothing still lands the action, no log
+//      entry. The action is NEVER blocked on the question.
+describe("admin agent — quiet-return system-prompt pin", () => {
+  const source = readFileSync(AGENT_PATH, "utf8");
+
+  it("exports the marker constant", () => {
+    expect(QUIET_RETURN_INSTRUCTION_MARKER).toBe("Quiet-return rule (load-bearing):");
+  });
+
+  it("includes the quiet-return rule header in the system prompt", () => {
+    expect(source).toContain(QUIET_RETURN_INSTRUCTION_MARKER);
+  });
+
+  it("ties the prompt to a long quiet gap with no recent events", () => {
+    const lc = source.toLowerCase();
+    expect(lc).toMatch(/14 days|fourteen days|two weeks/);
+    expect(lc).toMatch(/welcome back|anything interesting|in the gap/);
+  });
+
+  it("instructs the agent to write the answer to _meta/log.md as a Note", () => {
+    const lc = source.toLowerCase();
+    expect(lc).toContain("_meta/log.md");
+    expect(lc).toContain("note");
+    // The Note rides as an append-bullet meta-patch, not a book patch.
+    expect(lc).toContain("append-bullet");
+  });
+
+  it("instructs the agent to never block the user's actual action on the question", () => {
+    const lc = source.toLowerCase();
+    expect(lc).toMatch(/never block|do not block|still (commit|land)|piggyback/);
+  });
+
+  it("instructs the agent to make the question skippable", () => {
+    const lc = source.toLowerCase();
+    expect(lc).toMatch(/skip|skippable|silence/);
   });
 });

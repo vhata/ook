@@ -1,4 +1,5 @@
 import { runAgent, type AgentState } from "@/lib/admin/agent";
+import { getCorpusLastEventDate, shouldAskQuietReturn } from "@/lib/admin/quiet-return";
 
 // POST /api/admin/agent — body: {userText, priorState?}.
 // Returns AgentResult: either {kind: "needs-clarification", ...} or
@@ -63,12 +64,23 @@ export async function POST(req: Request): Promise<Response> {
     priorState = body.priorState;
   }
 
+  // On the first turn only, decide whether to piggyback the quiet-return
+  // question: a corpus-wide reading gap of > 14 days since the last event.
+  // Follow-up turns (priorState present) inherit the decision from turn 1
+  // via the conversation, so we don't re-evaluate it here.
+  let quietReturn = false;
+  if (!priorState) {
+    const lastEventDate = await getCorpusLastEventDate();
+    quietReturn = shouldAskQuietReturn({ lastEventDate, today: new Date() });
+  }
+
   try {
     const result = await runAgent({
       userText: body.userText,
       apiKey,
       model: process.env.ANTHROPIC_MODEL,
       priorState,
+      quietReturn,
     });
     return Response.json(result);
   } catch (e) {

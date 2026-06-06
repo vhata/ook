@@ -5,19 +5,30 @@ import { listBingo, listBooks } from "../mcp/tools";
 import { commitPatchInputSchema } from "../mcp/patch";
 import { listBingoInputSchema, listBooksInputSchema } from "../mcp/tools";
 import { getBookInputSchema } from "../mcp/book-tools";
-import { createFilePatchSchema, removeFilePatchSchema, type MetaPatch } from "../mcp/meta-patch";
+import {
+  appendBulletPatchSchema,
+  createFilePatchSchema,
+  removeFilePatchSchema,
+  type MetaPatch,
+} from "../mcp/meta-patch";
 import { parseBookIds } from "../url-id-detect";
 import { z } from "zod";
 
 // Validation for the `propose_patch` tool input. Mirrors
-// `commitPatchInputSchema` with an optional `meta_patches` field — the
-// only kinds the agent is permitted to stage are `create-file` and
-// `remove-file`, used together for the progress-archive dance on
-// finish. (The book-patch lane covers everything else; bullet edits
-// are out of scope for this surface.)
+// `commitPatchInputSchema` with an optional `meta_patches` field. The
+// kinds the agent is permitted to stage are `create-file` and
+// `remove-file` (the progress-archive dance on finish) plus
+// `append-bullet` (the quiet-return Note that rides on `_meta/log.md`).
+// The book-patch lane covers everything else.
 const proposedPatchSchema = commitPatchInputSchema.extend({
   meta_patches: z
-    .array(z.discriminatedUnion("kind", [createFilePatchSchema, removeFilePatchSchema]))
+    .array(
+      z.discriminatedUnion("kind", [
+        createFilePatchSchema,
+        removeFilePatchSchema,
+        appendBulletPatchSchema,
+      ]),
+    )
     .optional(),
 });
 
@@ -78,6 +89,15 @@ Override: if the user clearly indicates in their initial free-text that they wan
 
 The start-flow gate only fires at the tbr → reading transition. A book already at status: reading (or any other non-tbr status) gets a plain propose_patch when the user edits something on it; no trigger question.
 
+Quiet-return rule (load-bearing):
+The system tells you, in a "(context: …)" parenthetical appended to the user's message, when the user is returning after a long quiet stretch — no reading event anywhere in the corpus for 14 days or more. ONLY when that quiet-return context is present, piggyback ONE plain-text aside on whatever action the user came to do: "welcome back — anything interesting in the gap?"
+
+This NEVER blocks or delays the user's actual action. Do the action they asked for exactly as you normally would. The aside rides alongside it:
+- If the user's reply (this turn or the next) contains a genuine note about the gap, bundle it into the SAME propose_patch as the action, as a meta_patches entry of kind "append-bullet" targeting \`_meta/log.md\`: { kind: "append-bullet", path: "_meta/log.md", section: "<today's date YYYY-MM-DD>", bullet: "**Note** — <the user's note, verbatim>" }. The \`_meta/log.md\` file is a reading log of dated H2 headings; append-bullet slots the bullet under today's date heading (creating it if absent).
+- If the user replies "skip", "no", "nothing", or simply doesn't answer, commit the action WITHOUT any log entry. Do not nag, do not ask twice. Silence is a clean skip.
+
+Only fire this aside once per return — never on a routine same-day follow-up where the quiet-return context is absent. If the action is itself a finish or a start, the finish/start gate takes precedence for the action; the quiet-return Note can still ride along when the user volunteers one.
+
 Progress-archive rule (rides on the finish flow):
 When the patch flips a book to status: finished AND the book has a progress.md file (get_book frontmatter shows hasProgress: true), the same propose_patch must also archive that file. The dance:
   1. On get_book for the finish flip, also fetch sections: ["progress"] so you have the file's current content.
@@ -110,6 +130,20 @@ export const FINISH_FLOW_INSTRUCTION_MARKER = "Finish-flow rule (load-bearing):"
 // enforce the gate, the agent does), so a refactor that strips the
 // block would silently regress the voice prompt.
 export const START_FLOW_INSTRUCTION_MARKER = "Start-flow rule (load-bearing):";
+
+// Same pinning treatment for the quiet-return rule. The "welcome back —
+// anything interesting in the gap?" aside fires only when the caller
+// flags a ≥ 14-day quiet stretch in the message context; the aside and
+// its append-bullet-to-`_meta/log.md` answer live in natural language,
+// so a refactor that strips the block would silently regress the voice
+// prompt.
+export const QUIET_RETURN_INSTRUCTION_MARKER = "Quiet-return rule (load-bearing):";
+
+// The parenthetical `runAgent` appends to the first-turn message when
+// the caller flags a quiet return. The quiet-return rule in the system
+// prompt keys off this exact "(context: …)" shape.
+export const QUIET_RETURN_CONTEXT_NOTE =
+  "(context: the user is returning after a quiet stretch — no reading event in the corpus for 14 days or more. Apply the quiet-return rule.)";
 
 // Pure helper: decides whether the start-flow trigger question should
 // fire for a tbr → reading flip on this book. Returns false when the
@@ -231,13 +265,15 @@ const TOOL_DEFINITIONS: AnthropicTool[] = [
         meta_patches: {
           type: "array",
           description:
-            "Optional non-book-reference file operations applied in the same commit. Each entry is { kind, ...fields }. Supported kinds: 'create-file' { kind, path, content } — writes a brand-new file; refuses if path already exists. 'remove-file' { kind, path } — deletes an existing file. Used together for the progress-archive dance on finish (create-file the archive, remove-file the source).",
+            "Optional non-book-reference file operations applied in the same commit. Each entry is { kind, ...fields }. Supported kinds: 'create-file' { kind, path, content } — writes a brand-new file; refuses if path already exists. 'remove-file' { kind, path } — deletes an existing file. Used together for the progress-archive dance on finish (create-file the archive, remove-file the source). 'append-bullet' { kind, path, section, bullet } — appends a bullet under an H2 heading in a markdown file, creating the heading when absent. Used for the quiet-return Note on _meta/log.md (section = today's date, bullet = \"**Note** — <text>\").",
           items: {
             type: "object",
             properties: {
-              kind: { type: "string", enum: ["create-file", "remove-file"] },
+              kind: { type: "string", enum: ["create-file", "remove-file", "append-bullet"] },
               path: { type: "string" },
               content: { type: "string" },
+              section: { type: "string" },
+              bullet: { type: "string" },
             },
             required: ["kind", "path"],
           },
@@ -305,6 +341,14 @@ export async function runAgent(opts: {
   // get a reply, and proceed (e.g. the finish-flow pullquote+rating
   // gate).
   priorState?: AgentState;
+  // When true, the caller has determined (via shouldAskQuietReturn) that
+  // the corpus has had no reading event for ≥ 14 days and this is a
+  // returning visit. We append a "(context: …)" parenthetical to the
+  // first-turn message so the quiet-return rule in the system prompt
+  // fires its one piggybacked "anything interesting in the gap?" aside.
+  // Only honoured on the initial turn — follow-ups already carry it in
+  // priorState.
+  quietReturn?: boolean;
 }): Promise<AgentResult> {
   const client = new Anthropic({ apiKey: opts.apiKey });
   const model = opts.model ?? "claude-opus-4-7";
@@ -316,7 +360,12 @@ export async function runAgent(opts: {
   // dedicated tool call for what's a pure-regex job, and the parsed
   // IDs ride into the conversation as plain context for the model
   // to act on (or ignore).
-  const enrichedUserText = enrichWithUrlIds(opts.userText);
+  // Append the quiet-return context parenthetical on the first turn only
+  // (follow-ups replay it via priorState). The system prompt's
+  // quiet-return rule keys off this marker.
+  const baseText = enrichWithUrlIds(opts.userText);
+  const enrichedUserText =
+    opts.quietReturn && !opts.priorState ? `${baseText}\n\n${QUIET_RETURN_CONTEXT_NOTE}` : baseText;
 
   // Conversation log surfaced to the client so the user can see what
   // the agent did to arrive at the proposed patch.
