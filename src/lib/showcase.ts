@@ -42,11 +42,24 @@ export type ShowcaseFinished = {
   finishedOn: string | null;
 };
 
+export type ShowcaseBingoSquare = {
+  title: string;
+  author: string;
+  done: boolean;
+};
+
 export type ShowcaseBingo = {
   year: number;
   filled: number;
   total: number;
   url: string;
+  // One entry per fillable square (the free centre excluded), in the
+  // card's reading order — left-to-right, top-to-bottom. `squares.length`
+  // equals `total`, and the count of `done: true` equals `filled`. ook's
+  // squares are designated books, so each carries the book's title +
+  // author rather than a challenge-prompt theme; the consumer decides how
+  // to present them.
+  squares: ShowcaseBingoSquare[];
 };
 
 export type Showcase = {
@@ -111,12 +124,21 @@ export function buildShowcase(input: ShowcaseInput): Showcase {
   // Bingo progress mirrors the home page exactly: the free square counts
   // toward neither the numerator nor the denominator. Done-ness is derived
   // from the bound book's status upstream in `getBingo`.
+  const fillable = bingo ? bingo.squares.filter((s) => !s.free) : [];
   const bingoOut: ShowcaseBingo | null = bingo
     ? {
         year: bingo.year,
-        filled: bingo.squares.filter((s) => s.done && !s.free).length,
-        total: bingo.squares.filter((s) => !s.free).length,
+        filled: fillable.filter((s) => s.done).length,
+        total: fillable.length,
         url: `${siteUrl}/#bingo`,
+        // Reading order is preserved from the card; the free centre is
+        // already filtered out above. `title`/`author` come from the
+        // square's designated book (null title/empty authors → "").
+        squares: fillable.map((s) => ({
+          title: s.title ?? "",
+          author: authorString(s.authors),
+          done: s.done,
+        })),
       }
     : null;
 

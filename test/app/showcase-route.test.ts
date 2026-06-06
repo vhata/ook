@@ -19,7 +19,16 @@ const fixture: Showcase = {
     },
   ],
   recentlyFinished: [],
-  bingo: { year: 2026, filled: 3, total: 25, url: "https://b-ook.vercel.app/#bingo" },
+  bingo: {
+    year: 2026,
+    filled: 1,
+    total: 2,
+    url: "https://b-ook.vercel.app/#bingo",
+    squares: [
+      { title: "Ra", author: "qntm", done: true },
+      { title: "Piranesi", author: "Susanna Clarke", done: false },
+    ],
+  },
   stats: { booksThisYear: 12 },
   siteUrl: "https://b-ook.vercel.app",
 };

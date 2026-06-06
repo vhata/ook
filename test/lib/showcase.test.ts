@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildShowcase } from "../../src/lib/showcase";
-import type { BingoCard, Book } from "../../src/lib/types";
+import type { BingoCard, BingoSquare, Book } from "../../src/lib/types";
 
 // `buildShowcase` is the pure transform behind the public
 // `GET /api/showcase.json` endpoint that vhata.net consumes server-side.
@@ -207,52 +207,69 @@ describe("buildShowcase — recentlyFinished", () => {
 });
 
 describe("buildShowcase — bingo", () => {
-  it("summarises filled/total excluding the free square, with an absolute url", () => {
+  const sq = (over: Partial<BingoSquare> & { id: string }): BingoSquare => ({
+    title: null,
+    authors: [],
+    book: null,
+    cover: null,
+    done: false,
+    reading: false,
+    free: false,
+    ...over,
+  });
+
+  it("summarises filled/total and emits a {title, author, done} square per fillable cell", () => {
     const out = buildShowcase({
       ...EMPTY,
       bingo: bingo({
         year: 2026,
         freeSquare: "center",
         squares: [
-          {
-            id: "1",
-            title: null,
-            authors: [],
-            book: "x",
-            cover: null,
-            done: true,
-            reading: false,
-            free: false,
-          },
-          {
-            id: "2",
-            title: null,
-            authors: [],
-            book: "y",
-            cover: null,
-            done: false,
-            reading: true,
-            free: false,
-          },
-          {
-            id: "f",
-            title: null,
-            authors: [],
-            book: null,
-            cover: null,
-            done: false,
-            reading: false,
-            free: true,
-          },
+          sq({ id: "a1", title: "Ra", authors: ["qntm"], book: "Ra", done: true }),
+          sq({ id: "a2", title: "Piranesi", authors: ["Susanna Clarke"], reading: true }),
+          sq({ id: "free", free: true }),
+          sq({ id: "a3", title: "Good Omens", authors: ["Terry Pratchett", "Neil Gaiman"] }),
         ],
       }),
     });
     expect(out.bingo).toEqual({
       year: 2026,
       filled: 1,
-      total: 2,
+      total: 3,
       url: `${SITE}/#bingo`,
+      squares: [
+        { title: "Ra", author: "qntm", done: true },
+        { title: "Piranesi", author: "Susanna Clarke", done: false },
+        { title: "Good Omens", author: "Terry Pratchett, Neil Gaiman", done: false },
+      ],
     });
+  });
+
+  it("excludes the free centre, preserves reading order, and keeps filled = done count", () => {
+    const out = buildShowcase({
+      ...EMPTY,
+      bingo: bingo({
+        year: 2026,
+        freeSquare: "center",
+        squares: [
+          sq({ id: "a1", title: "One", done: true }),
+          sq({ id: "a2", title: "Two" }),
+          sq({ id: "c3", free: true }),
+          sq({ id: "a3", title: "Three", done: true }),
+        ],
+      }),
+    });
+    expect(out.bingo?.squares.map((s) => s.title)).toEqual(["One", "Two", "Three"]);
+    expect(out.bingo?.squares).toHaveLength(out.bingo!.total);
+    expect(out.bingo?.squares.filter((s) => s.done)).toHaveLength(out.bingo!.filled);
+  });
+
+  it("renders a missing title/author as empty strings", () => {
+    const out = buildShowcase({
+      ...EMPTY,
+      bingo: bingo({ year: 2026, freeSquare: null, squares: [sq({ id: "a1" })] }),
+    });
+    expect(out.bingo?.squares).toEqual([{ title: "", author: "", done: false }]);
   });
 
   it("is null when no card exists", () => {
