@@ -35,9 +35,9 @@ describe("BingoCellEl READ stamp", () => {
     const { container } = render(<BingoCellEl square={makeSquare({ done: true })} />);
     const stamp = container.querySelector("[data-testid='bingo-read-stamp']");
     expect(stamp).toBeTruthy();
-    // The stamp says READ in small caps (uppercase via Tailwind) and
-    // carries an accessible label.
-    expect(stamp?.textContent?.toLowerCase()).toContain("read");
+    // The done marker is a gold star medallion: a filled star glyph with
+    // an accessible "read" label (the visual carries no text word).
+    expect(stamp?.textContent).toContain("★");
     expect(stamp?.getAttribute("aria-label")).toBe("read");
   });
 

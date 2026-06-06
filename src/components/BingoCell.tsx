@@ -6,10 +6,11 @@ import type { BingoSquare } from "@/lib/types";
 // cell does not. The free square is a special-cased typographic tile.
 //
 // State markers on the corners:
-//   done    — a small postal-stamp "READ" chip, top-right. Echoes the
-//             Stamp component's visual language (accent border, small
-//             caps, paper-and-ink) at chip scale. Reads as a quiet
-//             celebration; the cover image stays visible underneath.
+//   done    — a gold star medallion, top-right: a filled star in a round
+//             gold seal, ringed in the page surface colour so it reads as
+//             a sticker lifted off the cover. Sized to be obvious when
+//             scanning the whole grid for read squares; the cover image
+//             stays visible underneath.
 //   reading — a "now" pill, top-right, plus an accent ring around the
 //             whole cell. Drives the eye in a way the cover-dim alone
 //             couldn't.
@@ -78,24 +79,23 @@ export function BingoCellEl({ square }: { square: BingoSquare }) {
   );
 }
 
-// Postal-stamp READ chip. Sits in the top-right corner of a done bingo
-// cell. Accent-bordered rectangle, accent ink, small-caps READ with a
-// star flourish — same visual idiom as the larger Stamp component used
-// on per-book pages, sized down to fit a bingo corner without
-// obscuring the cover. The slight backdrop-blur softens the cover
-// behind it so the text stays legible against busy covers without an
-// opaque overlay.
+// Gold star medallion marking a read square. A filled star glyph sits in a
+// round gold seal (`bg-star`) in the top-right corner of a done cell. The
+// star takes the page surface colour so it stays high-contrast against the
+// gold in both light and dark themes; a surface-colour ring plus a drop
+// shadow lift the medallion off the cover so it reads as a sticker rather
+// than a flat overlay. Deliberately large — the previous chip-scale marker
+// was easy to miss when scanning the grid for which books are read.
 function ReadStamp() {
   return (
     <div
-      className="border-accent bg-surface/85 text-accent absolute top-1 right-1 flex items-center gap-0.5 rounded-sm border px-1 py-[1px] text-[7px] font-semibold tracking-[0.18em] uppercase shadow-[0_1px_2px_rgba(0,0,0,0.15)] backdrop-blur-[1px]"
+      className="bg-star text-surface ring-surface absolute top-1 right-1 flex h-20 w-20 items-center justify-center rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.4)] ring-2"
       aria-label="read"
       data-testid="bingo-read-stamp"
     >
-      <span aria-hidden="true" className="text-star text-[8px] leading-none">
+      <span aria-hidden="true" className="text-[42px] leading-none">
         ★
       </span>
-      <span className="leading-none">Read</span>
     </div>
   );
 }
