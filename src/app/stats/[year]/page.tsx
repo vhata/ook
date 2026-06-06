@@ -156,6 +156,7 @@ export default async function StatsYearPage({ params }: { params: Params }) {
                   key: a.author,
                   label: a.author,
                   count: a.count,
+                  href: `/authors/${encodeURIComponent(a.author)}`,
                   tooltip: titlesTooltip(authorToBooks.get(a.author) ?? []),
                 }))}
               />

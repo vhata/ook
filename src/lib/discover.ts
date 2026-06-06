@@ -25,6 +25,33 @@ export function formatScoreBreakdown(reasons: ConnectionReason[], score: number)
   return `${parts.join(" + ")} = ${score}`;
 }
 
+// Drill-in href for a connection reason chip on /discover, or null when
+// the reason has no filtered view to point at. Tag → the tag page; series
+// → the series anchor on /series; author → the per-author page, but ONLY
+// when a single author is shared — a co-authored pair (detail is the
+// comma-joined author list, e.g. "Terry Pratchett, Stephen Baxter") has no
+// single valid /authors target, so it stays unlinked. see-also reasons
+// have no filtered view (both books already link from the row) → null.
+export function connectionReasonHref(reason: ConnectionReason): string | null {
+  if (reason.kind === "tag" && reason.detail) {
+    return `/tags/${encodeURIComponent(reason.detail)}`;
+  }
+  if (reason.kind === "series" && reason.detail) {
+    return `/series#series-${slugifySeriesName(reason.detail)}`;
+  }
+  if (reason.kind === "author" && reason.detail && !reason.detail.includes(", ")) {
+    return `/authors/${encodeURIComponent(reason.detail)}`;
+  }
+  return null;
+}
+
+function slugifySeriesName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 // Normalise a title for similarity comparison: lowercase, drop
 // punctuation, collapse whitespace. Possessive `'s` is folded into the
 // preceding word (so "Philosopher's" and "Sorcerers" share their tail

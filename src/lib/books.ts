@@ -4,6 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { cache } from "react";
 import matter from "gray-matter";
+import { booksByAuthor } from "./authors";
 import { dedupeRegionalTitles } from "./discover";
 import { effectiveStatus } from "./status";
 import type {
@@ -1349,6 +1350,10 @@ export async function getBooksByTag(tag: string): Promise<Book[]> {
       if (ad && bd && ad !== bd) return bd.localeCompare(ad);
       return a.title.localeCompare(b.title);
     });
+}
+
+export async function getBooksByAuthor(author: string): Promise<Book[]> {
+  return booksByAuthor(await getAllBooks(), author);
 }
 
 // Score the similarity between two books from vault data alone. Reasons

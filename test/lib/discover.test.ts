@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   formatScoreBreakdown,
+  connectionReasonHref,
   titleSimilarity,
   isRegionalTitlePair,
   dedupeRegionalTitles,
@@ -219,5 +220,44 @@ describe("dedupeRegionalTitles", () => {
     );
     const result = dedupeRegionalTitles([c], new Map());
     expect(result[0].sameBook).toBeUndefined();
+  });
+});
+
+describe("connectionReasonHref", () => {
+  const reason = (kind: ConnectionReason["kind"], detail: string): ConnectionReason => ({
+    kind,
+    detail,
+    points: 1,
+  });
+
+  it("links a tag reason to its tag page", () => {
+    expect(connectionReasonHref(reason("tag", "space opera"))).toBe("/tags/space%20opera");
+  });
+
+  it("links a series reason to its anchor on /series", () => {
+    expect(connectionReasonHref(reason("series", "The Long Earth"))).toBe(
+      "/series#series-the-long-earth",
+    );
+  });
+
+  it("links a single-author reason to the per-author page", () => {
+    expect(connectionReasonHref(reason("author", "Brandon Sanderson"))).toBe(
+      "/authors/Brandon%20Sanderson",
+    );
+  });
+
+  it("does NOT link a co-authored (multi-author) reason — no single valid target", () => {
+    // detail is the comma-joined shared-author list; there's no
+    // /authors/<both> page, so it must stay unlinked rather than 404.
+    expect(connectionReasonHref(reason("author", "Terry Pratchett, Stephen Baxter"))).toBeNull();
+  });
+
+  it("does not link a see-also reason", () => {
+    expect(connectionReasonHref(reason("see-also", "linked both ways"))).toBeNull();
+  });
+
+  it("returns null when a linkable kind has an empty detail", () => {
+    expect(connectionReasonHref(reason("tag", ""))).toBeNull();
+    expect(connectionReasonHref(reason("author", ""))).toBeNull();
   });
 });

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Cover } from "@/components/Cover";
 import { HomeMark } from "@/components/HomeMark";
 import { getConnections } from "@/lib/books";
-import { formatScoreBreakdown } from "@/lib/discover";
+import { connectionReasonHref, formatScoreBreakdown } from "@/lib/discover";
 import type { Connection, ConnectionReason } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -124,7 +124,7 @@ function ReasonChip({ reason }: { reason: ConnectionReason }) {
       )}
     </>
   );
-  const href = chipHref(reason);
+  const href = connectionReasonHref(reason);
   if (href) {
     return (
       <Link href={href} className={className}>
@@ -132,27 +132,5 @@ function ReasonChip({ reason }: { reason: ConnectionReason }) {
       </Link>
     );
   }
-  const titleAttr = reason.kind === "author" ? "No per-author page yet" : undefined;
-  return (
-    <span className={className} title={titleAttr}>
-      {inner}
-    </span>
-  );
-}
-
-function chipHref(reason: ConnectionReason): string | null {
-  if (reason.kind === "tag" && reason.detail) {
-    return `/tags/${encodeURIComponent(reason.detail)}`;
-  }
-  if (reason.kind === "series" && reason.detail) {
-    return `/series#series-${slugifySeriesName(reason.detail)}`;
-  }
-  return null;
-}
-
-function slugifySeriesName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+  return <span className={className}>{inner}</span>;
 }
