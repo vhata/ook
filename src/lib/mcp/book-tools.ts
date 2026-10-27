@@ -327,6 +327,13 @@ function projectFrontmatterToBook(
     patch.premise = (fm.premise as string | null) ?? null;
   if (typeof fm.trigger === "string" || fm.trigger === null)
     patch.trigger = (fm.trigger as string | null) ?? null;
+  // This is the complete post-patch frontmatter, so an absent pullquote
+  // means it was removed. Reflect that immediately, before reindexing.
+  const quote = fm.pullquote as Record<string, unknown> | undefined;
+  patch.pullquote =
+    quote && typeof quote.text === "string" && quote.text
+      ? { text: quote.text, source: typeof quote.source === "string" ? quote.source : null }
+      : null;
   // ... external IDs
   if (typeof fm.goodreads_id === "string" || typeof fm.goodreads_id === "number")
     patch.goodreadsId = String(fm.goodreads_id);

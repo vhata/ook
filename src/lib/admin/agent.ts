@@ -109,12 +109,12 @@ If hasProgress is false, skip the archive dance — there's nothing to archive.
 This rule applies ONLY at the initial status → finished transition. For books that are already finished and the user is editing something else, leave any existing progress.md untouched.
 
 Schema notes:
-- Frontmatter scalars: string, number, boolean, string array, or null (null deletes the key).
+- Frontmatter values: string, number, boolean, string array, or null (null deletes the key). The pullquote field additionally accepts the structured object described below; other fields do not accept objects.
 - Section actions: replace, append, prepend.
 - Special section names "progress", "review", "quotes" map to top-level files (replace overwrites the file). Other names are H2 blocks in the reference notes. The "progress" file is the running-notes scratchpad the reader writes while reading; it's archived to _meta/progress-archive/<slug>.md on finish.
 - Status values: tbr, reading, finished, abandoned, paused.
 - Dates: ISO YYYY-MM-DD.
-- Pullquote lives in frontmatter as \`pullquote: "..."\` (string). Rating lives as \`rating: N\` (integer 1-5).
+- Pullquote lives in frontmatter as \`pullquote: { text: "...", source: null }\`. Always propose that object shape, replacing null with a chapter/page string when the source is known. Rating lives as \`rating: N\` (integer 1-5).
 - Premise (\`premise:\`) is the tier-0 back-cover blurb. Operator-populated from the Hardcover description cache via \`scripts/backfill-premises.mjs\` — the agent does NOT write it. If the user explicitly asks to overwrite a premise (rare), proceed; otherwise leave it alone.
 - Trigger (\`trigger:\`) is a short free-text string — what brought the reader to the book. Captured at the tbr → reading transition by the start-flow rule above. Single-line; whatever the reader typed, verbatim. Optional — absent on books where the reader skipped the prompt.
 
@@ -242,8 +242,32 @@ const TOOL_DEFINITIONS: AnthropicTool[] = [
         frontmatter_changes: {
           type: "object",
           description:
-            "Key→value object. Values: string, number, boolean, string array, or null (null deletes the key). Anything else is rejected.",
-          additionalProperties: true,
+            "Key→value object. Values: string, number, boolean, string array, or null (null deletes the key). Only pullquote accepts an object: {text, source} with source null when unknown.",
+          properties: {
+            pullquote: {
+              anyOf: [
+                {
+                  type: "object",
+                  properties: {
+                    text: { type: "string", minLength: 1 },
+                    source: { type: ["string", "null"] },
+                  },
+                  required: ["text"],
+                  additionalProperties: false,
+                },
+                { type: "null" },
+              ],
+            },
+          },
+          additionalProperties: {
+            anyOf: [
+              { type: "string" },
+              { type: "number" },
+              { type: "boolean" },
+              { type: "array", items: { type: "string" } },
+              { type: "null" },
+            ],
+          },
         },
         section_changes: {
           type: "object",

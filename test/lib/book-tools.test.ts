@@ -6,6 +6,7 @@ import path from "node:path";
 import { commitPatch, getBook } from "../../src/lib/mcp/book-tools";
 import { reindex } from "../../src/lib/store/index-vault";
 import { MemoryStore, setStore } from "../../src/lib/store";
+import { parseMarkdownFile } from "../../src/lib/markdown-sections";
 
 // commit_patch goes through the local-fs vault client (no GITHUB_BOOKS_PAT
 // in the test env). We point BOOKS_DIR at a fresh tempdir cloned from
@@ -64,6 +65,34 @@ describe("getBook", () => {
 });
 
 describe("commitPatch — frontmatter changes via local-fs vault client", () => {
+  it("persists a structured pullquote and updates the store before reindexing", async () => {
+    const store = new MemoryStore();
+    setStore(store);
+    await reindex(store);
+    const pullquote = { text: "A favourite line.", source: "Chapter 3" };
+
+    await commitPatch({
+      slug: "TestBook",
+      frontmatter_changes: { pullquote },
+      commit_message: "Set quote",
+    });
+
+    const onDisk = readFileSync(path.join(workingVault, "TestBook", "TestBook.md"), "utf8");
+    expect(parseMarkdownFile(onDisk).frontmatter.pullquote).toEqual(pullquote);
+    expect((await getBook({ slug: "TestBook" }))?.frontmatter.pullquote).toEqual(pullquote);
+
+    await commitPatch({
+      slug: "TestBook",
+      frontmatter_changes: { pullquote: null },
+      commit_message: "Remove quote",
+    });
+    expect((await getBook({ slug: "TestBook" }))?.frontmatter.pullquote).toBeNull();
+    expect(
+      parseMarkdownFile(readFileSync(path.join(workingVault, "TestBook", "TestBook.md"), "utf8"))
+        .frontmatter,
+    ).not.toHaveProperty("pullquote");
+  });
+
   it("updates a frontmatter scalar and writes the file back to disk", async () => {
     const store = new MemoryStore();
     setStore(store);

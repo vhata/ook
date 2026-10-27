@@ -57,7 +57,7 @@ Validated server-side against strict schema:
 ```ts
 {
   slug: string,
-  frontmatter_changes?: Record<string, string | number | boolean | string[] | null>, // null = delete
+  frontmatter_changes?: Record<string, string | number | boolean | string[] | null | { text: string, source?: string | null }>, // null = delete; objects only for pullquote
   section_changes?: Record<string, {
     action: "replace" | "append" | "prepend",
     content: string,
@@ -65,6 +65,8 @@ Validated server-side against strict schema:
   commit_message: string,
 }
 ```
+
+Only `pullquote` accepts a structured value: `{ text, source }`, with nonblank text and an optional string/null source. Legacy nonblank string input for this field is normalized to `{ text, source: null }` on write; a missing source also becomes null. All other keys retain scalar/list/null inputs. Null deletes the entire field.
 
 Server fetches current file, applies changes, validates the _result_ against the Book type from `src/lib/types.ts`, commits via Octokit, updates KV optimistically. The original user free-text input is included in the commit message body for audit.
 

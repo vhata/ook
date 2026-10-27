@@ -12,6 +12,8 @@ The home page shows what I'm reading now, what I just finished, and the year's r
 
 The recent-finish grid shows up to six books across years. Its “since January” count covers all finishes in the displayed year, up to the chosen date when using the time-machine view.
 
+The owner’s admin console and MCP tools save a headline quote with its text and optional chapter/page source. These pullquotes use the same format as the public book pages.
+
 If you're a reader, you might find some of the shapes interesting. If you're a developer, the technical story is in `ARCHITECTURE.md` and the per-feature history is in `FEATURES.md`.
 
 ## What you'll see

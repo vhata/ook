@@ -28,9 +28,44 @@ export const frontmatterScalarSchema = z.union([
 ]);
 export type FrontmatterScalar = z.infer<typeof frontmatterScalarSchema>;
 
+export const pullquoteSchema = z
+  .object({
+    text: z.string().refine((text) => text.trim().length > 0, "Pullquote text must not be blank"),
+    source: z.string().nullable().optional(),
+  })
+  .strict();
+
+const frontmatterValueSchema = z.union([frontmatterScalarSchema, pullquoteSchema]);
+export type FrontmatterValue = z.infer<typeof frontmatterValueSchema>;
+
+export const frontmatterChangesSchema = z
+  .record(z.string(), frontmatterValueSchema)
+  .superRefine((changes, ctx) => {
+    for (const [key, value] of Object.entries(changes)) {
+      if (key === "pullquote") {
+        const valid =
+          value === null ||
+          (typeof value === "string" && value.trim().length > 0) ||
+          pullquoteSchema.safeParse(value).success;
+        if (!valid)
+          ctx.addIssue({
+            code: "custom",
+            path: [key],
+            message: "Pullquote must be {text, source}, a nonblank legacy string, or null",
+          });
+      } else if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [key],
+          message: "Structured values are only supported for pullquote",
+        });
+      }
+    }
+  });
+
 export const commitPatchInputSchema = z.object({
   slug: z.string().min(1),
-  frontmatter_changes: z.record(z.string(), frontmatterScalarSchema).optional(),
+  frontmatter_changes: frontmatterChangesSchema.optional(),
   section_changes: z.record(z.string(), sectionChangeSchema).optional(),
   commit_message: z.string().min(1),
 });
@@ -49,15 +84,25 @@ export type ApplyPatchResult = {
 export function applyPatch(
   rawBefore: string,
   changes: {
-    frontmatter_changes?: Record<string, FrontmatterScalar>;
+    frontmatter_changes?: Record<string, FrontmatterValue>;
     section_changes?: Record<string, SectionChange>;
   },
 ): ApplyPatchResult {
   const parsed = parseMarkdownFile(rawBefore);
+  const frontmatterChanges = changes.frontmatter_changes
+    ? frontmatterChangesSchema.parse(changes.frontmatter_changes)
+    : undefined;
+  // Older clients sent a plain quote string. Preserve that input contract,
+  // but always write the object shape consumed by the public reader.
+  if (frontmatterChanges?.pullquote !== undefined && frontmatterChanges.pullquote !== null) {
+    const quote = frontmatterChanges.pullquote;
+    const structured = typeof quote === "string" ? { text: quote } : pullquoteSchema.parse(quote);
+    frontmatterChanges.pullquote = { ...structured, source: structured.source ?? null };
+  }
 
   const changedFrontmatter: ApplyPatchResult["changedFrontmatter"] = [];
-  if (changes.frontmatter_changes) {
-    for (const [key, value] of Object.entries(changes.frontmatter_changes)) {
+  if (frontmatterChanges) {
+    for (const [key, value] of Object.entries(frontmatterChanges)) {
       const before = parsed.frontmatter[key];
       if (value === null) {
         if (key in parsed.frontmatter) {
@@ -122,10 +167,7 @@ export function applyPatch(
   // logic.
   let after: string;
   if (changedFrontmatter.length > 0) {
-    const updatedRaw = applyFrontmatterSurgically(
-      parsed.frontmatterRaw,
-      changes.frontmatter_changes ?? {},
-    );
+    const updatedRaw = applyFrontmatterSurgically(parsed.frontmatterRaw, frontmatterChanges ?? {});
     const fm = updatedRaw.endsWith("\n") ? updatedRaw : `${updatedRaw}\n`;
     const body = serialiseBody(parsed);
     after = `---\n${fm}---\n\n${body}`;
@@ -157,7 +199,7 @@ export function applyPatch(
 // path will fall through to a full re-emit and we lose the fidelity gain.
 export function applyFrontmatterSurgically(
   raw: string,
-  changes: Record<string, FrontmatterScalar>,
+  changes: Record<string, FrontmatterValue>,
 ): string {
   // gray-matter's `matter` block ends with the closing `---`; what we
   // get here is just the YAML between the delimiters, possibly with a
@@ -205,7 +247,7 @@ function findKeyBlockRange(lines: string[], key: string): [number, number] | nul
   return [start, end];
 }
 
-function formatKeyLine(key: string, value: FrontmatterScalar): string {
+function formatKeyLine(key: string, value: FrontmatterValue): string {
   if (typeof value === "string") {
     return `${key}: ${quoteIfNeeded(value)}`;
   }
@@ -215,7 +257,7 @@ function formatKeyLine(key: string, value: FrontmatterScalar): string {
   if (Array.isArray(value)) {
     return `${key}: [${value.map(quoteIfNeeded).join(", ")}]`;
   }
-  // Defensive — schema rejects this, but keep the type-checker happy.
+  // JSON flow mappings are valid YAML and preserve multiline quote text.
   return `${key}: ${JSON.stringify(value)}`;
 }
 
@@ -239,6 +281,23 @@ function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((x, i) => deepEqual(x, b[i]));
+  }
+  if (
+    a !== null &&
+    b !== null &&
+    typeof a === "object" &&
+    typeof b === "object" &&
+    !Array.isArray(a) &&
+    !Array.isArray(b)
+  ) {
+    const left = a as Record<string, unknown>;
+    const right = b as Record<string, unknown>;
+    return (
+      Object.keys(left).length === Object.keys(right).length &&
+      Object.keys(left).every(
+        (key) => Object.hasOwn(right, key) && deepEqual(left[key], right[key]),
+      )
+    );
   }
   return false;
 }

@@ -7,6 +7,7 @@ Legend: ✓ shipped · ⋯ in progress
 ## Reading-data corrections
 
 - ✓ Home's “since January” count includes every finish in the displayed year, independently of the six-card recent grid, and respects the time-machine cutoff.
+- ✓ Admin and MCP pullquote patches accept `{ text, source }`, matching the reader and backfill cards. An omitted source becomes null; legacy string inputs are saved in the structured format. Null removes the quote, and optimistic store reads reflect updates and removals immediately. Other frontmatter fields retain scalar/list/null inputs; malformed objects are rejected before writing.
 
 ## Milestone — initial work
 

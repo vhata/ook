@@ -80,13 +80,69 @@ describe("applyPatch — frontmatter changes", () => {
     const parsed = parseMarkdownFile(result.after);
     expect(parsed.frontmatter.status).toBe("finished");
     expect(parsed.frontmatter.rating).toBe(5);
-    expect(parsed.frontmatter.pullquote).toBe("A man lives in a house of statues.");
+    expect(parsed.frontmatter.pullquote).toEqual({
+      text: "A man lives in a house of statues.",
+      source: null,
+    });
     expect(parsed.frontmatter.finished).toBe("2026-05-09");
     // Every key shows up in the changedFrontmatter audit so the diff
     // preview can render them. status moved from reading → finished;
     // rating was null and is now 5; pullquote + finished are brand-new.
     const changedKeys = result.changedFrontmatter.map((c) => c.key).sort();
     expect(changedKeys).toEqual(["finished", "pullquote", "rating", "status"]);
+  });
+});
+
+describe("applyPatch — structured pullquotes", () => {
+  const withQuote = SAMPLE.replace(
+    "rating: null",
+    'pullquote:\n  text: "Original quote."\n  source: "Chapter 1"\nrating: null',
+  );
+
+  it("replaces a block quote without changing unrelated metadata or body", () => {
+    const quote = { text: 'A line: "quoted".\nAnother line \\ back.', source: "Page 42" };
+    const result = applyPatch(withQuote, { frontmatter_changes: { pullquote: quote } });
+    const parsed = parseMarkdownFile(result.after);
+    expect(parsed.frontmatter.pullquote).toEqual(quote);
+    expect(result.after).toContain('progress: "Chapter 3"');
+    expect(result.after).toContain("rating: null\ntags: [scifi]");
+    expect(parsed.sections.map((section) => section.content.trim())).toEqual(
+      parseMarkdownFile(SAMPLE).sections.map((section) => section.content.trim()),
+    );
+    expect(result.changedFrontmatter).toEqual([
+      {
+        key: "pullquote",
+        before: { text: "Original quote.", source: "Chapter 1" },
+        after: quote,
+      },
+    ]);
+  });
+
+  it("normalizes an omitted source without mutating the input", () => {
+    const changes = { pullquote: { text: "A favourite line." } };
+    const result = applyPatch(SAMPLE, { frontmatter_changes: changes });
+    expect(parseMarkdownFile(result.after).frontmatter.pullquote).toEqual({
+      text: "A favourite line.",
+      source: null,
+    });
+    expect(changes.pullquote).toEqual({ text: "A favourite line." });
+  });
+
+  it("preserves identical structured quote metadata byte-for-byte", () => {
+    const result = applyPatch(withQuote, {
+      frontmatter_changes: { pullquote: { text: "Original quote.", source: "Chapter 1" } },
+    });
+    expect(result.changedFrontmatter).toEqual([]);
+    expect(parseMarkdownFile(result.after).frontmatterRaw).toBe(
+      parseMarkdownFile(withQuote).frontmatterRaw,
+    );
+  });
+
+  it("removes the whole quote mapping when passed null", () => {
+    const result = applyPatch(withQuote, { frontmatter_changes: { pullquote: null } });
+    expect(parseMarkdownFile(result.after).frontmatter).toEqual(
+      parseMarkdownFile(SAMPLE).frontmatter,
+    );
   });
 });
 
@@ -237,6 +293,69 @@ describe("applyPatch — section changes", () => {
 });
 
 describe("commitPatchInputSchema", () => {
+  it.each([
+    { text: "A line.", source: "Chapter 3" },
+    { text: "A line.", source: null },
+    { text: "A line." },
+    "Legacy quote.",
+    null,
+  ])("accepts a supported pullquote value: %j", (pullquote) => {
+    expect(
+      commitPatchInputSchema.safeParse({
+        slug: "TestBook",
+        frontmatter_changes: { pullquote },
+        commit_message: "Set quote",
+      }).success,
+    ).toBe(true);
+  });
+
+  it.each([
+    { text: "A line.", source: 3 },
+    { text: "A line.", source: { page: 3 } },
+    { text: "A line.", extra: "unexpected" },
+    { source: "Chapter 3" },
+    { text: "" },
+    { text: "  \n " },
+    " ",
+    3,
+    true,
+    ["A line."],
+  ])("rejects malformed pullquotes: %j", (pullquote) => {
+    expect(
+      commitPatchInputSchema.safeParse({
+        slug: "TestBook",
+        frontmatter_changes: { pullquote },
+        commit_message: "Set quote",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects objects for other fields while retaining scalar and list values", () => {
+    expect(
+      commitPatchInputSchema.safeParse({
+        slug: "TestBook",
+        frontmatter_changes: { title: { text: "Wrong shape" } },
+        commit_message: "x",
+      }).success,
+    ).toBe(false);
+    expect(() =>
+      applyPatch(SAMPLE, { frontmatter_changes: { title: { text: "Wrong shape" } } }),
+    ).toThrow();
+    expect(
+      commitPatchInputSchema.safeParse({
+        slug: "TestBook",
+        frontmatter_changes: {
+          title: "Title",
+          rating: 4.5,
+          would_reread: true,
+          tags: ["scifi"],
+          cover: null,
+        },
+        commit_message: "x",
+      }).success,
+    ).toBe(true);
+  });
+
   it("accepts a well-formed patch", () => {
     const valid = {
       slug: "TestBook",

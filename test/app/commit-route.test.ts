@@ -82,3 +82,32 @@ describe("/api/admin/agent/commit — append-bullet acceptance", () => {
     expect(batchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("/api/admin/agent/commit — pullquote contract", () => {
+  it.each([{ text: "A line.", source: "Chapter 2" }, { text: "A line." }])(
+    "accepts the backfill card's structured quote: %j",
+    async (pullquote) => {
+      commitMock.mockResolvedValueOnce({ ok: true });
+      const patch = {
+        slug: "TestBook",
+        frontmatter_changes: { pullquote },
+        commit_message: "Set quote",
+      };
+      const res = await POST(makeRequest(patch));
+      expect(res.status).toBe(200);
+      expect(commitMock).toHaveBeenCalledWith(patch);
+    },
+  );
+
+  it.each([{ pullquote: { text: "A line.", source: 5 } }, { title: { text: "Wrong shape" } }])(
+    "rejects invalid structured changes before writing: %j",
+    async (frontmatter_changes) => {
+      const res = await POST(
+        makeRequest({ slug: "TestBook", frontmatter_changes, commit_message: "x" }),
+      );
+      expect(res.status).toBe(400);
+      expect(commitMock).not.toHaveBeenCalled();
+      expect(batchMock).not.toHaveBeenCalled();
+    },
+  );
+});
