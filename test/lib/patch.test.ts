@@ -99,6 +99,33 @@ describe("applyPatch — structured pullquotes", () => {
     'pullquote:\n  text: "Original quote."\n  source: "Chapter 1"\nrating: null',
   );
 
+  describe.each(["", "    "])("multiline quote with paragraph separator %j", (blank) => {
+    const source = SAMPLE.replace(
+      "rating: null",
+      `# Before quote\npullquote:\n  text: |-\n    First paragraph.\n${blank}\n    Second paragraph.\n  source: Chapter 1\n\n# Keep rating comment\nrating: null`,
+    );
+
+    it.each([{ text: "Replacement.", source: null }, null])(
+      "handles replacement/removal %j without orphaned lines",
+      (pullquote) => {
+        const result = applyPatch(source, { frontmatter_changes: { pullquote } });
+        const parsed = parseMarkdownFile(result.after);
+        const expected = parseMarkdownFile(SAMPLE).frontmatter;
+        if (pullquote) expected.pullquote = pullquote;
+        expect(parsed.frontmatter).toEqual(expected);
+        expect(parsed.frontmatterRaw).toContain("# Before quote\n");
+        expect(parsed.frontmatterRaw).toContain(
+          "\n\n# Keep rating comment\nrating: null\ntags: [scifi]",
+        );
+        expect(parsed.frontmatterRaw).not.toContain("paragraph.");
+        expect(parsed.frontmatterRaw).not.toContain("Chapter 1");
+        expect(parsed.sections.map((section) => section.content.trim())).toEqual(
+          parseMarkdownFile(SAMPLE).sections.map((section) => section.content.trim()),
+        );
+      },
+    );
+  });
+
   it("replaces a block quote without changing unrelated metadata or body", () => {
     const quote = { text: 'A line: "quoted".\nAnother line \\ back.', source: "Page 42" };
     const result = applyPatch(withQuote, { frontmatter_changes: { pullquote: quote } });

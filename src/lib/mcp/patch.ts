@@ -234,15 +234,18 @@ export function applyFrontmatterSurgically(
 
 // Returns [startLine, endLine] inclusive, or null if the key isn't
 // present at column zero. The block extends through any indented
-// continuation lines (block-style nested maps or lists).
+// continuation lines (block-style nested maps or lists), including
+// blank lines between them. Trailing separators remain outside it.
 function findKeyBlockRange(lines: string[], key: string): [number, number] | null {
   const escaped = key.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
   const startRe = new RegExp(`^${escaped}\\s*:`);
   const start = lines.findIndex((l) => startRe.test(l));
   if (start < 0) return null;
   let end = start;
-  while (end + 1 < lines.length && lines[end + 1].length > 0 && /^\s/.test(lines[end + 1])) {
-    end++;
+  for (let next = start + 1; next < lines.length; next++) {
+    if (lines[next].trim() === "") continue;
+    if (!/^\s/.test(lines[next])) break;
+    end = next;
   }
   return [start, end];
 }
