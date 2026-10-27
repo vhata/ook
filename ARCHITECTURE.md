@@ -12,6 +12,8 @@ Corpus size as of May 2026 is ~230 books after a Goodreads bulk-import. To keep 
 
 Set `BOOKS_DIR` in `.env.local` to the absolute path of a books vault (see `.env.example` for the full set of optional env vars). `make install` for dependencies, `make dev` to start the dev server. `make` with no target lists every workflow. Dev mode walks the vault on each request rather than reading the build-time `_index.json` — slower but means changes to vault files appear without a rebuild.
 
+`make check` runs formatting, linting, type checks, and Vitest. Ook's test suites live under `test/`; discovery is restricted to that directory so tests in a linked vault or agent worktree are left to their own repositories.
+
 ## Tech stack
 
 - Language: TypeScript

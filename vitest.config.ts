@@ -12,9 +12,10 @@ export default defineConfig({
     },
   },
   test: {
-    // Don't pick up duplicate test files from agent worktrees that the
-    // Claude Code harness creates under `.claude/worktrees/`. Vitest's
-    // default include glob is repo-wide and doesn't honour `.gitignore`.
+    // The vault and agent worktrees can contain their own test suites.
+    // Keep discovery inside ook's test directory; Vitest follows vault
+    // symlinks and its repo-wide default doesn't honour `.gitignore`.
+    include: ["test/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
     exclude: ["**/node_modules/**", "**/dist/**", "**/.next/**", ".claude/**"],
   },
 });
