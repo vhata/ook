@@ -4,6 +4,10 @@ Feature ledger. Grouped by milestone. One line per entry. Plain language.
 
 Legend: ✓ shipped · ⋯ in progress
 
+## Reading-data corrections
+
+- ✓ Home's “since January” count includes every finish in the displayed year, independently of the six-card recent grid, and respects the time-machine cutoff.
+
 ## Milestone — initial work
 
 - ✓ Home page renders Currently Reading, Recently Finished, and the 2026 Bingo grid from the local vault path.

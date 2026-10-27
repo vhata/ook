@@ -10,6 +10,8 @@ A personal website for one reader, rendered from their notes.
 
 The home page shows what I'm reading now, what I just finished, and the year's reading bingo card. Every book gets its own page with whatever I've written about it. There's also a reading log going back years, charts of rating drift over time, a shelf view of every finished book as a vertical bookspine, a printable bibliography per year, a random-book button, "remember this?" cards, and an "on this day" strip when something matches today's date in a previous year.
 
+The recent-finish grid shows up to six books across years. Its “since January” count covers all finishes in the displayed year, up to the chosen date when using the time-machine view.
+
 If you're a reader, you might find some of the shapes interesting. If you're a developer, the technical story is in `ARCHITECTURE.md` and the per-feature history is in `FEATURES.md`.
 
 ## What you'll see

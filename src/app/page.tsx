@@ -48,6 +48,11 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   // a reading-pace ETA on Currently-Reading cards. The lens path also
   // needs the corpus, so load both unconditionally and reuse below.
   const [all, hardcover] = await Promise.all([getAllBooks(), loadHardcoverBooks()]);
+  // The recent grid is capped at six and can include earlier years.
+  // Count the full year's finishes separately, respecting the lens cutoff.
+  const finishedThisYear = (
+    lens ? finishedAt(all, lens.at) : all.filter((b) => b.status === "finished")
+  ).filter((b) => b.finished?.startsWith(`${journalYear}-`)).length;
 
   if (lens) {
     reading = readingAt(all, lens.at);
@@ -110,7 +115,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
         right={
           finished.length > 0 ? (
             <span className="text-ink-soft text-[11px] tracking-[0.14em] uppercase">
-              {finished.length} since January
+              {finishedThisYear} since January
             </span>
           ) : undefined
         }
